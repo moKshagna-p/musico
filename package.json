@@ -7,10 +7,14 @@
     "dev": "vite",
     "build": "vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "server": "bun run server/index.ts",
+    "server:dev": "bun run --watch server/index.ts"
   },
   "dependencies": {
+    "@elysiajs/cors": "^1.4.1",
     "axios": "^1.13.4",
+    "elysia": "^1.4.22",
     "framer-motion": "^12.31.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
@@ -20,6 +24,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",
+    "@types/node": "^25.2.1",
     "@types/react": "^19.2.5",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^5.1.1",

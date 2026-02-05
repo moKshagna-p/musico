@@ -46,7 +46,7 @@ const Discover = () => {
           <h1 className="font-display text-4xl">Dig through the vault</h1>
         </div>
 
-        <SearchBar query="" onSearch={handleSearch} placeholder="Search artists or albums..." />
+        <SearchBar query="" onSearch={handleSearch} placeholder="Search artists or albums..." enablePredictive />
 
         <div>
           <p className="mb-4 text-xs uppercase tracking-[0.4em] text-muted">Featured Releases</p>

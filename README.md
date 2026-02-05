@@ -1,16 +1,32 @@
-# React + Vite
+# MuseVault
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+React + Vite frontend for browsing and rating Discogs releases paired with a Bun/Elysia proxy that caches calls for an hour and rate-limits abusive clients.
 
-Currently, two official plugins are available:
+## Requirements
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+- Node.js 18+ for the Vite app.
+- [Bun](https://bun.sh) 1.0+ for the Elysia backend.
 
-## React Compiler
+## Setup
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+1. `npm install`
+2. Copy `.env.example` to `.env` (or export the variables another way) and fill in:
+   - `VITE_API_BASE_URL` – origin of the Elysia server (defaults to `http://localhost:4000`).
+   - `PORT`, `ALLOWED_ORIGIN` (e.g. `http://localhost:5173` for the Vite dev server), and `DISCOGS_TOKEN` (your Discogs personal access token). Key/secret auth is optional—only add `DISCOGS_KEY`/`DISCOGS_SECRET` if you already have them.
+3. Start the backend: `npm run server:dev`
+4. In another terminal start the frontend: `npm run dev`
 
-## Expanding the ESLint configuration
+## Available Scripts
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+- `npm run dev` – Vite dev server.
+- `npm run build` – production build.
+- `npm run preview` – preview the production build locally.
+- `npm run lint` – lint the project.
+- `npm run server` – start the Bun/Elysia proxy once.
+- `npm run server:dev` – start the proxy in watch mode for development.
+
+## Backend behavior
+
+- Proxies Discogs search/release endpoints while normalizing the payload for the UI.
+- Caches featured lists, search results, and release details for 1 hour, so repeat queries (e.g., “Beatles”) return instantly without additional Discogs calls.
+- Applies IP-based abuse protection (100 requests/hour) and returns `429` with `Retry-After` headers when exceeded.
