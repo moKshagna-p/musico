@@ -1,31 +1,41 @@
-import { useEffect } from 'react'
-import { useNavigate, useSearchParams } from 'react-router-dom'
+import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 
 import AlbumGrid from '../components/AlbumGrid.jsx'
 import PageTransition from '../components/PageTransition.jsx'
 import SearchBar from '../components/SearchBar.jsx'
-import { useAlbums } from '../hooks/useAlbums.js'
+import { getFeaturedReleases } from '../services/discogsService.js'
 
 const Discover = () => {
   const navigate = useNavigate()
-  const [searchParams, setSearchParams] = useSearchParams()
-  const initialQuery = searchParams.get('query') ?? ''
-
-  const { albums, query, setQuery, loading, error } = useAlbums(initialQuery)
+  const [albums, setAlbums] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
 
   useEffect(() => {
-    setQuery(initialQuery)
-  }, [initialQuery, setQuery])
-
-  const updateQuery = (value) => {
-    setQuery(value)
-    const params = new URLSearchParams(searchParams)
-    if (value) {
-      params.set('query', value)
-    } else {
-      params.delete('query')
+    const loadFeatured = async () => {
+      setLoading(true)
+      setError(null)
+      try {
+        const releases = await getFeaturedReleases(24)
+        setAlbums(releases)
+      } catch (err) {
+        setError(err?.message ?? 'Unable to load featured releases.')
+      } finally {
+        setLoading(false)
+      }
     }
-    setSearchParams(params, { replace: true })
+    loadFeatured()
+  }, [])
+
+  const handleSearch = (value) => {
+    if (value?.trim()) {
+      navigate(`/search?q=${encodeURIComponent(value)}`)
+    }
+  }
+
+  const handleAlbumSelect = (id) => {
+    navigate(`/album/${id}`, { state: { from: '/discover', query: '' } })
   }
 
   return (
@@ -36,9 +46,12 @@ const Discover = () => {
           <h1 className="font-display text-4xl">Dig through the vault</h1>
         </div>
 
-        <SearchBar query={query} onSearch={updateQuery} />
+        <SearchBar query="" onSearch={handleSearch} placeholder="Search artists or albums..." />
 
-        <AlbumGrid albums={albums} loading={loading} error={error} onSelect={(id) => navigate(`/album/${id}`)} />
+        <div>
+          <p className="mb-4 text-xs uppercase tracking-[0.4em] text-muted">Featured Releases</p>
+          <AlbumGrid albums={albums} loading={loading} error={error} onSelect={handleAlbumSelect} />
+        </div>
       </div>
     </PageTransition>
   )

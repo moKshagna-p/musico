@@ -3,7 +3,7 @@ import { FiSearch } from 'react-icons/fi'
 
 const trendingQueries = ['Cosmic Soul', 'Modular Jazz', 'Berlin Club', 'Alt-R&B', 'Ambient Strings']
 
-const SearchBar = ({ query = '', onSearch }) => {
+const SearchBar = ({ query = '', onSearch, placeholder, autoFocus }) => {
   const [value, setValue] = useState(query)
 
   useEffect(() => {
@@ -22,7 +22,8 @@ const SearchBar = ({ query = '', onSearch }) => {
         <input
           value={value}
           onChange={(event) => setValue(event.target.value)}
-          placeholder="Search albums or artists"
+          placeholder={placeholder ?? "Search albums or artists"}
+          autoFocus={autoFocus}
           className="flex-1 bg-transparent text-lg text-white placeholder:text-muted focus:outline-none"
         />
         <button type="submit" className="text-xs uppercase tracking-[0.4em] text-muted hover:text-white">

@@ -7,6 +7,7 @@ import AlbumDetails from './pages/AlbumDetails.jsx'
 import Discover from './pages/Discover.jsx'
 import Home from './pages/Home.jsx'
 import NotFound from './pages/NotFound.jsx'
+import SearchResults from './pages/SearchResults.jsx'
 
 const App = () => {
   const location = useLocation()
@@ -18,6 +19,7 @@ const App = () => {
         <Routes location={location} key={location.pathname}>
           <Route path="/" element={<Home />} />
           <Route path="/discover" element={<Discover />} />
+          <Route path="/search" element={<SearchResults />} />
           <Route path="/album/:albumId" element={<AlbumDetails />} />
           <Route path="*" element={<NotFound />} />
         </Routes>

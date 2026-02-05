@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { FiArrowLeft, FiClock } from 'react-icons/fi'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useLocation, useNavigate, useParams } from 'react-router-dom'
 
 import PageTransition from '../components/PageTransition.jsx'
 import RatingStars from '../components/RatingStars.jsx'
@@ -11,6 +11,7 @@ import { formatDuration, formatLargeNumber, generateStreamingLinks } from '../ut
 
 const AlbumDetails = () => {
   const navigate = useNavigate()
+  const location = useLocation()
   const { albumId } = useParams()
   const { rateAlbum, getUserRating, getCommunityStats } = useRatings()
 
@@ -43,9 +44,15 @@ const AlbumDetails = () => {
   const community = album ? getCommunityStats(album) : { average: 0, total: 0 }
 
   const goBack = () => {
-    const referrer = document.referrer
-    if (referrer.includes('/discover')) {
-      navigate(-1)
+    const from = location.state?.from
+    const query = location.state?.query
+    
+    if (from === '/search' && query) {
+      navigate(`/search?q=${encodeURIComponent(query)}`)
+    } else if (from === '/discover') {
+      navigate('/discover')
+    } else if (from === '/') {
+      navigate('/')
     } else {
       navigate('/discover')
     }
