@@ -16,23 +16,33 @@ const HEADERS = {
 }
 
 const convertDurationToMs = (duration) => {
-  if (!duration || typeof duration !== 'string') return 0
-  const cleaned = duration.trim()
-  const colonValue = cleaned.includes(':') ? cleaned : cleaned.replace('.', ':')
-
-  if (colonValue.includes(':')) {
-    const [minPart, secPart] = colonValue.split(':')
-    const minutes = Number(minPart.replace(/[^\d]/g, ''))
-    const seconds = Number(secPart.replace(/[^\d]/g, '').slice(0, 2))
-    if (Number.isNaN(minutes) || Number.isNaN(seconds)) return 0
-    return minutes * 60000 + seconds * 1000
+  if (!duration) return 0
+  
+  // Convert to string and clean
+  const cleaned = String(duration).trim()
+  if (!cleaned) return 0
+  
+  // Handle format with colon (MM:SS or M:SS)
+  if (cleaned.includes(':')) {
+    const parts = cleaned.split(':')
+    if (parts.length >= 2) {
+      const minutes = parseInt(parts[0], 10) || 0
+      const seconds = parseInt(parts[1], 10) || 0
+      return minutes * 60000 + seconds * 1000
+    }
   }
-
-  const numeric = Number(cleaned.replace(/[^\d.]/g, ''))
-  if (!Number.isNaN(numeric)) {
-    return Math.round(numeric * 60000)
+  
+  // Handle numeric format (seconds as number)
+  const numericValue = parseFloat(cleaned)
+  if (!Number.isNaN(numericValue)) {
+    // If it's a small number, assume it's minutes
+    if (numericValue < 100) {
+      return Math.round(numericValue * 60000)
+    }
+    // Otherwise assume it's already in milliseconds or seconds
+    return Math.round(numericValue < 10000 ? numericValue * 1000 : numericValue)
   }
-
+  
   return 0
 }
 
@@ -190,7 +200,6 @@ export const searchReleases = async (query) => {
 
   const response = await requestDiscogs('/database/search', {
     q: trimmed,
-    artist: trimmed,
     type: 'release',
     per_page: 30,
   })

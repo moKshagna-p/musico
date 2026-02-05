@@ -42,6 +42,15 @@ const AlbumDetails = () => {
   const userRating = getUserRating(album?.id ?? '')
   const community = album ? getCommunityStats(album) : { average: 0, total: 0 }
 
+  const goBack = () => {
+    const referrer = document.referrer
+    if (referrer.includes('/discover')) {
+      navigate(-1)
+    } else {
+      navigate('/discover')
+    }
+  }
+
   if (loading) {
     return (
       <PageTransition>
@@ -67,7 +76,7 @@ const AlbumDetails = () => {
           <p className="font-semibold">{error}</p>
           <button
             type="button"
-            onClick={() => navigate(-1)}
+            onClick={goBack}
             className="mt-4 rounded-full border border-red-200/30 px-4 py-2 text-xs uppercase tracking-[0.3em]"
           >
             Go Back
@@ -83,7 +92,7 @@ const AlbumDetails = () => {
     <PageTransition>
       <button
         type="button"
-        onClick={() => navigate(-1)}
+        onClick={goBack}
         className="mb-6 inline-flex items-center gap-2 text-xs uppercase tracking-[0.4em] text-muted hover:text-white"
       >
         <FiArrowLeft /> Back

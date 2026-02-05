@@ -14,8 +14,8 @@ const App = () => {
   return (
     <div className="min-h-screen bg-canvas text-white">
       <Navigation />
-      <AnimatePresence mode="wait">
-        <Routes location={location} key={location.pathname + location.search}>
+      <AnimatePresence mode="wait" initial={false}>
+        <Routes location={location} key={location.pathname}>
           <Route path="/" element={<Home />} />
           <Route path="/discover" element={<Discover />} />
           <Route path="/album/:albumId" element={<AlbumDetails />} />
