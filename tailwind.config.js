@@ -26,11 +26,16 @@ export default {
       },
       animation: {
         shimmer: 'shimmer 1.8s ease-in-out infinite',
+        vinylSpin: 'vinylSpin 6s linear infinite',
       },
       keyframes: {
         shimmer: {
           '0%': { backgroundPosition: '-700px 0' },
           '100%': { backgroundPosition: '700px 0' },
+        },
+        vinylSpin: {
+          '0%': { transform: 'rotate(0deg)' },
+          '100%': { transform: 'rotate(360deg)' },
         },
       },
     },

@@ -13,17 +13,19 @@ const App = () => {
   const location = useLocation()
 
   return (
-    <div className="min-h-screen bg-canvas text-white">
+    <div className="flex min-h-screen flex-col bg-canvas text-white">
       <Navigation />
-      <AnimatePresence mode="wait" initial={false}>
-        <Routes location={location} key={location.pathname}>
-          <Route path="/" element={<Home />} />
-          <Route path="/discover" element={<Discover />} />
-          <Route path="/search" element={<SearchResults />} />
-          <Route path="/album/:albumId" element={<AlbumDetails />} />
-          <Route path="*" element={<NotFound />} />
-        </Routes>
-      </AnimatePresence>
+      <main className="flex-1">
+        <AnimatePresence mode="wait" initial={false}>
+          <Routes location={location} key={location.pathname}>
+            <Route path="/" element={<Home />} />
+            <Route path="/discover" element={<Discover />} />
+            <Route path="/search" element={<SearchResults />} />
+            <Route path="/album/:albumId" element={<AlbumDetails />} />
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </AnimatePresence>
+      </main>
       <Footer />
     </div>
   )
