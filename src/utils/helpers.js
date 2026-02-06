@@ -8,42 +8,18 @@ export const formatDuration = (ms) => {
 }
 
 export const formatReleaseDate = (date, releaseYear) => {
+  if (releaseYear) return String(releaseYear)
   if (typeof date === 'string') {
     const trimmed = date.trim()
-    if (/^\d{4}$/.test(trimmed)) return trimmed
-    if (/^\d{4}-\d{2}$/.test(trimmed)) {
-      const parsedMonth = new Date(`${trimmed}-01`)
-      if (!Number.isNaN(parsedMonth.getTime())) {
-        const monthFormatter = new Intl.DateTimeFormat('en', {
-          year: 'numeric',
-          month: 'short',
-        })
-        return monthFormatter.format(parsedMonth)
-      }
-      return trimmed
-    }
-    if (trimmed) {
-      const parsed = new Date(trimmed)
-      if (!Number.isNaN(parsed.getTime())) {
-        const formatter = new Intl.DateTimeFormat('en', {
-          year: 'numeric',
-          month: 'short',
-          day: 'numeric',
-        })
-        return formatter.format(parsed)
-      }
-    }
+    const yearMatch = trimmed.match(/\b(19|20)\d{2}\b/)
+    if (yearMatch) return yearMatch[0]
+    const parsed = new Date(trimmed)
+    if (!Number.isNaN(parsed.getTime())) return String(parsed.getFullYear())
   }
-  if (releaseYear) return String(releaseYear)
-  if (!date) return 'Unknown'
-  const formatter = new Intl.DateTimeFormat('en', {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-  })
-  const parsed = new Date(date)
-  if (Number.isNaN(parsed.getTime())) return 'Unknown'
-  return formatter.format(parsed)
+  if (typeof date === 'number' && Number.isFinite(date)) {
+    return String(date)
+  }
+  return 'Unknown'
 }
 
 export const generateStreamingLinks = (album) => {

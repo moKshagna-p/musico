@@ -120,7 +120,7 @@ const AlbumDetails = () => {
             <h1 className="font-display text-4xl">{album.name}</h1>
             <p className="text-lg text-muted">{album.artists.join(', ')}</p>
             <p className="mt-2 text-xs uppercase tracking-[0.3em] text-muted">
-              Released {formatReleaseDate(album.releaseDate, album.releaseYear)}
+              {formatReleaseDate(album.releaseDate, album.releaseYear)}
             </p>
           </div>
 

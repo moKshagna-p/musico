@@ -10,6 +10,7 @@ const DISCOGS_KEY = env.DISCOGS_KEY
 const DISCOGS_SECRET = env.DISCOGS_SECRET
 
 const CACHE_WINDOW = 1000 * 60 * 60 // 1 hour
+const FEATURED_CACHE_WINDOW = 1000 * 60 * 5 // 5 minutes
 
 const featuredCache: { data: Release[]; timestamp: number } = { data: [], timestamp: 0 }
 const searchCache = new Map<string, { data: Release[]; timestamp: number }>()
@@ -175,7 +176,7 @@ const requestDiscogs = async (endpoint: string, params: Record<string, string | 
   return response.json()
 }
 
-const isFresh = (timestamp: number) => Date.now() - timestamp < CACHE_WINDOW
+const isFresh = (timestamp: number, ttl = CACHE_WINDOW) => Date.now() - timestamp < ttl
 
 const variantMarkers = [
   'deluxe',
@@ -252,14 +253,15 @@ const dedupeReleasedAlbums = (releases: Release[]) => {
   return Array.from(picked.values())
 }
 
-export const getFeaturedReleases = async (limit = 24) => {
-  if (featuredCache.data.length && isFresh(featuredCache.timestamp)) {
+export const getFeaturedReleases = async (limit = 24, forceRefresh = false) => {
+  if (!forceRefresh && featuredCache.data.length && isFresh(featuredCache.timestamp, FEATURED_CACHE_WINDOW)) {
     return featuredCache.data.slice(0, limit)
   }
   const response = await requestDiscogs('/database/search', {
-    per_page: limit,
+    per_page: Math.max(limit * 2, 36),
     type: 'release',
-    sort: 'year',
+    format: 'album',
+    sort: 'have',
     sort_order: 'desc',
   })
   const normalized = (response.results ?? [])

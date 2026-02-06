@@ -1,5 +1,6 @@
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:4000').replace(/\/$/, '')
 const CACHE_WINDOW = 1000 * 60 * 60 // 1 hour
+const FEATURED_CACHE_WINDOW = 1000 * 60 * 5 // 5 minutes
 
 const featuredCache = { timestamp: 0, data: [] }
 const searchCache = new Map()
@@ -28,14 +29,15 @@ const requestBackend = async (path, params = {}) => {
   return response.json()
 }
 
-const isFresh = (timestamp) => Date.now() - timestamp < CACHE_WINDOW
+const isFresh = (timestamp, ttl = CACHE_WINDOW) => Date.now() - timestamp < ttl
 
-export const getFeaturedReleases = async (limit = 24) => {
-  if (featuredCache.data.length && isFresh(featuredCache.timestamp)) {
+export const getFeaturedReleases = async (limit = 24, options = {}) => {
+  const forceRefresh = Boolean(options?.forceRefresh)
+  if (!forceRefresh && featuredCache.data.length && isFresh(featuredCache.timestamp, FEATURED_CACHE_WINDOW)) {
     return featuredCache.data.slice(0, limit)
   }
 
-  const response = await requestBackend('/api/featured', { limit })
+  const response = await requestBackend('/api/featured', { limit, refresh: forceRefresh ? 1 : undefined })
   const data = Array.isArray(response?.data) ? response.data : []
   featuredCache.timestamp = Date.now()
   featuredCache.data = data

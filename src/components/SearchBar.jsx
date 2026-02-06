@@ -194,9 +194,12 @@ const SearchBar = ({ query = '', onSearch, placeholder, autoFocus, enablePredict
         )}
       </div>
 
-      <div className="mt-4">
+      <div className="mt-5 rounded-2xl border border-outline/80 bg-canvas/25 p-4">
         <div className="mb-3 flex items-center justify-between">
-          <p className="text-xs uppercase tracking-[0.4em] text-muted">Recent Searches</p>
+          <p className="text-xs uppercase tracking-[0.34em] text-muted">
+            Recent Searches
+            {recentSearches.length > 0 ? ` (${recentSearches.length})` : ''}
+          </p>
           {recentSearches.length > 0 && (
             <button
               type="button"
@@ -209,11 +212,11 @@ const SearchBar = ({ query = '', onSearch, placeholder, autoFocus, enablePredict
         </div>
 
         {recentSearches.length > 0 ? (
-          <div className="flex flex-wrap gap-3 text-xs uppercase tracking-[0.4em] text-muted">
+          <div className="flex flex-wrap gap-2 text-xs text-muted">
             {recentSearches.map((term) => (
               <div
                 key={term}
-                className="group inline-flex items-center rounded-full border border-outline px-3 py-1 text-[0.6rem]"
+                className="group inline-flex items-center rounded-full border border-outline bg-panel px-3 py-1.5 text-[0.7rem]"
               >
                 <button
                   type="button"
@@ -235,7 +238,10 @@ const SearchBar = ({ query = '', onSearch, placeholder, autoFocus, enablePredict
             ))}
           </div>
         ) : (
-          <p className="text-xs text-muted">No recent searches yet.</p>
+          <div className="rounded-xl border border-dashed border-outline px-4 py-5 text-center">
+            <p className="text-sm text-muted">No recent searches yet.</p>
+            <p className="mt-1 text-xs text-muted/80">Search an artist or album to start building history.</p>
+          </div>
         )}
       </div>
     </div>

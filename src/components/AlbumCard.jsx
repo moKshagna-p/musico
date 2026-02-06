@@ -38,7 +38,7 @@ const AlbumCard = ({ album, onSelect }) => {
         <h3 className="font-display text-xl">{album.name}</h3>
         <p className="text-sm text-muted">{album.artists?.join(', ')}</p>
         <p className="text-xs uppercase tracking-[0.22em] text-muted">
-          Released {formatReleaseDate(album.releaseDate, album.releaseYear)}
+          {formatReleaseDate(album.releaseDate, album.releaseYear)}
         </p>
       </div>
 

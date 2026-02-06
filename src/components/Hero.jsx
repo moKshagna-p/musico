@@ -1,5 +1,4 @@
 import { useMemo } from 'react'
-import { Link } from 'react-router-dom'
 
 const artistQuotes = [
   { quote: 'Music is life itself.', artist: 'Louis Armstrong' },
@@ -22,20 +21,6 @@ const Hero = () => {
         &ldquo;{randomQuote.quote}&rdquo;
       </h1>
       <p className="mt-2 text-sm uppercase tracking-[0.4em] text-muted">— {randomQuote.artist}</p>
-      <div className="mt-6 flex gap-4 text-xs uppercase tracking-[0.4em]">
-        <Link
-          to="/discover"
-          className="rounded-full border border-outline px-6 py-3 text-white transition hover:bg-white/5"
-        >
-          Discover
-        </Link>
-        <Link
-          to="/discover?sort=rating"
-          className="rounded-full border border-outline px-6 py-3 text-muted transition hover:text-white"
-        >
-          Highest Rated
-        </Link>
-      </div>
     </section>
   )
 }

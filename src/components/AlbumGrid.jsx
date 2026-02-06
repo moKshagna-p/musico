@@ -12,8 +12,9 @@ const AlbumGrid = ({ albums = [], loading, error, onSelect }) => {
 
   if (!loading && !albums.length) {
     return (
-      <div className="rounded-3xl border border-outline bg-panel px-6 py-8 text-center text-muted">
-        No albums found.
+      <div className="rounded-3xl border border-outline bg-panel px-6 py-8 text-center">
+        <p className="text-sm uppercase tracking-[0.28em] text-muted">No results found</p>
+        <p className="mt-2 text-sm text-muted">Try a different artist, album title, or broader keyword.</p>
       </div>
     )
   }
