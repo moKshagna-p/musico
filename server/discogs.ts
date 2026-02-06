@@ -82,20 +82,24 @@ const convertDurationToMs = (duration?: string | number | null) => {
   return Math.round(numericValue < 10000 ? numericValue * 1000 : numericValue)
 }
 
+const stripDiscogsDisambiguation = (value = '') => value.replace(/\s*\(\d+\)\s*$/g, '').trim()
+
 const parseArtists = (input: unknown, title = ''): string[] => {
   if (!input) {
-    if (title && typeof title === 'string' && title.includes(' - ')) return [title.split(' - ')[0].trim()]
+    if (title && typeof title === 'string' && title.includes(' - ')) {
+      return [stripDiscogsDisambiguation(title.split(' - ')[0].trim())]
+    }
     return []
   }
   if (Array.isArray(input)) {
     return input
       .map((artist) => (artist as { name?: string; title?: string })?.name ?? artist?.title ?? '')
       .filter(Boolean)
-      .map((name) => name.replace(/\(\d+\)$/g, '').trim())
+      .map((name) => stripDiscogsDisambiguation(name))
   }
   if (typeof input === 'string') {
-    if (input.includes(' - ')) return [input.split(' - ')[0].trim()]
-    return [input.trim()]
+    if (input.includes(' - ')) return [stripDiscogsDisambiguation(input.split(' - ')[0].trim())]
+    return [stripDiscogsDisambiguation(input.trim())]
   }
   return []
 }
@@ -126,10 +130,14 @@ const normalizeRelease = (release: any, fallbackTrackCount = 0): Release | null 
 
   const fallbackCommunity = generateCommunitySnapshot(release)
   const ratingData = release.community?.rating ?? {}
+  const rawName = release.title ?? release.name ?? 'Untitled'
+  const nameFromTitle =
+    typeof rawName === 'string' && rawName.includes(' - ') ? rawName.split(' - ').slice(1).join(' - ').trim() : ''
+  const cleanedName = stripDiscogsDisambiguation(nameFromTitle || rawName)
 
   return {
     id: release.id?.toString(),
-    name: release.title ?? release.name ?? 'Untitled',
+    name: cleanedName || 'Untitled',
     artists: artists.length ? artists : ['Unknown Artist'],
     releaseDate: release.released ?? release.released_formatted ?? null,
     releaseYear: release.year ?? null,
@@ -169,6 +177,81 @@ const requestDiscogs = async (endpoint: string, params: Record<string, string | 
 
 const isFresh = (timestamp: number) => Date.now() - timestamp < CACHE_WINDOW
 
+const variantMarkers = [
+  'deluxe',
+  'expanded',
+  'remaster',
+  'reissue',
+  'anniversary',
+  'edition',
+  'version',
+  'mono',
+  'stereo',
+  'bonus',
+  'special',
+  'collector',
+  'promo',
+  'test pressing',
+]
+
+const bannedAlbumTypes = ['unofficial', 'promo', 'test pressing', 'advance']
+
+const normalizeWhitespace = (value = '') => value.replace(/\s+/g, ' ').trim()
+
+const hasVariantMarker = (value = '') => {
+  const lower = value.toLowerCase()
+  return variantMarkers.some((marker) => lower.includes(marker))
+}
+
+const cleanAlbumName = (release: Release) => {
+  const primaryArtist = release.artists?.[0] ?? ''
+  let name = release.name ?? ''
+  if (primaryArtist && name.toLowerCase().startsWith(`${primaryArtist.toLowerCase()} - `)) {
+    name = name.slice(primaryArtist.length + 3)
+  }
+  name = name.replace(/\(([^)]*)\)/g, (full, inner) => (hasVariantMarker(inner) ? ' ' : full))
+  name = name.replace(/\[([^\]]*)\]/g, (full, inner) => (hasVariantMarker(inner) ? ' ' : full))
+  name = name.replace(
+    /\b(deluxe|expanded|remaster(?:ed)?|reissue|anniversary|special|collector(?:'s)?|bonus)\b[^-–—]*$/i,
+    '',
+  )
+  return normalizeWhitespace(name).toLowerCase()
+}
+
+const isReleasedAlbum = (release: Release) => {
+  const hasReleaseDate = Boolean(release.releaseYear || (release.releaseDate && release.releaseDate !== '0'))
+  if (!hasReleaseDate) return false
+  const albumType = release.albumType?.toLowerCase?.() ?? ''
+  if (bannedAlbumTypes.some((item) => albumType.includes(item))) return false
+  return true
+}
+
+const releaseScore = (release: Release) => {
+  let score = 0
+  if (release.releaseYear) score += 4
+  if (release.cover) score += 2
+  if ((release.reviewCount ?? 0) > 0) score += 1
+  if (/album|lp/i.test(release.albumType ?? '')) score += 2
+  if (/single|ep/i.test(release.albumType ?? '')) score -= 2
+  if (hasVariantMarker(release.name)) score -= 3
+  return score
+}
+
+const dedupeReleasedAlbums = (releases: Release[]) => {
+  const picked = new Map<string, Release>()
+  for (const release of releases) {
+    if (!isReleasedAlbum(release)) continue
+    const primaryArtist = (release.artists?.[0] ?? 'unknown artist').toLowerCase()
+    const canonicalName = cleanAlbumName(release)
+    const key = `${primaryArtist}::${canonicalName || release.name?.toLowerCase() || release.id}`
+    const current = picked.get(key)
+    if (!current || releaseScore(release) > releaseScore(current)) {
+      picked.set(key, release)
+    }
+  }
+  return Array.from(picked.values())
+}
+
 export const getFeaturedReleases = async (limit = 24) => {
   if (featuredCache.data.length && isFresh(featuredCache.timestamp)) {
     return featuredCache.data.slice(0, limit)
@@ -197,9 +280,10 @@ export const getFeaturedReleases = async (limit = 24) => {
     )
     .filter(Boolean) as Release[]
 
-  featuredCache.data = normalized
+  const curated = dedupeReleasedAlbums(normalized)
+  featuredCache.data = curated
   featuredCache.timestamp = Date.now()
-  return normalized.slice(0, limit)
+  return curated.slice(0, limit)
 }
 
 export const searchReleases = async (query: string) => {
@@ -232,8 +316,9 @@ export const searchReleases = async (query: string) => {
     )
     .filter(Boolean) as Release[]
 
-  searchCache.set(cacheKey, { data: normalized, timestamp: Date.now() })
-  return normalized
+  const curated = dedupeReleasedAlbums(normalized)
+  searchCache.set(cacheKey, { data: curated, timestamp: Date.now() })
+  return curated
 }
 
 export const getReleaseDetails = async (releaseId: string) => {

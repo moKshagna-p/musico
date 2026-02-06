@@ -18,6 +18,7 @@ const SearchBar = ({ query = '', onSearch, placeholder, autoFocus, enablePredict
   const [suggestions, setSuggestions] = useState([])
   const [isSuggesting, setIsSuggesting] = useState(false)
   const [showSuggestions, setShowSuggestions] = useState(false)
+  const [activeSuggestionIndex, setActiveSuggestionIndex] = useState(-1)
   const latestRequestIdRef = useRef(0)
 
   useEffect(() => {
@@ -39,6 +40,7 @@ const SearchBar = ({ query = '', onSearch, placeholder, autoFocus, enablePredict
     if (trimmed.length < MIN_SUGGEST_QUERY_LENGTH) {
       setSuggestions([])
       setIsSuggesting(false)
+      setActiveSuggestionIndex(-1)
       return
     }
 
@@ -60,9 +62,11 @@ const SearchBar = ({ query = '', onSearch, placeholder, autoFocus, enablePredict
           }))
 
         setSuggestions(nextSuggestions)
+        setActiveSuggestionIndex(nextSuggestions.length ? 0 : -1)
       } catch {
         if (latestRequestIdRef.current === requestId) {
           setSuggestions([])
+          setActiveSuggestionIndex(-1)
         }
       } finally {
         if (latestRequestIdRef.current === requestId) {
@@ -85,11 +89,46 @@ const SearchBar = ({ query = '', onSearch, placeholder, autoFocus, enablePredict
     setRecentSearches(getSearchHistory())
     onSearch?.(trimmed)
     setShowSuggestions(false)
+    setActiveSuggestionIndex(-1)
+  }
+
+  const submitSuggestion = (item) => {
+    if (!item) return
+    const term = `${item.artist} ${item.title}`.trim()
+    setValue(term)
+    submitSearch(term)
   }
 
   const handleSubmit = (event) => {
     event.preventDefault()
     submitSearch(value)
+  }
+
+  const handleKeyDown = (event) => {
+    if (!shouldShowSuggestions || !suggestions.length) return
+
+    if (event.key === 'ArrowDown') {
+      event.preventDefault()
+      setActiveSuggestionIndex((prev) => (prev + 1) % suggestions.length)
+      return
+    }
+
+    if (event.key === 'ArrowUp') {
+      event.preventDefault()
+      setActiveSuggestionIndex((prev) => (prev <= 0 ? suggestions.length - 1 : prev - 1))
+      return
+    }
+
+    if (event.key === 'Enter' && activeSuggestionIndex >= 0) {
+      event.preventDefault()
+      submitSuggestion(suggestions[activeSuggestionIndex])
+      return
+    }
+
+    if (event.key === 'Escape') {
+      setShowSuggestions(false)
+      setActiveSuggestionIndex(-1)
+    }
   }
 
   const handleRecentSearchClick = (term) => {
@@ -119,6 +158,7 @@ const SearchBar = ({ query = '', onSearch, placeholder, autoFocus, enablePredict
             onChange={(event) => setValue(event.target.value)}
             onFocus={() => setShowSuggestions(true)}
             onBlur={() => setTimeout(() => setShowSuggestions(false), 120)}
+            onKeyDown={handleKeyDown}
             placeholder={placeholder ?? 'Search albums or artists'}
             autoFocus={autoFocus}
             className="flex-1 bg-transparent text-lg text-white placeholder:text-muted focus:outline-none"
@@ -137,11 +177,11 @@ const SearchBar = ({ query = '', onSearch, placeholder, autoFocus, enablePredict
                 <button
                   key={item.id}
                   type="button"
-                  onClick={() => {
-                    setValue(`${item.artist} ${item.title}`)
-                    submitSearch(`${item.artist} ${item.title}`)
-                  }}
-                  className="flex w-full items-center justify-between rounded-xl px-3 py-2 text-left transition hover:bg-white/5"
+                  onMouseEnter={() => setActiveSuggestionIndex(suggestions.findIndex((entry) => entry.id === item.id))}
+                  onClick={() => submitSuggestion(item)}
+                  className={`flex w-full items-center justify-between rounded-xl px-3 py-2 text-left transition ${
+                    suggestions[activeSuggestionIndex]?.id === item.id ? 'bg-white/10' : 'hover:bg-white/5'
+                  }`}
                 >
                   <span className="text-sm text-white">{item.title}</span>
                   <span className="truncate pl-3 text-xs uppercase tracking-[0.2em] text-muted">{item.artist}</span>

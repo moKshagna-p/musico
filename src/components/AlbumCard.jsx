@@ -4,6 +4,7 @@ import { FiArrowUpRight } from 'react-icons/fi'
 
 import { prefetchReleaseDetails } from '../services/discogsService.js'
 import { useRatings } from '../hooks/useRatings.js'
+import { formatReleaseDate } from '../utils/helpers.js'
 import RatingStars from './RatingStars.jsx'
 
 const AlbumCard = ({ album, onSelect }) => {
@@ -36,6 +37,9 @@ const AlbumCard = ({ album, onSelect }) => {
       <div className="flex flex-col gap-1">
         <h3 className="font-display text-xl">{album.name}</h3>
         <p className="text-sm text-muted">{album.artists?.join(', ')}</p>
+        <p className="text-xs uppercase tracking-[0.22em] text-muted">
+          Released {formatReleaseDate(album.releaseDate, album.releaseYear)}
+        </p>
       </div>
 
       <div className="flex items-end justify-between gap-4">

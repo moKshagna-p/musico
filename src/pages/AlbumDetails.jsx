@@ -7,7 +7,7 @@ import RatingStars from '../components/RatingStars.jsx'
 import StreamingLinks from '../components/StreamingLinks.jsx'
 import { useRatings } from '../hooks/useRatings.js'
 import { getReleaseDetails } from '../services/discogsService.js'
-import { formatDuration, formatLargeNumber, generateStreamingLinks } from '../utils/helpers.js'
+import { formatDuration, formatLargeNumber, formatReleaseDate, generateStreamingLinks } from '../utils/helpers.js'
 
 const AlbumDetails = () => {
   const navigate = useNavigate()
@@ -119,6 +119,9 @@ const AlbumDetails = () => {
             <p className="text-xs uppercase tracking-[0.5em] text-muted">Album</p>
             <h1 className="font-display text-4xl">{album.name}</h1>
             <p className="text-lg text-muted">{album.artists.join(', ')}</p>
+            <p className="mt-2 text-xs uppercase tracking-[0.3em] text-muted">
+              Released {formatReleaseDate(album.releaseDate, album.releaseYear)}
+            </p>
           </div>
 
           <div className="grid gap-4 rounded-3xl border border-outline bg-panel p-6 tablet:grid-cols-2">

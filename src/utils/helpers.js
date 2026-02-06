@@ -7,14 +7,43 @@ export const formatDuration = (ms) => {
   return `${minutes}:${seconds.toString().padStart(2, '0')}`
 }
 
-export const formatReleaseDate = (date) => {
+export const formatReleaseDate = (date, releaseYear) => {
+  if (typeof date === 'string') {
+    const trimmed = date.trim()
+    if (/^\d{4}$/.test(trimmed)) return trimmed
+    if (/^\d{4}-\d{2}$/.test(trimmed)) {
+      const parsedMonth = new Date(`${trimmed}-01`)
+      if (!Number.isNaN(parsedMonth.getTime())) {
+        const monthFormatter = new Intl.DateTimeFormat('en', {
+          year: 'numeric',
+          month: 'short',
+        })
+        return monthFormatter.format(parsedMonth)
+      }
+      return trimmed
+    }
+    if (trimmed) {
+      const parsed = new Date(trimmed)
+      if (!Number.isNaN(parsed.getTime())) {
+        const formatter = new Intl.DateTimeFormat('en', {
+          year: 'numeric',
+          month: 'short',
+          day: 'numeric',
+        })
+        return formatter.format(parsed)
+      }
+    }
+  }
+  if (releaseYear) return String(releaseYear)
   if (!date) return 'Unknown'
   const formatter = new Intl.DateTimeFormat('en', {
     year: 'numeric',
     month: 'short',
     day: 'numeric',
   })
-  return formatter.format(new Date(date))
+  const parsed = new Date(date)
+  if (Number.isNaN(parsed.getTime())) return 'Unknown'
+  return formatter.format(parsed)
 }
 
 export const generateStreamingLinks = (album) => {
