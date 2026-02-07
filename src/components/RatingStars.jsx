@@ -1,6 +1,6 @@
 import { memo, useMemo, useState } from 'react'
 import { motion } from 'framer-motion'
-import { FiStar } from 'react-icons/fi'
+import { FaStar } from 'react-icons/fa'
 
 const RatingStars = ({ value = 0, onRate, readOnly = false, showValue = false }) => {
   const [hoverValue, setHoverValue] = useState(null)
@@ -25,7 +25,7 @@ const RatingStars = ({ value = 0, onRate, readOnly = false, showValue = false })
               onMouseLeave={() => !readOnly && setHoverValue(null)}
               className={`p-1 ${readOnly ? 'cursor-default' : 'cursor-pointer'}`}
             >
-              <FiStar className={`text-xl transition ${active ? 'text-white' : 'text-muted'}`} />
+              <FaStar className={`text-xl transition ${active ? 'text-white' : 'text-muted/45'}`} />
             </motion.button>
           )
         })}

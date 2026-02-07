@@ -1,7 +1,6 @@
 import { createContext, useCallback, useEffect, useMemo, useState } from 'react'
 
 import {
-  generateCommunitySnapshot,
   loadRatingsFromStorage,
   persistRating,
 } from '../services/ratingsService.js'
@@ -37,15 +36,14 @@ export const RatingsProvider = ({ children }) => {
   const getCommunityStats = useCallback(
     (album) => {
       if (!album) return { average: 0, total: 0 }
-      if (album.communityRating && album.reviewCount) {
-        return {
-          average: album.communityRating,
-          total: album.reviewCount,
-        }
+      const average = Number(album.communityRating)
+      const total = Number(album.reviewCount)
+      return {
+        average: Number.isFinite(average) ? average : 0,
+        total: Number.isFinite(total) ? total : 0,
       }
-      return generateCommunitySnapshot(album, ratings[album?.id]?.rating)
     },
-    [ratings],
+    [],
   )
 
   const value = useMemo(

@@ -1,7 +1,7 @@
 import { Elysia } from 'elysia'
 import { cors } from '@elysiajs/cors'
 
-import { getFeaturedReleases, getReleaseDetails, searchReleases } from './discogs'
+import { getFeaturedReleases, getRecentPopularReleases, getReleaseDetails, searchReleases } from './discogs'
 
 const env = ((globalThis as unknown as { Bun?: { env: Record<string, string | undefined> } }).Bun?.env ??
   process.env ??
@@ -73,7 +73,11 @@ const app = new Elysia()
       const limit = Number.isFinite(limitParam) ? Math.min(Math.max(limitParam, 1), 50) : 24
       const refreshFlag = String(query?.refresh ?? '').toLowerCase()
       const forceRefresh = refreshFlag === '1' || refreshFlag === 'true'
-      const data = await getFeaturedReleases(limit, forceRefresh)
+      const mode = String(query?.mode ?? '').toLowerCase()
+      const data =
+        mode === 'recent-popular'
+          ? await getRecentPopularReleases(limit, forceRefresh)
+          : await getFeaturedReleases(limit, forceRefresh)
       set.headers ??= {}
       set.headers['Cache-Control'] = 'public, max-age=60'
       return { data }

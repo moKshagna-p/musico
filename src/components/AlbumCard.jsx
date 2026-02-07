@@ -49,7 +49,7 @@ const AlbumCard = ({ album, onSelect }) => {
             {(album.communityRating ?? 0).toFixed(1)}
           </p>
           <p className="text-xs text-muted">
-            {(album.reviewCount ?? 0).toLocaleString()} reviews
+            {(album.reviewCount ?? 0).toLocaleString()} ratings
           </p>
         </div>
 

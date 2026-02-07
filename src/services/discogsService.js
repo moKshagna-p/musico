@@ -3,6 +3,7 @@ const CACHE_WINDOW = 1000 * 60 * 60 // 1 hour
 const FEATURED_CACHE_WINDOW = 1000 * 60 * 5 // 5 minutes
 
 const featuredCache = { timestamp: 0, data: [] }
+const recentPopularCache = { timestamp: 0, data: [] }
 const searchCache = new Map()
 const releaseCache = new Map()
 
@@ -41,6 +42,23 @@ export const getFeaturedReleases = async (limit = 24, options = {}) => {
   const data = Array.isArray(response?.data) ? response.data : []
   featuredCache.timestamp = Date.now()
   featuredCache.data = data
+  return data.slice(0, limit)
+}
+
+export const getRecentPopularReleases = async (limit = 24, options = {}) => {
+  const forceRefresh = Boolean(options?.forceRefresh)
+  if (!forceRefresh && recentPopularCache.data.length && isFresh(recentPopularCache.timestamp, FEATURED_CACHE_WINDOW)) {
+    return recentPopularCache.data.slice(0, limit)
+  }
+
+  const response = await requestBackend('/api/featured', {
+    limit,
+    mode: 'recent-popular',
+    refresh: forceRefresh ? 1 : undefined,
+  })
+  const data = Array.isArray(response?.data) ? response.data : []
+  recentPopularCache.timestamp = Date.now()
+  recentPopularCache.data = data
   return data.slice(0, limit)
 }
 

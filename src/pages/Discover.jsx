@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom'
 import AlbumGrid from '../components/AlbumGrid.jsx'
 import PageTransition from '../components/PageTransition.jsx'
 import SearchBar from '../components/SearchBar.jsx'
-import { getFeaturedReleases } from '../services/discogsService.js'
+import { getRecentPopularReleases } from '../services/discogsService.js'
 
 const Discover = () => {
   const navigate = useNavigate()
@@ -17,7 +17,7 @@ const Discover = () => {
       setLoading(true)
       setError(null)
       try {
-        const releases = await getFeaturedReleases(24)
+        const releases = await getRecentPopularReleases(24)
         setAlbums(releases)
       } catch (err) {
         setError(err?.message ?? 'Unable to load featured releases.')

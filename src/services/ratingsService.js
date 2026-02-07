@@ -51,19 +51,6 @@ const seedFromString = (value = '') => {
   return stringValue.split('').reduce((acc, char) => (acc * 31 + char.charCodeAt(0)) % 997, 7)
 }
 
-export const generateCommunitySnapshot = (album, userRating) => {
-  const popularity = album?.popularity ?? 52
-  const seed = seedFromString(album?.id ?? album?.name ?? '')
-  const baseRating = 3.2 + (popularity / 100) * 1.4 + (seed % 20) / 100
-  const rating = Math.min(5, Math.max(1.2, baseRating + (userRating ? userRating / 50 : 0)))
-  const total = 120 + Math.round(popularity * 6) + (seed % 90)
-
-  return {
-    average: Number(rating.toFixed(1)),
-    total,
-  }
-}
-
 export const inferGenresFromSeed = (album) => {
   const list = new Set()
   const seed = seedFromString(album?.id ?? album?.name ?? '')

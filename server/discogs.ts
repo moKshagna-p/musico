@@ -13,6 +13,7 @@ const CACHE_WINDOW = 1000 * 60 * 60 // 1 hour
 const FEATURED_CACHE_WINDOW = 1000 * 60 * 5 // 5 minutes
 
 const featuredCache: { data: Release[]; timestamp: number } = { data: [], timestamp: 0 }
+const recentPopularCache: { data: Release[]; timestamp: number } = { data: [], timestamp: 0 }
 const searchCache = new Map<string, { data: Release[]; timestamp: number }>()
 const releaseCache = new Map<string, { data: Release; timestamp: number }>()
 
@@ -54,17 +55,13 @@ const inferAlbumGenres = (album: Partial<Release>) => {
   return inferGenresFromSeed(album)
 }
 
-const generateCommunitySnapshot = (album?: { id?: string; name?: string; popularity?: number }, userRating?: number) => {
-  const popularity = album?.popularity ?? 52
-  const seed = seedFromString(album?.id ?? album?.name ?? '')
-  const baseRating = 3.2 + (popularity / 100) * 1.4 + ((seed % 20) / 100)
-  const rating = Math.min(5, Math.max(1.2, baseRating + (userRating ? userRating / 50 : 0)))
-  const total = 120 + Math.round(popularity * 6) + (seed % 90)
-
-  return {
-    average: Number(rating.toFixed(1)),
-    total,
+const toFiniteNumber = (value: unknown): number | null => {
+  if (typeof value === 'number') return Number.isFinite(value) ? value : null
+  if (typeof value === 'string' && value.trim()) {
+    const parsed = Number.parseFloat(value)
+    return Number.isFinite(parsed) ? parsed : null
   }
+  return null
 }
 
 const convertDurationToMs = (duration?: string | number | null) => {
@@ -129,8 +126,9 @@ const normalizeRelease = (release: any, fallbackTrackCount = 0): Release | null 
     release.image_url ||
     ''
 
-  const fallbackCommunity = generateCommunitySnapshot(release)
   const ratingData = release.community?.rating ?? {}
+  const ratingAverage = toFiniteNumber(ratingData.average)
+  const ratingCount = toFiniteNumber(ratingData.count)
   const rawName = release.title ?? release.name ?? 'Untitled'
   const nameFromTitle =
     typeof rawName === 'string' && rawName.includes(' - ') ? rawName.split(' - ').slice(1).join(' - ').trim() : ''
@@ -151,8 +149,8 @@ const normalizeRelease = (release: any, fallbackTrackCount = 0): Release | null 
       discogs: release.uri,
     },
     genres: inferAlbumGenres({ ...release, tracks: tracklist }) ?? [],
-    communityRating: ratingData.average ?? fallbackCommunity.average,
-    reviewCount: ratingData.count ?? fallbackCommunity.total,
+    communityRating: Number((ratingAverage ?? 0).toFixed(1)),
+    reviewCount: Math.max(0, Math.round(ratingCount ?? 0)),
     tracks: tracklist,
   }
 }
@@ -286,6 +284,62 @@ export const getFeaturedReleases = async (limit = 24, forceRefresh = false) => {
   featuredCache.data = curated
   featuredCache.timestamp = Date.now()
   return curated.slice(0, limit)
+}
+
+export const getRecentPopularReleases = async (limit = 24, forceRefresh = false) => {
+  if (!forceRefresh && recentPopularCache.data.length && isFresh(recentPopularCache.timestamp, FEATURED_CACHE_WINDOW)) {
+    return recentPopularCache.data.slice(0, limit)
+  }
+
+  const response = await requestDiscogs('/database/search', {
+    per_page: Math.max(limit * 4, 96),
+    type: 'release',
+    format: 'album',
+    sort: 'year',
+    sort_order: 'desc',
+  })
+
+  const normalized = (response.results ?? [])
+    .map((entry: any) =>
+      normalizeRelease({
+        id: entry.id,
+        title: entry.title,
+        artist: entry.artist,
+        year: entry.year,
+        cover_image: entry.cover_image,
+        thumb: entry.thumb,
+        genres: entry.genre,
+        labels: entry.label ? [{ name: entry.label }] : undefined,
+        formats: entry.format ? [{ name: entry.format }] : undefined,
+        uri: entry.uri,
+        community: entry.community,
+      }),
+    )
+    .filter(Boolean) as Release[]
+
+  const curated = dedupeReleasedAlbums(normalized)
+  const currentYear = new Date().getFullYear()
+  const recentStartYear = currentYear - 2
+
+  const recentFirst = curated
+    .filter((release) => Number(release.releaseYear ?? 0) >= recentStartYear)
+    .sort(
+      (a, b) =>
+        Number(b.releaseYear ?? 0) - Number(a.releaseYear ?? 0) || Number(b.popularity ?? 0) - Number(a.popularity ?? 0),
+    )
+
+  const olderFallback = curated
+    .filter((release) => Number(release.releaseYear ?? 0) < recentStartYear)
+    .sort(
+      (a, b) =>
+        Number(b.popularity ?? 0) - Number(a.popularity ?? 0) || Number(b.releaseYear ?? 0) - Number(a.releaseYear ?? 0),
+    )
+
+  const ranked = [...recentFirst, ...olderFallback]
+  recentPopularCache.data = ranked
+  recentPopularCache.timestamp = Date.now()
+
+  return ranked.slice(0, limit)
 }
 
 export const searchReleases = async (query: string) => {
