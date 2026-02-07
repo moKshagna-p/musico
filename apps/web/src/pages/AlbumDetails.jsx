@@ -128,7 +128,9 @@ const AlbumDetails = () => {
             <div>
               <p className="text-xs uppercase tracking-[0.4em] text-muted">Community Avg</p>
               <p className="text-4xl font-semibold text-white">{community.average?.toFixed(1)}</p>
-              <p className="text-xs text-muted">{formatLargeNumber(community.total)} ratings</p>
+              <p className="text-xs text-muted">
+                {formatLargeNumber(community.total)} ratings
+              </p>
             </div>
             <div className="flex items-center justify-end">
               <RatingStars value={userRating ?? community.average} onRate={(value) => rateAlbum(album.id, value)} showValue />

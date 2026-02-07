@@ -20,6 +20,7 @@ const SearchBar = ({ query = '', onSearch, placeholder, autoFocus, enablePredict
   const [showSuggestions, setShowSuggestions] = useState(false)
   const [activeSuggestionIndex, setActiveSuggestionIndex] = useState(-1)
   const latestRequestIdRef = useRef(0)
+  const suggestionsCacheRef = useRef(new Map())
 
   useEffect(() => {
     setValue(query)
@@ -44,6 +45,15 @@ const SearchBar = ({ query = '', onSearch, placeholder, autoFocus, enablePredict
       return
     }
 
+    const cacheKey = trimmed.toLowerCase()
+    const cachedSuggestions = suggestionsCacheRef.current.get(cacheKey)
+    if (cachedSuggestions) {
+      setSuggestions(cachedSuggestions)
+      setIsSuggesting(false)
+      setActiveSuggestionIndex(-1)
+      return
+    }
+
     const requestId = latestRequestIdRef.current + 1
     latestRequestIdRef.current = requestId
     setIsSuggesting(true)
@@ -61,8 +71,9 @@ const SearchBar = ({ query = '', onSearch, placeholder, autoFocus, enablePredict
             artist: item.artists?.[0] ?? 'Unknown artist',
           }))
 
+        suggestionsCacheRef.current.set(cacheKey, nextSuggestions)
         setSuggestions(nextSuggestions)
-        setActiveSuggestionIndex(nextSuggestions.length ? 0 : -1)
+        setActiveSuggestionIndex(-1)
       } catch {
         if (latestRequestIdRef.current === requestId) {
           setSuggestions([])
@@ -73,7 +84,7 @@ const SearchBar = ({ query = '', onSearch, placeholder, autoFocus, enablePredict
           setIsSuggesting(false)
         }
       }
-    }, 180)
+    }, 120)
 
     return () => clearTimeout(timer)
   }, [enablePredictive, value])
@@ -109,13 +120,13 @@ const SearchBar = ({ query = '', onSearch, placeholder, autoFocus, enablePredict
 
     if (event.key === 'ArrowDown') {
       event.preventDefault()
-      setActiveSuggestionIndex((prev) => (prev + 1) % suggestions.length)
+      setActiveSuggestionIndex((prev) => (prev < 0 ? 0 : (prev + 1) % suggestions.length))
       return
     }
 
     if (event.key === 'ArrowUp') {
       event.preventDefault()
-      setActiveSuggestionIndex((prev) => (prev <= 0 ? suggestions.length - 1 : prev - 1))
+      setActiveSuggestionIndex((prev) => (prev < 0 ? suggestions.length - 1 : prev <= 0 ? suggestions.length - 1 : prev - 1))
       return
     }
 

@@ -10,6 +10,8 @@ import RatingStars from './RatingStars.jsx'
 const AlbumCard = ({ album, onSelect }) => {
   const { getUserRating, rateAlbum } = useRatings()
   const userRating = getUserRating(album.id)
+  const communityAverage = Number(album.communityRating ?? 0)
+  const communityCount = Number(album.reviewCount ?? 0)
 
   const handleNavigate = () => {
     onSelect?.(album.id)
@@ -46,15 +48,15 @@ const AlbumCard = ({ album, onSelect }) => {
         <div>
           <p className="text-xs uppercase tracking-[0.4em] text-muted">Community</p>
           <p className="text-2xl font-semibold text-white">
-            {(album.communityRating ?? 0).toFixed(1)}
+            {communityAverage.toFixed(1)}
           </p>
           <p className="text-xs text-muted">
-            {(album.reviewCount ?? 0).toLocaleString()} ratings
+            {communityCount.toLocaleString()} ratings
           </p>
         </div>
 
         <RatingStars
-          value={userRating ?? album.communityRating ?? 0}
+          value={userRating ?? communityAverage}
           onRate={(value) => rateAlbum(album.id, value)}
           showValue
         />

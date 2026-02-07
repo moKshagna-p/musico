@@ -1,32 +1,40 @@
 # MuseVault
 
-React + Vite frontend for browsing and rating Discogs releases paired with a Bun/Elysia proxy that caches calls for an hour and rate-limits abusive clients.
+Turbo monorepo for a React/Vite frontend and a Bun/Elysia API proxy.
+
+## Monorepo Layout
+
+- `apps/web` - React + Vite frontend.
+- `apps/api` - Bun + Elysia backend.
+- `packages/*` - shared packages (empty scaffold for now).
 
 ## Requirements
 
-- Node.js 18+ for the Vite app.
-- [Bun](https://bun.sh) 1.0+ for the Elysia backend.
+- Node.js 18+ for workspace tooling and frontend.
+- [Bun](https://bun.sh) 1.0+ for the backend runtime.
 
 ## Setup
 
-1. `npm install`
-2. Copy `.env.example` to `.env` (or export the variables another way) and fill in:
-   - `VITE_API_BASE_URL` – origin of the Elysia server (defaults to `http://localhost:4000`).
-   - `PORT`, `ALLOWED_ORIGIN` (e.g. `http://localhost:5173` for the Vite dev server), and `DISCOGS_TOKEN` (your Discogs personal access token). Key/secret auth is optional—only add `DISCOGS_KEY`/`DISCOGS_SECRET` if you already have them.
-3. Start the backend: `npm run server:dev`
-4. In another terminal start the frontend: `npm run dev`
+1. Install dependencies:
+   - `npm install`
+2. Copy `.env.example` to `.env` at the repo root and fill:
+   - `VITE_API_BASE_URL` - backend origin (defaults to `http://localhost:4000`).
+   - `PORT`, `ALLOWED_ORIGIN`, `DISCOGS_TOKEN` (+ optional `DISCOGS_KEY`/`DISCOGS_SECRET`).
+3. Start everything:
+   - `npm run dev`
 
-## Available Scripts
+## Scripts
 
-- `npm run dev` – Vite dev server.
-- `npm run build` – production build.
-- `npm run preview` – preview the production build locally.
-- `npm run lint` – lint the project.
-- `npm run server` – start the Bun/Elysia proxy once.
-- `npm run server:dev` – start the proxy in watch mode for development.
+- `npm run dev` - run `apps/web` and `apps/api` in parallel via Turbo.
+- `npm run build` - build all apps that expose `build`.
+- `npm run lint` - lint all apps that expose `lint`.
+- `npm run preview` - preview the web build.
+- `npm run dev:web` - run frontend only.
+- `npm run dev:api` - run backend only.
+- `npm run start:api` - start backend once.
 
 ## Backend behavior
 
-- Proxies Discogs search/release endpoints while normalizing the payload for the UI.
-- Caches featured lists, search results, and release details for 1 hour, so repeat queries (e.g., “Beatles”) return instantly without additional Discogs calls.
+- Proxies Discogs search/release endpoints while normalizing payloads for UI use.
+- Caches featured lists, search results, and release details for 1 hour.
 - Applies IP-based abuse protection (100 requests/hour) and returns `429` with `Retry-After` headers when exceeded.

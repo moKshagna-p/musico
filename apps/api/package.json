@@ -1,0 +1,17 @@
+{
+  "name": "@musico/api",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "bun --env-file=../../.env run --watch index.ts",
+    "start": "bun --env-file=../../.env run index.ts"
+  },
+  "dependencies": {
+    "@elysiajs/cors": "^1.4.1",
+    "elysia": "^1.4.22"
+  },
+  "devDependencies": {
+    "@types/node": "^25.2.1"
+  }
+}
