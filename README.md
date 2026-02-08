@@ -20,8 +20,9 @@ Turbo monorepo for a React/Vite frontend and a Bun/Elysia API proxy.
 2. Copy `.env.example` to `.env` at the repo root and fill:
    - `VITE_API_BASE_URL` - backend origin (defaults to `http://localhost:4000`).
    - `PORT`, `ALLOWED_ORIGIN`, `DISCOGS_TOKEN` (+ optional `DISCOGS_KEY`/`DISCOGS_SECRET`).
+   - `BETTER_AUTH_URL` and `BETTER_AUTH_SECRET` for authentication.
 3. Start everything:
-   - `npm run dev`
+   - `bun run dev` (or `npm run dev`)
 
 ## Scripts
 
@@ -32,6 +33,13 @@ Turbo monorepo for a React/Vite frontend and a Bun/Elysia API proxy.
 - `npm run dev:web` - run frontend only.
 - `npm run dev:api` - run backend only.
 - `npm run start:api` - start backend once.
+
+## Auth
+
+- Better Auth is mounted in the API at `/api/auth/*`.
+- Email/password auth is enabled.
+- Auth data is stored in `apps/api/auth.db` (SQLite via `better-sqlite3`).
+- Web auth page is available at `/auth`.
 
 ## Backend behavior
 

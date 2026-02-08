@@ -12,6 +12,8 @@ const AlbumCard = ({ album, onSelect }) => {
   const userRating = getUserRating(album.id)
   const communityAverage = Number(album.communityRating ?? 0)
   const communityCount = Number(album.reviewCount ?? 0)
+  const genres = Array.isArray(album.genres) ? album.genres.filter(Boolean) : []
+  const genreLabel = genres.slice(0, 2).join(' • ')
 
   const handleNavigate = () => {
     onSelect?.(album.id)
@@ -39,6 +41,9 @@ const AlbumCard = ({ album, onSelect }) => {
       <div className="flex flex-col gap-1">
         <h3 className="font-display text-xl">{album.name}</h3>
         <p className="text-sm text-muted">{album.artists?.join(', ')}</p>
+        {genreLabel ? (
+          <p className="text-xs uppercase tracking-[0.22em] text-muted">{genreLabel}</p>
+        ) : null}
         <p className="text-xs uppercase tracking-[0.22em] text-muted">
           {formatReleaseDate(album.releaseDate, album.releaseYear)}
         </p>

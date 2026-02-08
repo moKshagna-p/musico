@@ -12,6 +12,8 @@ dist
 dist-ssr
 .env
 *.local
+apps/api/auth.db
+.turbo/
 
 # Editor directories and files
 .vscode/*

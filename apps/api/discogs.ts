@@ -22,37 +22,33 @@ const HEADERS: Record<string, string> = {
   Accept: 'application/json',
 }
 
-const baseGenres = [
-  'Neo-Soul',
-  'Jazztronica',
-  'Alt R&B',
-  'Analog House',
-  'Indie Electronic',
-  'Future Funk',
-  'Atmospheric Pop',
-  'Chillwave',
-]
-
-const seedFromString = (value = '') =>
-  String(value)
-    .split('')
-    .reduce((acc, char) => (acc * 31 + char.charCodeAt(0)) % 997, 7)
-
-const inferGenresFromSeed = (album?: { id?: string; name?: string; album_type?: string; total_tracks?: number }) => {
-  const list = new Set<string>()
-  const seed = seedFromString(album?.id ?? album?.name ?? '')
-  const first = baseGenres[seed % baseGenres.length]
-  const second = baseGenres[(seed * 3) % baseGenres.length]
-  list.add(first)
-  if (second !== first) list.add(second)
-  if (album?.album_type === 'single') list.add('Collector Cut')
-  if ((album?.total_tracks ?? 0) > 16) list.add('Extended Edition')
-  return Array.from(list)
+const parseGenreSource = (value: unknown): string[] => {
+  if (!value) return []
+  if (Array.isArray(value)) {
+    return value
+      .map((entry) => (typeof entry === 'string' ? entry.trim() : ''))
+      .filter(Boolean)
+  }
+  if (typeof value === 'string') {
+    return value
+      .split(',')
+      .map((entry) => entry.trim())
+      .filter(Boolean)
+  }
+  return []
 }
 
-const inferAlbumGenres = (album: Partial<Release>) => {
-  if (album?.genres?.length) return album.genres
-  return inferGenresFromSeed(album)
+const parseGenres = (release: any) => {
+  const merged = [
+    ...parseGenreSource(release?.genres),
+    ...parseGenreSource(release?.genre),
+    ...parseGenreSource(release?.styles),
+    ...parseGenreSource(release?.style),
+  ]
+
+  const unique = new Set<string>()
+  merged.forEach((entry) => unique.add(entry))
+  return Array.from(unique)
 }
 
 const toFiniteNumber = (value: unknown): number | null => {
@@ -148,7 +144,7 @@ const normalizeRelease = (release: any, fallbackTrackCount = 0): Release | null 
     external_urls: {
       discogs: release.uri,
     },
-    genres: inferAlbumGenres({ ...release, tracks: tracklist }) ?? [],
+    genres: parseGenres(release),
     communityRating: Number((ratingAverage ?? 0).toFixed(1)),
     reviewCount: Math.max(0, Math.round(ratingCount ?? 0)),
     tracks: tracklist,
@@ -301,6 +297,7 @@ export const getFeaturedReleases = async (limit = 24, forceRefresh = false) => {
         cover_image: entry.cover_image,
         thumb: entry.thumb,
         genres: entry.genre,
+        styles: entry.style,
         labels: entry.label ? [{ name: entry.label }] : undefined,
         formats: entry.format ? [{ name: entry.format }] : undefined,
         uri: entry.uri,
@@ -310,10 +307,11 @@ export const getFeaturedReleases = async (limit = 24, forceRefresh = false) => {
     .filter(Boolean) as Release[]
 
   const curated = dedupeReleasedAlbums(normalized)
-  await hydrateCommunityRatings(curated, Math.min(limit, 10))
-  featuredCache.data = curated
+  const topFeatured = curated.slice(0, limit)
+  await hydrateCommunityRatings(topFeatured, topFeatured.length)
+  featuredCache.data = topFeatured
   featuredCache.timestamp = Date.now()
-  return curated.slice(0, limit)
+  return topFeatured
 }
 
 export const getRecentPopularReleases = async (limit = 24, forceRefresh = false) => {
@@ -339,6 +337,7 @@ export const getRecentPopularReleases = async (limit = 24, forceRefresh = false)
         cover_image: entry.cover_image,
         thumb: entry.thumb,
         genres: entry.genre,
+        styles: entry.style,
         labels: entry.label ? [{ name: entry.label }] : undefined,
         formats: entry.format ? [{ name: entry.format }] : undefined,
         uri: entry.uri,
@@ -366,11 +365,12 @@ export const getRecentPopularReleases = async (limit = 24, forceRefresh = false)
     )
 
   const ranked = [...recentFirst, ...olderFallback]
-  await hydrateCommunityRatings(ranked, Math.min(limit, 10))
-  recentPopularCache.data = ranked
+  const topRanked = ranked.slice(0, limit)
+  await hydrateCommunityRatings(topRanked, topRanked.length)
+  recentPopularCache.data = topRanked
   recentPopularCache.timestamp = Date.now()
 
-  return ranked.slice(0, limit)
+  return topRanked
 }
 
 export const searchReleases = async (query: string) => {
@@ -395,6 +395,7 @@ export const searchReleases = async (query: string) => {
         cover_image: entry.cover_image,
         thumb: entry.thumb,
         genres: entry.genre,
+        styles: entry.style,
         labels: entry.label ? [{ name: entry.label }] : undefined,
         formats: entry.format ? [{ name: entry.format }] : undefined,
         uri: entry.uri,
@@ -404,7 +405,7 @@ export const searchReleases = async (query: string) => {
     .filter(Boolean) as Release[]
 
   const curated = dedupeReleasedAlbums(normalized)
-  await hydrateCommunityRatings(curated, 12)
+  await hydrateCommunityRatings(curated, curated.length)
   searchCache.set(cacheKey, { data: curated, timestamp: Date.now() })
   return curated
 }

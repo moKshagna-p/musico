@@ -122,6 +122,9 @@ const AlbumDetails = () => {
             <p className="mt-2 text-xs uppercase tracking-[0.3em] text-muted">
               {formatReleaseDate(album.releaseDate, album.releaseYear)}
             </p>
+            <p className="mt-2 text-xs uppercase tracking-[0.3em] text-muted">
+              Community {community.average?.toFixed(1)} • {formatLargeNumber(community.total)} ratings
+            </p>
           </div>
 
           <div className="grid gap-4 rounded-3xl border border-outline bg-panel p-6 tablet:grid-cols-2">
@@ -155,7 +158,6 @@ const AlbumDetails = () => {
             </div>
           </div>
 
-          <p className="text-xs uppercase tracking-[0.4em] text-muted">No extra commentary. Just track data.</p>
         </div>
       </div>
     </PageTransition>

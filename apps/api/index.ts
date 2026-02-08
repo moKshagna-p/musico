@@ -1,6 +1,7 @@
 import { Elysia } from 'elysia'
 import { cors } from '@elysiajs/cors'
 
+import { auth } from './auth'
 import { getFeaturedReleases, getRecentPopularReleases, getReleaseDetails, searchReleases } from './discogs'
 
 const env = ((globalThis as unknown as { Bun?: { env: Record<string, string | undefined> } }).Bun?.env ??
@@ -40,16 +41,20 @@ const consumeRateLimit = (ip: string) => {
   return { allowed: true, remaining: RATE_LIMIT_MAX - entry.count, retryAfter: Math.ceil((entry.resetAt - now) / 1000) }
 }
 
-const allowedOrigin = env.ALLOWED_ORIGIN ?? '*'
+const allowedOrigin = (env.ALLOWED_ORIGIN ?? 'http://localhost:5173')
+  .split(',')
+  .map((origin) => origin.trim())
+  .filter(Boolean)
 
 const app = new Elysia()
   .use(
     cors({
       origin: allowedOrigin,
-      methods: ['GET', 'OPTIONS'],
-      credentials: false,
+      methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+      credentials: true,
     }),
   )
+  .mount(auth.handler)
   .derive(({ request }) => ({ clientIp: getClientIp(request) }))
   .onBeforeHandle(({ set, clientIp }) => {
     const rateLimit = consumeRateLimit(clientIp)

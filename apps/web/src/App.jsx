@@ -4,6 +4,7 @@ import { Route, Routes, useLocation } from 'react-router-dom'
 import Footer from './components/Footer.jsx'
 import Navigation from './components/Navigation.jsx'
 import AlbumDetails from './pages/AlbumDetails.jsx'
+import Auth from './pages/Auth.jsx'
 import Discover from './pages/Discover.jsx'
 import Home from './pages/Home.jsx'
 import NotFound from './pages/NotFound.jsx'
@@ -21,6 +22,7 @@ const App = () => {
             <Route path="/" element={<Home />} />
             <Route path="/discover" element={<Discover />} />
             <Route path="/search" element={<SearchResults />} />
+            <Route path="/auth" element={<Auth />} />
             <Route path="/album/:albumId" element={<AlbumDetails />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
