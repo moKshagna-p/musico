@@ -1,5 +1,8 @@
-import { Database } from 'bun:sqlite'
 import { betterAuth } from 'better-auth'
+import { drizzleAdapter } from 'better-auth/adapters/drizzle'
+
+import { db } from './db'
+import { authSchema } from './schema'
 
 const env = ((globalThis as unknown as { Bun?: { env: Record<string, string | undefined> } }).Bun?.env ??
   process.env ??
@@ -11,10 +14,11 @@ const allowedOrigins = (env.ALLOWED_ORIGIN ?? 'http://localhost:5173')
   .map((origin) => origin.trim())
   .filter(Boolean)
 
-const db = new Database('./auth.db')
-
 export const auth = betterAuth({
-  database: db,
+  database: drizzleAdapter(db, {
+    provider: 'pg',
+    schema: authSchema,
+  }),
   baseURL: baseUrl,
   trustedOrigins: allowedOrigins,
   emailAndPassword: {

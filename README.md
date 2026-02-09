@@ -20,6 +20,7 @@ Turbo monorepo for a React/Vite frontend and a Bun/Elysia API proxy.
 2. Copy `.env.example` to `.env` at the repo root and fill:
    - `VITE_API_BASE_URL` - backend origin (defaults to `http://localhost:4000`).
    - `PORT`, `ALLOWED_ORIGIN`, `DISCOGS_TOKEN` (+ optional `DISCOGS_KEY`/`DISCOGS_SECRET`).
+   - `DATABASE_URL` for Neon Postgres.
    - `BETTER_AUTH_URL` and `BETTER_AUTH_SECRET` for authentication.
 3. Start everything:
    - `bun run dev` (or `npm run dev`)
@@ -38,8 +39,17 @@ Turbo monorepo for a React/Vite frontend and a Bun/Elysia API proxy.
 
 - Better Auth is mounted in the API at `/api/auth/*`.
 - Email/password auth is enabled.
-- Auth data is stored in `apps/api/auth.db` (SQLite via `better-sqlite3`).
+- Auth data is stored in Neon Postgres via Drizzle ORM.
 - Web auth page is available at `/auth`.
+- Better Auth Drizzle schema is defined in `apps/api/schema.ts`.
+
+## Database
+
+- Drizzle config: `apps/api/drizzle.config.ts`
+- Migration files: `apps/api/drizzle/*`
+- Generate migration: `bun run --cwd apps/api db:generate`
+- Apply migration: `bun run --cwd apps/api db:migrate`
+- Open Drizzle Studio: `bun run --cwd apps/api db:studio`
 
 ## Backend behavior
 
