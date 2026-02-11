@@ -1,60 +1,85 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 
-import { getFeaturedReleases, searchReleases } from '../services/discogsService.js'
+import { searchReleases } from '../services/discogsService.js'
 import { debounce } from '../utils/helpers.js'
 
 export const useAlbums = (initialQuery = '') => {
+  const skipNextSearchEffectRef = useRef(false)
   const [albums, setAlbums] = useState([])
-  const [featured, setFeatured] = useState([])
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(Boolean(initialQuery?.trim()))
   const [error, setError] = useState(null)
   const [query, setQuery] = useState(initialQuery)
 
-  const fetchReleases = useCallback(async () => {
+  const searchHandler = useCallback(
+    debounce(async (value) => {
+      const trimmed = value?.trim() ?? ''
+      if (!trimmed) {
+        setAlbums([])
+        setLoading(false)
+        setError(null)
+        return
+      }
+
+      setLoading(true)
+      setError(null)
+      try {
+        const results = await searchReleases(trimmed)
+        setAlbums(results)
+      } catch (err) {
+        setError(err?.message ?? 'Search is unavailable at the moment.')
+        setAlbums([])
+      } finally {
+        setLoading(false)
+      }
+    }, 300),
+    [],
+  )
+
+  const runSearchImmediately = useCallback(async (value) => {
+    const trimmed = value?.trim() ?? ''
+    if (!trimmed) {
+      setAlbums([])
+      setLoading(false)
+      setError(null)
+      return
+    }
+
     setLoading(true)
     setError(null)
     try {
-      const releases = await getFeaturedReleases(36)
-      setAlbums(releases)
-      setFeatured(releases.slice(0, 3))
+      const results = await searchReleases(trimmed)
+      setAlbums(results)
     } catch (err) {
-      setError(err?.message ?? 'Unable to load featured releases.')
+      setError(err?.message ?? 'Search is unavailable at the moment.')
+      setAlbums([])
     } finally {
       setLoading(false)
     }
   }, [])
 
   useEffect(() => {
-    fetchReleases()
-  }, [fetchReleases])
-
-  const searchHandler = useCallback(
-    debounce(async (value) => {
-      if (!value) {
-        await fetchReleases()
-        return
-      }
-      setLoading(true)
-      setError(null)
-      try {
-        const results = await searchReleases(value)
-        setAlbums(results)
-      } catch (err) {
-        setError(err?.message ?? 'Search is unavailable at the moment.')
-      } finally {
-        setLoading(false)
-      }
-    }, 420),
-    [fetchReleases],
-  )
+    const trimmed = query?.trim() ?? ''
+    if (trimmed) {
+      skipNextSearchEffectRef.current = true
+      void runSearchImmediately(trimmed)
+    } else {
+      setLoading(false)
+      setAlbums([])
+    }
+    // Run once on mount so /search?q=... restores immediately without a featured-data flicker.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   useEffect(() => {
+    if (skipNextSearchEffectRef.current) {
+      skipNextSearchEffectRef.current = false
+      return
+    }
     searchHandler(query)
   }, [query, searchHandler])
 
   return {
     albums,
-    featuredAlbums: featured,
     query,
     setQuery,
     loading,
