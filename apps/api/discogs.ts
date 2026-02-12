@@ -277,15 +277,16 @@ const dedupeReleasedAlbums = (releases: Release[]) => {
   return Array.from(picked.values())
 }
 
-const hydrateCommunityRatings = async (releases: Release[], maxToHydrate = 8) => {
-  const pending = releases
-    .filter((release) => release?.id && (release.reviewCount ?? 0) === 0)
-    .slice(0, Math.max(0, maxToHydrate))
+const hydrateReleaseMetadata = async (releases: Release[], maxToHydrate = releases.length) => {
+  const pending = releases.filter((release) => release?.id).slice(0, Math.max(0, maxToHydrate))
 
   await Promise.all(
     pending.map(async (release) => {
       const cached = releaseCache.get(release.id)
       if (cached && isFresh(cached.timestamp)) {
+        if (cached.data.genres?.length) {
+          release.genres = cached.data.genres
+        }
         release.communityRating = cached.data.communityRating
         release.reviewCount = cached.data.reviewCount
         return
@@ -296,6 +297,9 @@ const hydrateCommunityRatings = async (releases: Release[], maxToHydrate = 8) =>
         const normalized = normalizeRelease(response, response.tracklist?.length)
         if (!normalized) return
 
+        if (normalized.genres?.length) {
+          release.genres = normalized.genres
+        }
         release.communityRating = normalized.communityRating
         release.reviewCount = normalized.reviewCount
         releaseCache.set(release.id, { data: normalized, timestamp: Date.now() })
@@ -340,7 +344,7 @@ export const getFeaturedReleases = async (limit = 24, forceRefresh = false) => {
 
   const curated = dedupeReleasedAlbums(normalized)
   const topFeatured = curated.slice(0, limit)
-  await hydrateCommunityRatings(topFeatured, 6)
+  await hydrateReleaseMetadata(topFeatured, topFeatured.length)
   featuredCache.data = topFeatured
   featuredCache.timestamp = Date.now()
   return topFeatured
@@ -398,7 +402,7 @@ export const getRecentPopularReleases = async (limit = 24, forceRefresh = false)
 
   const ranked = [...recentFirst, ...olderFallback]
   const topRanked = ranked.slice(0, limit)
-  await hydrateCommunityRatings(topRanked, 6)
+  await hydrateReleaseMetadata(topRanked, topRanked.length)
   recentPopularCache.data = topRanked
   recentPopularCache.timestamp = Date.now()
 
@@ -437,6 +441,7 @@ export const searchReleases = async (query: string) => {
     .filter(Boolean) as Release[]
 
   const curated = dedupeReleasedAlbums(normalized)
+  await hydrateReleaseMetadata(curated, curated.length)
   searchCache.set(cacheKey, { data: curated, timestamp: Date.now() })
   return curated
 }

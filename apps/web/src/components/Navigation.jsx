@@ -4,12 +4,7 @@ import { useAuth } from '../hooks/useAuth.js'
 
 const Navigation = () => {
   const navigate = useNavigate()
-  const { user, signOutCurrentUser } = useAuth()
-
-  const handleSignOut = async () => {
-    await signOutCurrentUser()
-    navigate('/auth')
-  }
+  const { user } = useAuth()
 
   return (
     <header className="sticky top-0 z-40 border-b border-outline/60 bg-canvas/95 backdrop-blur">
@@ -82,9 +77,9 @@ const Navigation = () => {
             Discover
           </NavLink>
           {user ? (
-            <button type="button" onClick={handleSignOut} className="hover:text-white">
-              Sign Out
-            </button>
+            <NavLink to="/profile" className={({ isActive }) => (isActive ? 'text-white' : 'hover:text-white')}>
+              Profile
+            </NavLink>
           ) : (
             <NavLink to="/auth" className={({ isActive }) => (isActive ? 'text-white' : 'hover:text-white')}>
               Sign In
