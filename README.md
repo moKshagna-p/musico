@@ -1,4 +1,4 @@
-# MuseVault
+# Musico
 
 Turbo monorepo for a React/Vite frontend and a Bun/Elysia API proxy.
 
