@@ -5,9 +5,17 @@ const env = ((globalThis as unknown as { Bun?: { env: Record<string, string | un
   {}) as Record<string, string | undefined>
 
 const DISCOGS_BASE = 'https://api.discogs.com'
-const DISCOGS_TOKEN = env.DISCOGS_TOKEN
-const DISCOGS_KEY = env.DISCOGS_KEY
-const DISCOGS_SECRET = env.DISCOGS_SECRET
+const sanitizeDiscogsCredential = (value?: string) => {
+  const trimmed = value?.trim()
+  if (!trimmed) return undefined
+  const placeholderPattern = /^(your_|replace_|example|changeme|token_here|key_here|secret_here)/i
+  if (placeholderPattern.test(trimmed)) return undefined
+  return trimmed
+}
+const DISCOGS_TOKEN = sanitizeDiscogsCredential(env.DISCOGS_TOKEN)
+const DISCOGS_KEY = sanitizeDiscogsCredential(env.DISCOGS_KEY)
+const DISCOGS_SECRET = sanitizeDiscogsCredential(env.DISCOGS_SECRET)
+const DISCOGS_USER_AGENT = env.DISCOGS_USER_AGENT?.trim() || 'musico/1.0 (+http://localhost:4000)'
 
 const CACHE_WINDOW = 1000 * 60 * 60 // 1 hour
 const FEATURED_CACHE_WINDOW = 1000 * 60 * 5 // 5 minutes
@@ -18,7 +26,7 @@ const searchCache = new Map<string, { data: Release[]; timestamp: number }>()
 const releaseCache = new Map<string, { data: Release; timestamp: number }>()
 
 const HEADERS: Record<string, string> = {
-  'User-Agent': 'MuseVault/1.0 (https://example.com)',
+  'User-Agent': DISCOGS_USER_AGENT,
   Accept: 'application/json',
 }
 
@@ -152,21 +160,43 @@ const normalizeRelease = (release: any, fallbackTrackCount = 0): Release | null 
 }
 
 const requestDiscogs = async (endpoint: string, params: Record<string, string | number | undefined> = {}) => {
-  const url = new URL(`${DISCOGS_BASE}${endpoint}`)
-  Object.entries(params).forEach(([key, value]) => {
-    if (value !== undefined && value !== null && value !== '') url.searchParams.append(key, String(value))
-  })
-
-  if (DISCOGS_KEY && DISCOGS_SECRET) {
-    url.searchParams.append('key', DISCOGS_KEY)
-    url.searchParams.append('secret', DISCOGS_SECRET)
+  const makeUrl = (useTokenQuery = false) => {
+    const url = new URL(`${DISCOGS_BASE}${endpoint}`)
+    Object.entries(params).forEach(([key, value]) => {
+      if (value !== undefined && value !== null && value !== '') url.searchParams.append(key, String(value))
+    })
+    if (DISCOGS_KEY && DISCOGS_SECRET) {
+      url.searchParams.append('key', DISCOGS_KEY)
+      url.searchParams.append('secret', DISCOGS_SECRET)
+    }
+    if (useTokenQuery && DISCOGS_TOKEN) url.searchParams.append('token', DISCOGS_TOKEN)
+    return url
   }
 
-  const headers = { ...HEADERS }
-  if (DISCOGS_TOKEN) headers.Authorization = `Discogs token=${DISCOGS_TOKEN}`
+  const makeHeaders = (useTokenHeader = true) => {
+    const headers = { ...HEADERS }
+    if (useTokenHeader && DISCOGS_TOKEN) headers.Authorization = `Discogs token=${DISCOGS_TOKEN}`
+    return headers
+  }
 
-  const response = await fetch(url, { headers })
-  if (!response.ok) throw new Error(`Discogs request failed: ${response.status}`)
+  let response = await fetch(makeUrl(false), { headers: makeHeaders(true) })
+
+  // Some Discogs setups only accept user token via query param.
+  if (response.status === 401 && DISCOGS_TOKEN) {
+    response = await fetch(makeUrl(true), { headers: makeHeaders(false) })
+  }
+
+  // If token auth fails entirely and no key/secret exists, retry as anonymous public request.
+  if (response.status === 401 && DISCOGS_TOKEN && !(DISCOGS_KEY && DISCOGS_SECRET)) {
+    response = await fetch(makeUrl(false), { headers: makeHeaders(false) })
+  }
+
+  if (!response.ok) {
+    const errorBody = await response.text().catch(() => '')
+    const hasCredentials = Boolean(DISCOGS_TOKEN || (DISCOGS_KEY && DISCOGS_SECRET))
+    const reason = errorBody ? ` - ${errorBody.slice(0, 200)}` : ''
+    throw new Error(`Discogs request failed: ${response.status}${hasCredentials ? ' (with credentials)' : ''}${reason}`)
+  }
   return response.json()
 }
 
