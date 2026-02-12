@@ -6,11 +6,15 @@ import PageTransition from '../components/PageTransition.jsx'
 import SearchBar from '../components/SearchBar.jsx'
 import { getRecentPopularReleases } from '../services/discogsService.js'
 
+const MIN_LIVE_SEARCH_LENGTH = 3
+const LIVE_SEARCH_DEBOUNCE_MS = 300
+
 const Discover = () => {
   const navigate = useNavigate()
   const [albums, setAlbums] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  const [liveQuery, setLiveQuery] = useState('')
 
   useEffect(() => {
     const loadFeatured = async () => {
@@ -27,6 +31,17 @@ const Discover = () => {
     }
     loadFeatured()
   }, [])
+
+  useEffect(() => {
+    const trimmed = liveQuery.trim()
+    if (trimmed.length < MIN_LIVE_SEARCH_LENGTH) return
+
+    const timer = setTimeout(() => {
+      navigate(`/search?q=${encodeURIComponent(trimmed)}`)
+    }, LIVE_SEARCH_DEBOUNCE_MS)
+
+    return () => clearTimeout(timer)
+  }, [liveQuery, navigate])
 
   const handleSearch = (value) => {
     if (value?.trim()) {
@@ -46,7 +61,13 @@ const Discover = () => {
           <h1 className="font-display text-4xl">Dig through the vault</h1>
         </div>
 
-        <SearchBar query="" onSearch={handleSearch} placeholder="Search artists or albums..." enablePredictive />
+        <SearchBar
+          query=""
+          onSearch={handleSearch}
+          onValueChange={setLiveQuery}
+          placeholder="Search artists or albums..."
+          enablePredictive
+        />
 
         <div>
           <p className="mb-4 text-xs uppercase tracking-[0.4em] text-muted">Featured Releases</p>

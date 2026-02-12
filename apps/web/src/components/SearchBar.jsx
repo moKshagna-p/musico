@@ -12,7 +12,7 @@ import {
 const MIN_SUGGEST_QUERY_LENGTH = 3
 const SUGGESTION_LIMIT = 5
 
-const SearchBar = ({ query = '', onSearch, placeholder, autoFocus, enablePredictive = false }) => {
+const SearchBar = ({ query = '', onSearch, onValueChange, placeholder, autoFocus, enablePredictive = false }) => {
   const [value, setValue] = useState(query)
   const [recentSearches, setRecentSearches] = useState([])
   const [suggestions, setSuggestions] = useState([])
@@ -166,7 +166,11 @@ const SearchBar = ({ query = '', onSearch, placeholder, autoFocus, enablePredict
           <FiSearch className="text-xl text-muted" />
           <input
             value={value}
-            onChange={(event) => setValue(event.target.value)}
+            onChange={(event) => {
+              const nextValue = event.target.value
+              setValue(nextValue)
+              onValueChange?.(nextValue)
+            }}
             onFocus={() => setShowSuggestions(true)}
             onBlur={() => setTimeout(() => setShowSuggestions(false), 120)}
             onKeyDown={handleKeyDown}
