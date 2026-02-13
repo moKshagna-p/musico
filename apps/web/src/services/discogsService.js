@@ -32,29 +32,26 @@ const requestBackend = async (path, params = {}) => {
 
 const isFresh = (timestamp, ttl = CACHE_WINDOW) => Date.now() - timestamp < ttl
 
-export const getFeaturedReleases = async (limit = 24, options = {}) => {
-  const forceRefresh = Boolean(options?.forceRefresh)
-  if (!forceRefresh && featuredCache.data.length && isFresh(featuredCache.timestamp, FEATURED_CACHE_WINDOW)) {
+export const getFeaturedReleases = async (limit = 24) => {
+  if (featuredCache.data.length && isFresh(featuredCache.timestamp, FEATURED_CACHE_WINDOW)) {
     return featuredCache.data.slice(0, limit)
   }
 
-  const response = await requestBackend('/api/featured', { limit, refresh: forceRefresh ? 1 : undefined })
+  const response = await requestBackend('/api/featured', { limit })
   const data = Array.isArray(response?.data) ? response.data : []
   featuredCache.timestamp = Date.now()
   featuredCache.data = data
   return data.slice(0, limit)
 }
 
-export const getRecentPopularReleases = async (limit = 24, options = {}) => {
-  const forceRefresh = Boolean(options?.forceRefresh)
-  if (!forceRefresh && recentPopularCache.data.length && isFresh(recentPopularCache.timestamp, FEATURED_CACHE_WINDOW)) {
+export const getRecentPopularReleases = async (limit = 24) => {
+  if (recentPopularCache.data.length && isFresh(recentPopularCache.timestamp, FEATURED_CACHE_WINDOW)) {
     return recentPopularCache.data.slice(0, limit)
   }
 
   const response = await requestBackend('/api/featured', {
     limit,
     mode: 'recent-popular',
-    refresh: forceRefresh ? 1 : undefined,
   })
   const data = Array.isArray(response?.data) ? response.data : []
   recentPopularCache.timestamp = Date.now()

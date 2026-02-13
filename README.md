@@ -20,6 +20,7 @@ Turbo monorepo for a React/Vite frontend and a Bun/Elysia API proxy.
 2. Copy `.env.example` to `.env` at the repo root and fill:
    - `VITE_API_BASE_URL` - backend origin (defaults to `http://localhost:4000`).
    - `PORT`, `ALLOWED_ORIGIN`, `DISCOGS_TOKEN` (+ optional `DISCOGS_KEY`/`DISCOGS_SECRET`).
+   - Optional cache TTL overrides: `FEATURED_CACHE_TTL_MS`, `SEARCH_CACHE_TTL_MS`.
    - `DATABASE_URL` for Neon Postgres.
    - `BETTER_AUTH_URL` and `BETTER_AUTH_SECRET` for authentication.
 3. Start everything:
@@ -54,5 +55,7 @@ Turbo monorepo for a React/Vite frontend and a Bun/Elysia API proxy.
 ## Backend behavior
 
 - Proxies Discogs search/release endpoints while normalizing payloads for UI use.
-- Caches featured lists, search results, and release details for 1 hour.
+- Stores featured lists in Postgres and refreshes them lazily every 24 hours on first request after expiry.
+- Stores search results in Postgres using SHA-256 query hashes to reuse repeated searches and reduce upstream API calls.
+- Keeps release detail caching in memory for 1 hour.
 - Applies IP-based abuse protection (100 requests/hour) and returns `429` with `Retry-After` headers when exceeded.

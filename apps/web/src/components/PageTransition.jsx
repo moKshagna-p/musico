@@ -1,15 +1,20 @@
-import { motion } from 'framer-motion'
+import { motion, useReducedMotion } from 'framer-motion'
 
-const PageTransition = ({ children }) => (
-  <motion.main
-    initial={{ opacity: 0 }}
-    animate={{ opacity: 1 }}
-    exit={{ opacity: 0 }}
-    transition={{ duration: 0.2 }}
-    className="mx-auto w-full max-w-6xl px-6 py-12"
-  >
-    {children}
-  </motion.main>
-)
+const PageTransition = ({ children }) => {
+  const shouldReduceMotion = useReducedMotion()
+  const MotionMain = motion.main
+
+  return (
+    <MotionMain
+      initial={shouldReduceMotion ? false : { opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={shouldReduceMotion ? { opacity: 1 } : { opacity: 0, y: -8 }}
+      transition={{ duration: shouldReduceMotion ? 0 : 0.24, ease: [0.16, 1, 0.3, 1] }}
+      className="mx-auto w-full max-w-6xl px-6 py-12"
+    >
+      {children}
+    </MotionMain>
+  )
+}
 
 export default PageTransition

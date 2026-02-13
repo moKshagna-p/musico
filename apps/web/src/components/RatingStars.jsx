@@ -3,6 +3,7 @@ import { motion } from 'framer-motion'
 import { FaStar } from 'react-icons/fa'
 
 const RatingStars = ({ value = 0, onRate, readOnly = false, showValue = false }) => {
+  const MotionButton = motion.button
   const [hoverValue, setHoverValue] = useState(null)
   const displayValue = hoverValue ?? value ?? 0
 
@@ -14,19 +15,24 @@ const RatingStars = ({ value = 0, onRate, readOnly = false, showValue = false })
         {stars.map((star) => {
           const active = displayValue >= star
           return (
-            <motion.button
+            <MotionButton
               key={star}
               type="button"
+              aria-label={`Rate ${star} star${star === 1 ? '' : 's'}`}
               disabled={readOnly}
               whileTap={{ scale: 0.9 }}
               whileHover={!readOnly ? { scale: 1.08 } : undefined}
               onClick={() => !readOnly && onRate?.(star)}
               onMouseEnter={() => !readOnly && setHoverValue(star)}
               onMouseLeave={() => !readOnly && setHoverValue(null)}
-              className={`p-1 ${readOnly ? 'cursor-default' : 'cursor-pointer'}`}
+              className={`rounded p-1 ${
+                readOnly
+                  ? 'cursor-default'
+                  : 'cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas'
+              }`}
             >
-              <FaStar className={`text-xl transition ${active ? 'text-white' : 'text-muted/45'}`} />
-            </motion.button>
+              <FaStar aria-hidden="true" className={`text-xl transition ${active ? 'text-white' : 'text-muted/45'}`} />
+            </MotionButton>
           )
         })}
       </div>

@@ -7,8 +7,6 @@ import PageTransition from '../components/PageTransition.jsx'
 import { searchReleases, getFeaturedReleases } from '../services/discogsService.js'
 import { getSearchHistory } from '../services/searchHistoryService.js'
 
-const TOP_ALBUM_REFRESH_MS = 1000 * 60 * 5
-
 const Home = () => {
   const navigate = useNavigate()
   const [featuredAlbums, setFeaturedAlbums] = useState([])
@@ -19,29 +17,20 @@ const Home = () => {
   const [error, setError] = useState(null)
 
   useEffect(() => {
-    const loadFeatured = async ({ forceRefresh = false, silent = false } = {}) => {
-      if (!silent) {
-        setLoading(true)
-        setError(null)
-      }
+    const loadFeatured = async () => {
+      setLoading(true)
+      setError(null)
       try {
-        const releases = await getFeaturedReleases(24, { forceRefresh })
+        const releases = await getFeaturedReleases(24)
         setFeaturedAlbums(releases)
       } catch (err) {
         setError(err?.message ?? 'Unable to load featured releases.')
       } finally {
-        if (!silent) {
-          setLoading(false)
-        }
+        setLoading(false)
       }
     }
 
     loadFeatured()
-    const intervalId = setInterval(() => {
-      loadFeatured({ forceRefresh: true, silent: true })
-    }, TOP_ALBUM_REFRESH_MS)
-
-    return () => clearInterval(intervalId)
   }, [])
 
   useEffect(() => {

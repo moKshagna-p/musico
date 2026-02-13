@@ -1,4 +1,6 @@
-import { boolean, index, pgTable, text, timestamp, uniqueIndex } from 'drizzle-orm/pg-core'
+import type { Release } from './types'
+
+import { boolean, index, jsonb, pgTable, text, timestamp, uniqueIndex } from 'drizzle-orm/pg-core'
 
 export const user = pgTable(
   'user',
@@ -69,10 +71,39 @@ export const verification = pgTable(
   (table) => [index('verification_identifier_idx').on(table.identifier)],
 )
 
+export const featuredCache = pgTable(
+  'featured_cache',
+  {
+    mode: text('mode').primaryKey(),
+    payload: jsonb('payload').$type<Release[]>().notNull(),
+    expiresAt: timestamp('expiresAt', { withTimezone: true, mode: 'date' }).notNull(),
+    refreshedAt: timestamp('refreshedAt', { withTimezone: true, mode: 'date' }).notNull(),
+    createdAt: timestamp('createdAt', { withTimezone: true, mode: 'date' }).notNull(),
+    updatedAt: timestamp('updatedAt', { withTimezone: true, mode: 'date' }).notNull(),
+  },
+  (table) => [index('featured_cache_expires_at_idx').on(table.expiresAt)],
+)
+
+export const searchCache = pgTable(
+  'search_cache',
+  {
+    queryHash: text('queryHash').primaryKey(),
+    normalizedQuery: text('normalizedQuery').notNull(),
+    payload: jsonb('payload').$type<Release[]>().notNull(),
+    expiresAt: timestamp('expiresAt', { withTimezone: true, mode: 'date' }).notNull(),
+    refreshedAt: timestamp('refreshedAt', { withTimezone: true, mode: 'date' }).notNull(),
+    createdAt: timestamp('createdAt', { withTimezone: true, mode: 'date' }).notNull(),
+    updatedAt: timestamp('updatedAt', { withTimezone: true, mode: 'date' }).notNull(),
+  },
+  (table) => [
+    index('search_cache_expires_at_idx').on(table.expiresAt),
+    index('search_cache_normalized_query_idx').on(table.normalizedQuery),
+  ],
+)
+
 export const authSchema = {
   user,
   session,
   account,
   verification,
 }
-

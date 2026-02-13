@@ -1,4 +1,11 @@
+import { createHash } from 'node:crypto'
+
+import { eq } from 'drizzle-orm'
+
 import type { Release } from './types'
+
+import { db } from './db'
+import { featuredCache as featuredCacheTable, searchCache as searchCacheTable } from './schema'
 
 const env = ((globalThis as unknown as { Bun?: { env: Record<string, string | undefined> } }).Bun?.env ??
   process.env ??
@@ -17,13 +24,19 @@ const DISCOGS_KEY = sanitizeDiscogsCredential(env.DISCOGS_KEY)
 const DISCOGS_SECRET = sanitizeDiscogsCredential(env.DISCOGS_SECRET)
 const DISCOGS_USER_AGENT = env.DISCOGS_USER_AGENT?.trim() || 'musico/1.0 (+http://localhost:4000)'
 
-const CACHE_WINDOW = 1000 * 60 * 60 // 1 hour
-const FEATURED_CACHE_WINDOW = 1000 * 60 * 5 // 5 minutes
+const parsePositiveInteger = (value: string | undefined, fallback: number) => {
+  const parsed = Number.parseInt(value ?? '', 10)
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback
+}
 
-const featuredCache: { data: Release[]; timestamp: number } = { data: [], timestamp: 0 }
-const recentPopularCache: { data: Release[]; timestamp: number } = { data: [], timestamp: 0 }
-const searchCache = new Map<string, { data: Release[]; timestamp: number }>()
+const RELEASE_CACHE_WINDOW = 1000 * 60 * 60 // 1 hour
+const FEATURED_DB_CACHE_WINDOW = parsePositiveInteger(env.FEATURED_CACHE_TTL_MS, 1000 * 60 * 60 * 24)
+const SEARCH_DB_CACHE_WINDOW = parsePositiveInteger(env.SEARCH_CACHE_TTL_MS, 1000 * 60 * 60 * 24 * 7)
+const FEATURED_REFRESH_SIZE = 50
+
 const releaseCache = new Map<string, { data: Release; timestamp: number }>()
+const featuredRefreshInFlight = new Map<string, Promise<Release[]>>()
+const searchRefreshInFlight = new Map<string, Promise<Release[]>>()
 
 const HEADERS: Record<string, string> = {
   'User-Agent': DISCOGS_USER_AGENT,
@@ -200,7 +213,15 @@ const requestDiscogs = async (endpoint: string, params: Record<string, string | 
   return response.json()
 }
 
-const isFresh = (timestamp: number, ttl = CACHE_WINDOW) => Date.now() - timestamp < ttl
+const isFresh = (timestamp: number, ttl = RELEASE_CACHE_WINDOW) => Date.now() - timestamp < ttl
+const isNotExpired = (expiresAt: Date | null | undefined) => Boolean(expiresAt && expiresAt.getTime() > Date.now())
+const normalizeCacheQuery = (query: string) => query.trim().toLowerCase().replace(/\s+/g, ' ')
+const createQueryHash = (query: string) => createHash('sha256').update(query).digest('hex')
+
+const toReleaseArray = (value: unknown): Release[] => {
+  if (!Array.isArray(value)) return []
+  return value.filter(Boolean) as Release[]
+}
 
 const variantMarkers = [
   'deluxe',
@@ -277,53 +298,8 @@ const dedupeReleasedAlbums = (releases: Release[]) => {
   return Array.from(picked.values())
 }
 
-const hydrateReleaseMetadata = async (releases: Release[], maxToHydrate = releases.length) => {
-  const pending = releases.filter((release) => release?.id).slice(0, Math.max(0, maxToHydrate))
-
-  await Promise.all(
-    pending.map(async (release) => {
-      const cached = releaseCache.get(release.id)
-      if (cached && isFresh(cached.timestamp)) {
-        if (cached.data.genres?.length) {
-          release.genres = cached.data.genres
-        }
-        release.communityRating = cached.data.communityRating
-        release.reviewCount = cached.data.reviewCount
-        return
-      }
-
-      try {
-        const response = await requestDiscogs(`/releases/${release.id}`)
-        const normalized = normalizeRelease(response, response.tracklist?.length)
-        if (!normalized) return
-
-        if (normalized.genres?.length) {
-          release.genres = normalized.genres
-        }
-        release.communityRating = normalized.communityRating
-        release.reviewCount = normalized.reviewCount
-        releaseCache.set(release.id, { data: normalized, timestamp: Date.now() })
-      } catch {
-        // Keep original values when hydration fails.
-      }
-    }),
-  )
-
-  return releases
-}
-
-export const getFeaturedReleases = async (limit = 24, forceRefresh = false) => {
-  if (!forceRefresh && featuredCache.data.length && isFresh(featuredCache.timestamp, FEATURED_CACHE_WINDOW)) {
-    return featuredCache.data.slice(0, limit)
-  }
-  const response = await requestDiscogs('/database/search', {
-    per_page: Math.max(limit * 2, 36),
-    type: 'release',
-    format: 'album',
-    sort: 'have',
-    sort_order: 'desc',
-  })
-  const normalized = (response.results ?? [])
+const mapDiscogsSearchResults = (results: any[]): Release[] =>
+  results
     .map((entry: any) =>
       normalizeRelease({
         id: entry.id,
@@ -342,46 +318,67 @@ export const getFeaturedReleases = async (limit = 24, forceRefresh = false) => {
     )
     .filter(Boolean) as Release[]
 
-  const curated = dedupeReleasedAlbums(normalized)
-  const topFeatured = curated.slice(0, limit)
-  await hydrateReleaseMetadata(topFeatured, topFeatured.length)
-  featuredCache.data = topFeatured
-  featuredCache.timestamp = Date.now()
-  return topFeatured
+type FeaturedMode = 'featured' | 'recent-popular'
+
+const clampLimit = (value: number, fallback = 24) => {
+  const safe = Number.isFinite(value) ? value : fallback
+  return Math.min(Math.max(Math.round(safe), 1), FEATURED_REFRESH_SIZE)
 }
 
-export const getRecentPopularReleases = async (limit = 24, forceRefresh = false) => {
-  if (!forceRefresh && recentPopularCache.data.length && isFresh(recentPopularCache.timestamp, FEATURED_CACHE_WINDOW)) {
-    return recentPopularCache.data.slice(0, limit)
-  }
+const getCachedFeatured = async (mode: FeaturedMode) => {
+  const rows = await db.select().from(featuredCacheTable).where(eq(featuredCacheTable.mode, mode)).limit(1)
+  return rows[0]
+}
 
+const upsertFeatured = async (mode: FeaturedMode, payload: Release[]) => {
+  const now = new Date()
+  const expiresAt = new Date(now.getTime() + FEATURED_DB_CACHE_WINDOW)
+
+  await db
+    .insert(featuredCacheTable)
+    .values({
+      mode,
+      payload,
+      expiresAt,
+      refreshedAt: now,
+      createdAt: now,
+      updatedAt: now,
+    })
+    .onConflictDoUpdate({
+      target: featuredCacheTable.mode,
+      set: {
+        payload,
+        expiresAt,
+        refreshedAt: now,
+        updatedAt: now,
+      },
+    })
+}
+
+const fetchFeaturedFromDiscogs = async (targetSize = FEATURED_REFRESH_SIZE) => {
   const response = await requestDiscogs('/database/search', {
-    per_page: Math.max(limit * 4, 96),
+    per_page: Math.max(targetSize * 2, 36),
+    type: 'release',
+    format: 'album',
+    sort: 'have',
+    sort_order: 'desc',
+  })
+
+  const normalized = mapDiscogsSearchResults(response.results ?? [])
+  const curated = dedupeReleasedAlbums(normalized)
+  return curated.slice(0, targetSize)
+}
+
+const fetchRecentPopularFromDiscogs = async (targetSize = FEATURED_REFRESH_SIZE) => {
+  const response = await requestDiscogs('/database/search', {
+    per_page: Math.max(targetSize * 4, 96),
     type: 'release',
     format: 'album',
     sort: 'year',
     sort_order: 'desc',
   })
 
-  const normalized = (response.results ?? [])
-    .map((entry: any) =>
-      normalizeRelease({
-        id: entry.id,
-        title: entry.title,
-        artist: entry.artist,
-        year: entry.year,
-        cover_image: entry.cover_image,
-        thumb: entry.thumb,
-        genres: entry.genre,
-        styles: entry.style,
-        labels: entry.label ? [{ name: entry.label }] : undefined,
-        formats: entry.format ? [{ name: entry.format }] : undefined,
-        uri: entry.uri,
-        community: entry.community,
-      }),
-    )
-    .filter(Boolean) as Release[]
-
+  const normalized = mapDiscogsSearchResults(response.results ?? [])
   const curated = dedupeReleasedAlbums(normalized)
   const currentYear = new Date().getFullYear()
   const recentStartYear = currentYear - 2
@@ -401,49 +398,127 @@ export const getRecentPopularReleases = async (limit = 24, forceRefresh = false)
     )
 
   const ranked = [...recentFirst, ...olderFallback]
-  const topRanked = ranked.slice(0, limit)
-  await hydrateReleaseMetadata(topRanked, topRanked.length)
-  recentPopularCache.data = topRanked
-  recentPopularCache.timestamp = Date.now()
+  return ranked.slice(0, targetSize)
+}
 
-  return topRanked
+const refreshFeaturedMode = async (mode: FeaturedMode) => {
+  const existing = featuredRefreshInFlight.get(mode)
+  if (existing) return existing
+
+  const refreshPromise = (async () => {
+    const payload =
+      mode === 'recent-popular'
+        ? await fetchRecentPopularFromDiscogs(FEATURED_REFRESH_SIZE)
+        : await fetchFeaturedFromDiscogs(FEATURED_REFRESH_SIZE)
+    await upsertFeatured(mode, payload)
+    return payload
+  })()
+
+  featuredRefreshInFlight.set(mode, refreshPromise)
+  return refreshPromise.finally(() => {
+    featuredRefreshInFlight.delete(mode)
+  })
+}
+
+const getFeaturedByMode = async (mode: FeaturedMode, limit = 24, forceRefresh = false) => {
+  const safeLimit = clampLimit(limit)
+  const cached = await getCachedFeatured(mode)
+  const cachedPayload = toReleaseArray(cached?.payload)
+
+  if (!forceRefresh && cachedPayload.length && isNotExpired(cached?.expiresAt)) {
+    return cachedPayload.slice(0, safeLimit)
+  }
+
+  try {
+    const refreshed = await refreshFeaturedMode(mode)
+    return refreshed.slice(0, safeLimit)
+  } catch {
+    if (cachedPayload.length) {
+      return cachedPayload.slice(0, safeLimit)
+    }
+    throw new Error('Unable to refresh featured releases from Discogs.')
+  }
+}
+
+export const getFeaturedReleases = async (limit = 24, forceRefresh = false) =>
+  getFeaturedByMode('featured', limit, forceRefresh)
+
+export const getRecentPopularReleases = async (limit = 24, forceRefresh = false) =>
+  getFeaturedByMode('recent-popular', limit, forceRefresh)
+
+const getCachedSearch = async (queryHash: string) => {
+  const rows = await db.select().from(searchCacheTable).where(eq(searchCacheTable.queryHash, queryHash)).limit(1)
+  return rows[0]
+}
+
+const upsertSearchCache = async (queryHash: string, normalizedQuery: string, payload: Release[]) => {
+  const now = new Date()
+  const expiresAt = new Date(now.getTime() + SEARCH_DB_CACHE_WINDOW)
+
+  await db
+    .insert(searchCacheTable)
+    .values({
+      queryHash,
+      normalizedQuery,
+      payload,
+      expiresAt,
+      refreshedAt: now,
+      createdAt: now,
+      updatedAt: now,
+    })
+    .onConflictDoUpdate({
+      target: searchCacheTable.queryHash,
+      set: {
+        normalizedQuery,
+        payload,
+        expiresAt,
+        refreshedAt: now,
+        updatedAt: now,
+      },
+    })
+}
+
+const refreshSearchQuery = async (queryHash: string, normalizedQuery: string, sourceQuery: string) => {
+  const existing = searchRefreshInFlight.get(queryHash)
+  if (existing) return existing
+
+  const refreshPromise = (async () => {
+    const response = await requestDiscogs('/database/search', {
+      q: sourceQuery,
+      type: 'release',
+      per_page: 18,
+    })
+    const normalized = mapDiscogsSearchResults(response.results ?? [])
+    const curated = dedupeReleasedAlbums(normalized)
+    await upsertSearchCache(queryHash, normalizedQuery, curated)
+    return curated
+  })()
+
+  searchRefreshInFlight.set(queryHash, refreshPromise)
+  return refreshPromise.finally(() => {
+    searchRefreshInFlight.delete(queryHash)
+  })
 }
 
 export const searchReleases = async (query: string) => {
   const trimmed = query?.trim()
   if (!trimmed) return []
-  const cacheKey = trimmed.toLowerCase()
-  const cached = searchCache.get(cacheKey)
-  if (cached && isFresh(cached.timestamp)) return cached.data
 
-  const response = await requestDiscogs('/database/search', {
-    q: trimmed,
-    type: 'release',
-    per_page: 18,
-  })
-  const normalized = (response.results ?? [])
-    .map((entry: any) =>
-      normalizeRelease({
-        id: entry.id,
-        title: entry.title,
-        artist: entry.artist,
-        year: entry.year,
-        cover_image: entry.cover_image,
-        thumb: entry.thumb,
-        genres: entry.genre,
-        styles: entry.style,
-        labels: entry.label ? [{ name: entry.label }] : undefined,
-        formats: entry.format ? [{ name: entry.format }] : undefined,
-        uri: entry.uri,
-        community: entry.community,
-      }),
-    )
-    .filter(Boolean) as Release[]
+  const normalizedQuery = normalizeCacheQuery(trimmed)
+  const queryHash = createQueryHash(normalizedQuery)
+  const cached = await getCachedSearch(queryHash)
+  const cachedPayload = toReleaseArray(cached?.payload)
 
-  const curated = dedupeReleasedAlbums(normalized)
-  await hydrateReleaseMetadata(curated, curated.length)
-  searchCache.set(cacheKey, { data: curated, timestamp: Date.now() })
-  return curated
+  if (cachedPayload.length && isNotExpired(cached?.expiresAt)) {
+    return cachedPayload
+  }
+
+  try {
+    return await refreshSearchQuery(queryHash, normalizedQuery, trimmed)
+  } catch {
+    if (cachedPayload.length) return cachedPayload
+    throw new Error('Search unavailable right now. Please try again shortly.')
+  }
 }
 
 export const getReleaseDetails = async (releaseId: string) => {

@@ -8,6 +8,7 @@ import { formatReleaseDate } from '../utils/helpers.js'
 import RatingStars from './RatingStars.jsx'
 
 const AlbumCard = ({ album, onSelect }) => {
+  const MotionArticle = motion.article
   const { getUserRating, rateAlbum } = useRatings()
   const userRating = getUserRating(album.id)
   const communityAverage = Number(album.communityRating ?? 0)
@@ -20,7 +21,7 @@ const AlbumCard = ({ album, onSelect }) => {
   }
 
   return (
-    <motion.article
+    <MotionArticle
       layout
       initial={{ opacity: 0, y: 30 }}
       animate={{ opacity: 1, y: 0 }}
@@ -33,6 +34,8 @@ const AlbumCard = ({ album, onSelect }) => {
         <img
           src={album.cover}
           alt={album.name}
+          width="320"
+          height="320"
           loading="lazy"
           className="h-64 w-full rounded-2xl object-cover transition duration-500 group-hover:scale-105"
         />
@@ -70,10 +73,10 @@ const AlbumCard = ({ album, onSelect }) => {
       <div className="flex items-center justify-end border-t border-outline pt-3 text-xs uppercase tracking-[0.3em] text-white">
         <span className="flex items-center gap-2">
           Details
-          <FiArrowUpRight />
+          <FiArrowUpRight aria-hidden="true" />
         </span>
       </div>
-    </motion.article>
+    </MotionArticle>
   )
 }
 

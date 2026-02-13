@@ -76,13 +76,11 @@ const app = new Elysia()
     try {
       const limitParam = Number(query?.limit)
       const limit = Number.isFinite(limitParam) ? Math.min(Math.max(limitParam, 1), 50) : 24
-      const refreshFlag = String(query?.refresh ?? '').toLowerCase()
-      const forceRefresh = refreshFlag === '1' || refreshFlag === 'true'
       const mode = String(query?.mode ?? '').toLowerCase()
       const data =
         mode === 'recent-popular'
-          ? await getRecentPopularReleases(limit, forceRefresh)
-          : await getFeaturedReleases(limit, forceRefresh)
+          ? await getRecentPopularReleases(limit)
+          : await getFeaturedReleases(limit)
       set.headers ??= {}
       set.headers['Cache-Control'] = 'public, max-age=60'
       return { data }
