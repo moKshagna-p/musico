@@ -1,6 +1,6 @@
 import { useContext } from 'react'
 
-import { RatingsContext } from '../context/RatingsContext.jsx'
+import { RatingsContext } from '../context/ratingsContext.js'
 
 export const useRatings = () => {
   const context = useContext(RatingsContext)

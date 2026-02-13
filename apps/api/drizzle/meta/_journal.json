@@ -15,6 +15,13 @@
       "when": 1770965544764,
       "tag": "0001_medical_wong",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1770967310789,
+      "tag": "0002_simple_domino",
+      "breakpoints": true
     }
   ]
 }

@@ -1,89 +1,152 @@
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 
+import { useAuth } from '../hooks/useAuth.js'
 import {
-  buildNewList,
+  createMyList,
+  fetchMyLists,
+  toggleAlbumInMyList,
+} from '../services/profileDataService.js'
+import {
   listStorageConfig,
-  loadListsFromStorage,
   normalizeListName,
-  persistListsToStorage,
   toListAlbumSummary,
 } from '../services/listsService.js'
 import { ListsContext } from './listsContext.js'
 
+const normalizeRemoteList = (value) => {
+  const id = String(value?.id ?? '').trim()
+  const name = normalizeListName(value?.name)
+  if (!id || !name) return null
+
+  const albums = Array.isArray(value?.albums)
+    ? value.albums
+        .map((entry) => toListAlbumSummary(entry))
+        .filter(Boolean)
+    : []
+
+  return {
+    id,
+    name,
+    albums,
+    createdAt: Number(value?.createdAt ?? Date.now()),
+    updatedAt: Number(value?.updatedAt ?? Date.now()),
+  }
+}
+
+const sortListsByUpdatedAt = (lists) => [...lists].sort((a, b) => Number(b.updatedAt ?? 0) - Number(a.updatedAt ?? 0))
+
 export const ListsProvider = ({ children }) => {
-  const [lists, setLists] = useState(() => loadListsFromStorage())
+  const { user, isPending } = useAuth()
+  const [lists, setLists] = useState([])
 
-  const createList = useCallback((name) => {
-    const normalized = normalizeListName(name)
-    if (!normalized) return { ok: false, reason: 'empty' }
+  useEffect(() => {
+    let isCancelled = false
 
-    let outcome = { ok: false, reason: 'unknown' }
-    setLists((prev) => {
-      const duplicate = prev.some((list) => list.name.toLowerCase() === normalized.toLowerCase())
-      if (duplicate) {
-        outcome = { ok: false, reason: 'duplicate' }
-        return prev
+    const loadLists = async () => {
+      if (isPending) return
+      if (!user?.id) {
+        setLists([])
+        return
       }
 
-      if (prev.length >= listStorageConfig.MAX_LISTS) {
-        outcome = { ok: false, reason: 'limit' }
-        return prev
-      }
-
-      const created = buildNewList(normalized)
-      if (!created) {
-        outcome = { ok: false, reason: 'empty' }
-        return prev
-      }
-
-      const next = [created, ...prev]
-      persistListsToStorage(next)
-      outcome = { ok: true, list: created }
-      return next
-    })
-
-    return outcome
-  }, [])
-
-  const toggleAlbumInList = useCallback((listId, album) => {
-    const albumSummary = toListAlbumSummary(album)
-    if (!albumSummary) return { ok: false, reason: 'album' }
-
-    let outcome = { ok: false, reason: 'list' }
-    setLists((prev) => {
-      let updated = false
-      const next = prev.map((list) => {
-        if (list.id !== listId) return list
-
-        const existingIndex = list.albums.findIndex((entry) => entry.id === albumSummary.id)
-        const isAlreadyAdded = existingIndex >= 0
-        const albums = isAlreadyAdded
-          ? list.albums.filter((entry) => entry.id !== albumSummary.id)
-          : [albumSummary, ...list.albums].slice(0, listStorageConfig.MAX_ALBUMS_PER_LIST)
-
-        updated = true
-        outcome = {
-          ok: true,
-          added: !isAlreadyAdded,
-          listName: list.name,
+      try {
+        const remote = await fetchMyLists()
+        if (isCancelled) return
+        const normalized = remote.map(normalizeRemoteList).filter(Boolean)
+        setLists(sortListsByUpdatedAt(normalized))
+      } catch {
+        if (!isCancelled) {
+          setLists([])
         }
+      }
+    }
+
+    void loadLists()
+
+    return () => {
+      isCancelled = true
+    }
+  }, [isPending, user?.id])
+
+  const createList = useCallback(
+    async (name) => {
+      if (!user?.id) return { ok: false, reason: 'auth' }
+
+      const normalized = normalizeListName(name)
+      if (!normalized) return { ok: false, reason: 'empty' }
+
+      const duplicate = lists.some((list) => list.name.toLowerCase() === normalized.toLowerCase())
+      if (duplicate) return { ok: false, reason: 'duplicate' }
+      if (lists.length >= listStorageConfig.MAX_LISTS) return { ok: false, reason: 'limit' }
+
+      try {
+        const created = normalizeRemoteList(await createMyList(normalized))
+        if (!created) return { ok: false, reason: 'invalid' }
+
+        setLists((prev) => sortListsByUpdatedAt([created, ...prev]))
+        return { ok: true, list: created }
+      } catch (error) {
+        const message = String(error?.message ?? '').toLowerCase()
+        if (message.includes('already exists')) return { ok: false, reason: 'duplicate' }
+        if (message.includes('limit')) return { ok: false, reason: 'limit' }
+        if (message.includes('unauthorized')) return { ok: false, reason: 'auth' }
+        return { ok: false, reason: 'server' }
+      }
+    },
+    [lists, user?.id],
+  )
+
+  const toggleAlbumInList = useCallback(
+    async (listId, album) => {
+      if (!user?.id) return { ok: false, reason: 'auth' }
+
+      const normalizedListId = String(listId ?? '').trim()
+      const albumSummary = toListAlbumSummary(album)
+      if (!normalizedListId || !albumSummary) return { ok: false, reason: 'invalid' }
+
+      const target = lists.find((list) => list.id === normalizedListId)
+      if (!target) return { ok: false, reason: 'list' }
+
+      try {
+        const response = await toggleAlbumInMyList(normalizedListId, albumSummary)
+        const added = Boolean(response?.added)
+        const now = Date.now()
+
+        setLists((prev) =>
+          sortListsByUpdatedAt(
+            prev.map((list) => {
+              if (list.id !== normalizedListId) return list
+
+              const exists = list.albums.some((entry) => entry.id === albumSummary.id)
+              const albums = added
+                ? exists
+                  ? list.albums
+                  : [{ ...albumSummary, addedAt: now }, ...list.albums].slice(0, listStorageConfig.MAX_ALBUMS_PER_LIST)
+                : list.albums.filter((entry) => entry.id !== albumSummary.id)
+
+              return {
+                ...list,
+                albums,
+                updatedAt: now,
+              }
+            }),
+          ),
+        )
 
         return {
-          ...list,
-          albums,
-          updatedAt: Date.now(),
+          ok: true,
+          added,
+          listName: response?.listName ?? target.name,
         }
-      })
-
-      if (!updated) return prev
-
-      const sorted = [...next].sort((a, b) => b.updatedAt - a.updatedAt)
-      persistListsToStorage(sorted)
-      return sorted
-    })
-
-    return outcome
-  }, [])
+      } catch (error) {
+        const message = String(error?.message ?? '').toLowerCase()
+        if (message.includes('unauthorized')) return { ok: false, reason: 'auth' }
+        if (message.includes('full')) return { ok: false, reason: 'limit' }
+        return { ok: false, reason: 'server' }
+      }
+    },
+    [lists, user?.id],
+  )
 
   const getListsContainingAlbum = useCallback(
     (albumId) => {

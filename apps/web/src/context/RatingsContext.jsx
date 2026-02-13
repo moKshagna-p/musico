@@ -1,32 +1,74 @@
-import { createContext, useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 
-import {
-  loadRatingsFromStorage,
-  persistRating,
-} from '../services/ratingsService.js'
-
-export const RatingsContext = createContext(null)
+import { useAuth } from '../hooks/useAuth.js'
+import { fetchMyRatings, saveMyRating } from '../services/profileDataService.js'
+import { RatingsContext } from './ratingsContext.js'
 
 export const RatingsProvider = ({ children }) => {
+  const { user, isPending } = useAuth()
   const [ratings, setRatings] = useState({})
 
   useEffect(() => {
-    setRatings(loadRatingsFromStorage())
-  }, [])
+    let isCancelled = false
+
+    const loadRatings = async () => {
+      if (isPending) return
+      if (!user?.id) {
+        setRatings({})
+        return
+      }
+
+      try {
+        const remoteRatings = await fetchMyRatings()
+        if (!isCancelled) {
+          setRatings(remoteRatings)
+        }
+      } catch {
+        if (!isCancelled) {
+          setRatings({})
+        }
+      }
+    }
+
+    void loadRatings()
+
+    return () => {
+      isCancelled = true
+    }
+  }, [isPending, user?.id])
 
   const rateAlbum = useCallback((albumId, rating) => {
+    if (!user?.id) return
+
+    const normalizedAlbumId = String(albumId ?? '').trim()
+    const normalizedRating = Math.min(5, Math.max(1, Math.round(Number(rating) || 0)))
+    if (!normalizedAlbumId || !normalizedRating) return
+
+    const timestamp = Date.now()
     setRatings((prev) => {
-      const next = {
+      return {
         ...prev,
-        [albumId]: {
-          rating,
-          timestamp: Date.now(),
+        [normalizedAlbumId]: {
+          rating: normalizedRating,
+          timestamp,
         },
       }
-      persistRating(albumId, rating)
-      return next
     })
-  }, [])
+
+    void saveMyRating(normalizedAlbumId, normalizedRating)
+      .then((saved) => {
+        setRatings((prev) => ({
+          ...prev,
+          [normalizedAlbumId]: {
+            rating: Number(saved?.rating ?? normalizedRating),
+            timestamp: Number(saved?.timestamp ?? timestamp),
+          },
+        }))
+      })
+      .catch(() => {
+        // Keep optimistic value.
+      })
+  }, [user?.id])
 
   const getUserRating = useCallback(
     (albumId) => ratings[albumId]?.rating ?? null,

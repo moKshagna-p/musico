@@ -1,6 +1,6 @@
 import type { Release } from './types'
 
-import { boolean, index, jsonb, pgTable, text, timestamp, uniqueIndex } from 'drizzle-orm/pg-core'
+import { boolean, index, integer, jsonb, pgTable, text, timestamp, uniqueIndex } from 'drizzle-orm/pg-core'
 
 export const user = pgTable(
   'user',
@@ -98,6 +98,61 @@ export const searchCache = pgTable(
   (table) => [
     index('search_cache_expires_at_idx').on(table.expiresAt),
     index('search_cache_normalized_query_idx').on(table.normalizedQuery),
+  ],
+)
+
+export const userRating = pgTable(
+  'user_rating',
+  {
+    id: text('id').primaryKey(),
+    userId: text('userId')
+      .notNull()
+      .references(() => user.id, { onDelete: 'cascade' }),
+    albumId: text('albumId').notNull(),
+    rating: integer('rating').notNull(),
+    createdAt: timestamp('createdAt', { withTimezone: true, mode: 'date' }).notNull(),
+    updatedAt: timestamp('updatedAt', { withTimezone: true, mode: 'date' }).notNull(),
+  },
+  (table) => [
+    uniqueIndex('user_rating_user_album_unique').on(table.userId, table.albumId),
+    index('user_rating_user_id_idx').on(table.userId),
+  ],
+)
+
+export const userList = pgTable(
+  'user_list',
+  {
+    id: text('id').primaryKey(),
+    userId: text('userId')
+      .notNull()
+      .references(() => user.id, { onDelete: 'cascade' }),
+    name: text('name').notNull(),
+    createdAt: timestamp('createdAt', { withTimezone: true, mode: 'date' }).notNull(),
+    updatedAt: timestamp('updatedAt', { withTimezone: true, mode: 'date' }).notNull(),
+  },
+  (table) => [
+    index('user_list_user_id_idx').on(table.userId),
+    uniqueIndex('user_list_user_name_unique').on(table.userId, table.name),
+  ],
+)
+
+export const userListAlbum = pgTable(
+  'user_list_album',
+  {
+    id: text('id').primaryKey(),
+    listId: text('listId')
+      .notNull()
+      .references(() => userList.id, { onDelete: 'cascade' }),
+    albumId: text('albumId').notNull(),
+    name: text('name').notNull(),
+    cover: text('cover').notNull().default(''),
+    artists: jsonb('artists').$type<string[]>().notNull(),
+    releaseYear: integer('releaseYear'),
+    addedAt: timestamp('addedAt', { withTimezone: true, mode: 'date' }).notNull(),
+  },
+  (table) => [
+    index('user_list_album_list_id_idx').on(table.listId),
+    uniqueIndex('user_list_album_unique').on(table.listId, table.albumId),
   ],
 )
 

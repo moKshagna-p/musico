@@ -66,15 +66,17 @@ const AlbumDetails = () => {
     setNewListName('')
   }, [album?.id])
 
-  const handleCreateList = (event) => {
+  const handleCreateList = async (event) => {
     event.preventDefault()
-    const result = createList(newListName)
+    const result = await createList(newListName)
 
     if (!result.ok) {
       if (result.reason === 'duplicate') {
         setListStatus('A list with this name already exists.')
       } else if (result.reason === 'limit') {
         setListStatus('You reached the list limit. Remove one list to create another.')
+      } else if (result.reason === 'auth') {
+        setListStatus('Sign in to create lists.')
       } else {
         setListStatus('Enter a list name to continue.')
       }
@@ -82,7 +84,7 @@ const AlbumDetails = () => {
     }
 
     setNewListName('')
-    const toggleResult = toggleAlbumInList(result.list.id, albumSummary)
+    const toggleResult = await toggleAlbumInList(result.list.id, albumSummary)
     if (toggleResult.ok && toggleResult.added) {
       setListStatus(`Created ${result.list.name} and added this album.`)
     } else {
@@ -90,10 +92,16 @@ const AlbumDetails = () => {
     }
   }
 
-  const handleToggleList = (listId) => {
-    const result = toggleAlbumInList(listId, albumSummary)
+  const handleToggleList = async (listId) => {
+    const result = await toggleAlbumInList(listId, albumSummary)
     if (!result.ok) {
-      setListStatus('Unable to update list right now.')
+      if (result.reason === 'auth') {
+        setListStatus('Sign in to update lists.')
+      } else if (result.reason === 'limit') {
+        setListStatus('This list already has the maximum number of albums.')
+      } else {
+        setListStatus('Unable to update list right now.')
+      }
       return
     }
 
