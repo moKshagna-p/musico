@@ -7,14 +7,17 @@ import { RatingsContext } from './ratingsContext.js'
 export const RatingsProvider = ({ children }) => {
   const { user, isPending } = useAuth()
   const [ratings, setRatings] = useState({})
+  const [loadingRatings, setLoadingRatings] = useState(true)
 
   useEffect(() => {
     let isCancelled = false
 
     const loadRatings = async () => {
+      setLoadingRatings(true)
       if (isPending) return
       if (!user?.id) {
         setRatings({})
+        setLoadingRatings(false)
         return
       }
 
@@ -26,6 +29,10 @@ export const RatingsProvider = ({ children }) => {
       } catch {
         if (!isCancelled) {
           setRatings({})
+        }
+      } finally {
+        if (!isCancelled) {
+          setLoadingRatings(false)
         }
       }
     }
@@ -91,11 +98,12 @@ export const RatingsProvider = ({ children }) => {
   const value = useMemo(
     () => ({
       ratings,
+      loadingRatings,
       rateAlbum,
       getUserRating,
       getCommunityStats,
     }),
-    [ratings, rateAlbum, getUserRating, getCommunityStats],
+    [ratings, loadingRatings, rateAlbum, getUserRating, getCommunityStats],
   )
 
   return <RatingsContext.Provider value={value}>{children}</RatingsContext.Provider>
