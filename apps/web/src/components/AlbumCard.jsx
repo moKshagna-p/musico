@@ -37,7 +37,7 @@ const AlbumCard = ({ album, onSelect }) => {
           width="320"
           height="320"
           loading="lazy"
-          className="h-64 w-full rounded-2xl object-cover transition duration-500 group-hover:scale-105"
+          className="h-56 w-full rounded-2xl object-cover transition duration-500 group-hover:scale-105 tablet:h-64"
         />
       </div>
 
@@ -55,7 +55,7 @@ const AlbumCard = ({ album, onSelect }) => {
       <div className="flex items-end justify-between gap-4">
         <div>
           <p className="text-xs uppercase tracking-[0.4em] text-muted">Community</p>
-          <p className="text-2xl font-semibold text-white">
+          <p className="text-xl font-semibold text-white tablet:text-2xl">
             {communityAverage.toFixed(1)}
           </p>
           <p className="text-xs text-muted">

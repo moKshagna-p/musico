@@ -160,9 +160,9 @@ const SearchBar = ({ query = '', onSearch, onValueChange, placeholder, autoFocus
   const shouldShowSuggestions = enablePredictive && showSuggestions && value.trim().length >= MIN_SUGGEST_QUERY_LENGTH
 
   return (
-    <div className="rounded-3xl border border-outline bg-panel p-6">
+    <div className="rounded-3xl border border-outline bg-panel p-4 tablet:p-6">
       <div className="relative">
-        <form onSubmit={handleSubmit} className="flex items-center gap-4 border-b border-outline pb-4">
+        <form onSubmit={handleSubmit} className="flex items-center gap-3 border-b border-outline pb-4 tablet:gap-4">
           <FiSearch className="text-xl text-muted" />
           <input
             value={value}
@@ -176,9 +176,9 @@ const SearchBar = ({ query = '', onSearch, onValueChange, placeholder, autoFocus
             onKeyDown={handleKeyDown}
             placeholder={placeholder ?? 'Search albums or artists'}
             autoFocus={autoFocus}
-            className="flex-1 bg-transparent text-lg text-white placeholder:text-muted focus:outline-none"
+            className="flex-1 bg-transparent text-base text-white placeholder:text-muted focus:outline-none tablet:text-lg"
           />
-          <button type="submit" className="text-xs uppercase tracking-[0.4em] text-muted hover:text-white">
+          <button type="submit" className="text-[0.64rem] uppercase tracking-[0.22em] text-muted hover:text-white tablet:text-xs tablet:tracking-[0.4em]">
             Search
           </button>
         </form>
@@ -198,8 +198,8 @@ const SearchBar = ({ query = '', onSearch, onValueChange, placeholder, autoFocus
                     suggestions[activeSuggestionIndex]?.id === item.id ? 'bg-white/10' : 'hover:bg-white/5'
                   }`}
                 >
-                  <span className="text-sm text-white">{item.title}</span>
-                  <span className="truncate pl-3 text-xs uppercase tracking-[0.2em] text-muted">{item.artist}</span>
+                  <span className="truncate text-sm text-white">{item.title}</span>
+                  <span className="max-w-28 truncate pl-3 text-xs uppercase tracking-[0.2em] text-muted tablet:max-w-none">{item.artist}</span>
                 </button>
               ))
             ) : (
@@ -236,7 +236,7 @@ const SearchBar = ({ query = '', onSearch, onValueChange, placeholder, autoFocus
                 <button
                   type="button"
                   onClick={() => handleRecentSearchClick(term)}
-                  className="max-w-44 truncate text-left text-muted transition group-hover:text-white"
+                  className="max-w-28 truncate text-left text-muted transition group-hover:text-white tablet:max-w-44"
                   title={term}
                 >
                   {term}

@@ -39,7 +39,7 @@ const SearchResults = () => {
       <button
         type="button"
         onClick={() => navigate('/discover')}
-        className="mb-6 inline-flex items-center gap-2 text-xs uppercase tracking-[0.4em] text-muted hover:text-white"
+        className="mb-6 inline-flex items-center gap-2 text-xs uppercase tracking-[0.28em] text-muted hover:text-white tablet:tracking-[0.4em]"
       >
         <FiArrowLeft /> Back to Discover
       </button>
@@ -47,7 +47,7 @@ const SearchResults = () => {
       <div className="space-y-8">
         <div>
           <p className="text-xs uppercase tracking-[0.4em] text-muted">Search Results</p>
-          <h1 className="font-display text-4xl">
+          <h1 className="break-words font-display text-3xl tablet:text-4xl">
             {query ? `"${query}"` : 'Start searching'}
           </h1>
         </div>

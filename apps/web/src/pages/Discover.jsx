@@ -58,7 +58,7 @@ const Discover = () => {
       <div className="space-y-8">
         <div>
           <p className="text-xs uppercase tracking-[0.4em] text-muted">Catalog Explorer</p>
-          <h1 className="font-display text-4xl">Dig through the vault</h1>
+          <h1 className="font-display text-3xl tablet:text-4xl">Dig through the vault</h1>
         </div>
 
         <SearchBar

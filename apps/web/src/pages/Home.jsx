@@ -77,16 +77,16 @@ const Home = () => {
       <div className="mt-12 space-y-10">
         {recommendedAlbums.length > 0 && (
           <section className="space-y-6">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col gap-3 tablet:flex-row tablet:items-center tablet:justify-between">
               <div>
                 <p className="text-xs uppercase tracking-[0.4em] text-muted">Based On Your Searches</p>
-                <h2 className="font-display text-3xl">For You</h2>
+                <h2 className="font-display text-2xl tablet:text-3xl">For You</h2>
               </div>
-            <Link
-              to="/discover"
-              className="text-xs uppercase tracking-[0.5em] text-muted transition hover:text-white"
-            >
-              Discover more
+              <Link
+                to="/discover"
+                className="text-xs uppercase tracking-[0.35em] text-muted transition hover:text-white tablet:tracking-[0.5em]"
+              >
+                Discover more
               </Link>
             </div>
             <AlbumGrid 
@@ -98,15 +98,15 @@ const Home = () => {
         )}
 
         <section className="space-y-6">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col gap-3 tablet:flex-row tablet:items-center tablet:justify-between">
             <div>
               <p className="text-xs uppercase tracking-[0.4em] text-muted">Global Listening Pulse</p>
-              <h2 className="font-display text-3xl">Top Albums Right Now</h2>
+              <h2 className="font-display text-2xl tablet:text-3xl">Top Albums Right Now</h2>
             </div>
             <button
               type="button"
               onClick={() => setShowAllTopAlbums((prev) => !prev)}
-              className="text-xs uppercase tracking-[0.5em] text-muted transition hover:text-white"
+              className="w-fit text-xs uppercase tracking-[0.35em] text-muted transition hover:text-white tablet:tracking-[0.5em]"
             >
               {showAllTopAlbums ? 'Show less' : 'See all'}
             </button>

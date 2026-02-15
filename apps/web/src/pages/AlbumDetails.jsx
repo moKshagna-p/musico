@@ -8,7 +8,13 @@ import StreamingLinks from '../components/StreamingLinks.jsx'
 import { useLists } from '../hooks/useLists.js'
 import { useRatings } from '../hooks/useRatings.js'
 import { getReleaseDetails } from '../services/discogsService.js'
-import { formatDuration, formatLargeNumber, formatReleaseDate, generateStreamingLinks } from '../utils/helpers.js'
+import {
+  formatDuration,
+  formatLargeNumber,
+  formatReleaseDate,
+  generateStreamingLinks,
+  inferAlbumGenres,
+} from '../utils/helpers.js'
 
 const AlbumDetails = () => {
   const navigate = useNavigate()
@@ -44,6 +50,7 @@ const AlbumDetails = () => {
   }, [albumId])
 
   const streamingLinks = useMemo(() => generateStreamingLinks(album), [album])
+  const albumGenres = useMemo(() => inferAlbumGenres(album), [album])
   const userRating = getUserRating(album?.id ?? '')
   const community = album ? getCommunityStats(album) : { average: 0, total: 0 }
   const albumSummary = useMemo(
@@ -167,7 +174,7 @@ const AlbumDetails = () => {
       <button
         type="button"
         onClick={goBack}
-        className="mb-8 inline-flex items-center gap-2 text-xs uppercase tracking-[0.42em] text-muted transition-colors duration-200 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
+        className="mb-8 inline-flex items-center gap-2 text-xs uppercase tracking-[0.24em] text-muted transition-colors duration-200 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas tablet:tracking-[0.42em]"
       >
         <FiArrowLeft aria-hidden="true" /> Back
       </button>
@@ -189,20 +196,20 @@ const AlbumDetails = () => {
         <section className="space-y-10">
           <header className="space-y-2 border-b border-outline pb-7">
             <p className="text-xs uppercase tracking-[0.52em] text-muted">Album</p>
-            <h1 className="font-display text-4xl leading-tight tablet:text-5xl">{album.name}</h1>
+            <h1 className="font-display text-3xl leading-tight tablet:text-5xl">{album.name}</h1>
             <p className="text-lg text-white/80">{album.artists.join(', ')}</p>
             <p className="pt-1 text-xs uppercase tracking-[0.28em] text-muted">
               {formatReleaseDate(album.releaseDate, album.releaseYear)}
             </p>
             <p className="text-xs uppercase tracking-[0.28em] text-muted">
-              Community {community.average?.toFixed(1)} • {formatLargeNumber(community.total)} ratings
+              {albumGenres?.length ? albumGenres.slice(0, 3).join(' • ') : 'Unknown Genre'}
             </p>
           </header>
 
           <div className="grid gap-10 tablet:grid-cols-[0.62fr,1fr]">
             <section className="space-y-3 border-b border-outline pb-8 tablet:border-b-0 tablet:border-r tablet:pb-0 tablet:pr-8">
               <p className="text-[0.62rem] uppercase tracking-[0.38em] text-muted">Score</p>
-              <p className="text-6xl font-semibold leading-none tabular-nums text-white">{community.average?.toFixed(1)}</p>
+              <p className="text-5xl font-semibold leading-none tabular-nums text-white tablet:text-6xl">{community.average?.toFixed(1)}</p>
               <p className="text-xs uppercase tracking-[0.22em] text-muted">{formatLargeNumber(community.total)} votes</p>
               <div className="pt-5">
                 <RatingStars value={userRating ?? 0} onRate={(value) => rateAlbum(album.id, value)} showValue />
@@ -266,7 +273,7 @@ const AlbumDetails = () => {
                         }`}
                       >
                         {isActive ? <FiCheck aria-hidden="true" /> : <FiPlus aria-hidden="true" />}
-                        <span className="max-w-36 truncate">{list.name}</span>
+                        <span className="max-w-28 truncate tablet:max-w-36">{list.name}</span>
                         <span className={`${isActive ? 'text-canvas/70' : 'text-white/55'} tabular-nums text-[0.62rem]`}>
                           {list.albums.length}
                         </span>

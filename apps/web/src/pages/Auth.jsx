@@ -52,7 +52,7 @@ const Auth = () => {
   if (isPending) {
     return (
       <PageTransition>
-        <div className="mx-auto max-w-xl rounded-3xl border border-outline bg-panel p-8 text-center text-muted">
+        <div className="mx-auto max-w-xl rounded-3xl border border-outline bg-panel p-6 text-center text-muted tablet:p-8">
           Loading session...
         </div>
       </PageTransition>
@@ -62,9 +62,9 @@ const Auth = () => {
   if (user) {
     return (
       <PageTransition>
-        <div className="mx-auto max-w-xl rounded-3xl border border-outline bg-panel p-8 text-center">
+        <div className="mx-auto max-w-xl rounded-3xl border border-outline bg-panel p-6 text-center tablet:p-8">
           <p className="text-sm uppercase tracking-[0.3em] text-muted">Signed in as</p>
-          <p className="mt-2 text-2xl text-white">{user.email}</p>
+          <p className="mt-2 break-all text-xl text-white tablet:text-2xl">{user.email}</p>
           <button
             type="button"
             onClick={() => navigate('/')}
@@ -79,16 +79,16 @@ const Auth = () => {
 
   return (
     <PageTransition>
-      <div className="mx-auto max-w-xl rounded-3xl border border-outline bg-panel p-8">
-        <div className="mb-6 flex items-center justify-between gap-4">
-          <h1 className="font-display text-4xl text-white">{title}</h1>
+      <div className="mx-auto max-w-xl rounded-3xl border border-outline bg-panel p-5 tablet:p-8">
+        <div className="mb-6 flex flex-col items-start gap-3 tablet:flex-row tablet:items-center tablet:justify-between tablet:gap-4">
+          <h1 className="font-display text-3xl text-white tablet:text-4xl">{title}</h1>
           <button
             type="button"
             onClick={() => {
               setMode((prev) => (prev === 'sign-in' ? 'sign-up' : 'sign-in'))
               setError('')
             }}
-            className="text-xs uppercase tracking-[0.32em] text-muted transition hover:text-white"
+            className="text-xs uppercase tracking-[0.24em] text-muted transition hover:text-white tablet:tracking-[0.32em]"
           >
             {mode === 'sign-in' ? 'Need account?' : 'Have account?'}
           </button>

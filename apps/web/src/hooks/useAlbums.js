@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import { searchReleases } from '../services/discogsService.js'
 import { debounce } from '../utils/helpers.js'
@@ -10,8 +10,9 @@ export const useAlbums = (initialQuery = '') => {
   const [error, setError] = useState(null)
   const [query, setQuery] = useState(initialQuery)
 
-  const searchHandler = useCallback(
-    debounce(async (value) => {
+  const searchHandler = useMemo(
+    () =>
+      debounce(async (value) => {
       const trimmed = value?.trim() ?? ''
       if (!trimmed) {
         setAlbums([])
@@ -31,7 +32,7 @@ export const useAlbums = (initialQuery = '') => {
       } finally {
         setLoading(false)
       }
-    }, 300),
+      }, 300),
     [],
   )
 

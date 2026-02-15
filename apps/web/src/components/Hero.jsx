@@ -1,5 +1,3 @@
-import { useMemo } from 'react'
-
 const artistQuotes = [
   { quote: 'Music is life itself.', artist: 'Louis Armstrong' },
   { quote: 'One good thing about music, when it hits you, you feel no pain.', artist: 'Bob Marley' },
@@ -12,15 +10,15 @@ const artistQuotes = [
 ]
 
 const Hero = () => {
-  const randomQuote = useMemo(() => artistQuotes[Math.floor(Math.random() * artistQuotes.length)], [])
+  const quote = artistQuotes[0]
 
   return (
-    <section className="rounded-3xl border border-outline bg-panel px-6 py-14 shadow-panel tablet:px-10">
+    <section className="rounded-3xl border border-outline bg-panel px-5 py-10 shadow-panel tablet:px-10 tablet:py-14">
       <p className="text-xs uppercase tracking-[0.4em] text-muted">Listening Room</p>
-      <h1 className="mt-4 font-display text-4xl text-white laptop:text-5xl">
-        &ldquo;{randomQuote.quote}&rdquo;
+      <h1 className="mt-4 font-display text-3xl leading-tight text-white tablet:text-4xl laptop:text-5xl">
+        &ldquo;{quote.quote}&rdquo;
       </h1>
-      <p className="mt-2 text-sm uppercase tracking-[0.4em] text-muted">— {randomQuote.artist}</p>
+      <p className="mt-2 text-xs uppercase tracking-[0.3em] text-muted tablet:text-sm tablet:tracking-[0.4em]">— {quote.artist}</p>
     </section>
   )
 }

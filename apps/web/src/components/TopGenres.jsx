@@ -16,14 +16,14 @@ const TopGenres = ({ ratedAlbums }) => {
 
   return (
     <section className="my-16">
-      <h2 className="mb-8 text-center font-serif text-4xl font-bold">Top Genres</h2>
+      <h2 className="mb-8 text-center font-display text-3xl font-bold tablet:text-4xl">Top Genres</h2>
       <div className="text-center">
         {topGenres.map(([genre]) => (
-          <p key={genre} className="text-lg text-muted">
+          <p key={genre} className="text-base text-muted tablet:text-lg">
             {genre}
           </p>
         ))}
-        {topGenres.length === 0 && <p className="text-lg text-muted">No genres yet</p>}
+        {topGenres.length === 0 && <p className="text-base text-muted tablet:text-lg">No genres yet</p>}
       </div>
     </section>
   )

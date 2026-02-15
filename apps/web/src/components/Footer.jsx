@@ -8,7 +8,7 @@ const Footer = () => {
 
   return (
     <footer className="border-t border-outline bg-canvas py-10">
-      <div className="mx-auto flex max-w-6xl flex-col gap-6 px-6 text-xs uppercase tracking-[0.4em] text-muted tablet:flex-row tablet:items-center tablet:justify-between">
+      <div className="mx-auto flex max-w-6xl flex-col gap-6 px-4 text-[0.64rem] uppercase tracking-[0.24em] text-muted tablet:flex-row tablet:items-center tablet:justify-between tablet:px-6 tablet:text-xs tablet:tracking-[0.4em]">
         <p>musico · {new Date().getFullYear()}</p>
         <div className="flex items-center gap-4 text-base">
           {socials.map((social) => (
