@@ -126,15 +126,17 @@ const AlbumDetails = () => {
   if (loading) {
     return (
       <PageTransition>
-        <div className="grid gap-8 tablet:grid-cols-[340px,1fr]">
-          <div className="h-[420px] rounded-3xl bg-white/5" />
+        <div className="grid gap-8 tablet:grid-cols-[360px,1fr]">
+          <div className="h-[420px] rounded-2xl border border-outline bg-panel/60" />
           <div className="space-y-4">
-            <div className="h-10 w-1/2 rounded-full bg-white/10" />
-            <div className="h-6 w-1/3 rounded-full bg-white/10" />
+            <div className="h-3 w-24 rounded-full bg-white/10" />
+            <div className="h-12 w-2/3 rounded-xl bg-white/10" />
+            <div className="h-6 w-1/2 rounded-full bg-white/10" />
             <div className="space-y-2">
               <div className="h-4 rounded-full bg-white/5" />
               <div className="h-4 rounded-full bg-white/5" />
             </div>
+            <div className="h-48 rounded-2xl border border-outline bg-panel/60" />
           </div>
         </div>
       </PageTransition>
@@ -165,65 +167,61 @@ const AlbumDetails = () => {
       <button
         type="button"
         onClick={goBack}
-        className="mb-6 inline-flex items-center gap-2 text-xs uppercase tracking-[0.4em] text-muted transition-colors duration-200 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
+        className="mb-8 inline-flex items-center gap-2 text-xs uppercase tracking-[0.42em] text-muted transition-colors duration-200 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
       >
         <FiArrowLeft aria-hidden="true" /> Back
       </button>
 
-      <div className="grid gap-12 tablet:grid-cols-[350px,1fr]">
-        <div className="space-y-6">
-          <div className="relative overflow-hidden rounded-3xl border border-outline bg-panel p-2">
-            <img src={album.cover} alt={album.name} width="640" height="640" className="rounded-2xl object-cover" />
+      <div className="grid gap-10 tablet:grid-cols-[360px,1fr]">
+        <aside className="space-y-6 tablet:sticky tablet:top-28 tablet:self-start">
+          <div className="relative overflow-hidden rounded-2xl border border-white/10 bg-panel p-2 shadow-panel">
+            <img
+              src={album.cover}
+              alt={album.name}
+              width="640"
+              height="640"
+              className="aspect-square rounded-xl object-cover"
+            />
           </div>
-
           <StreamingLinks links={streamingLinks} />
-        </div>
+        </aside>
 
-        <div className="space-y-8">
-          <div>
-            <p className="text-xs uppercase tracking-[0.5em] text-muted">Album</p>
-            <h1 className="font-display text-4xl">{album.name}</h1>
-            <p className="text-lg text-muted">{album.artists.join(', ')}</p>
-            <p className="mt-2 text-xs uppercase tracking-[0.3em] text-muted">
+        <section className="space-y-10">
+          <header className="space-y-2 border-b border-outline pb-7">
+            <p className="text-xs uppercase tracking-[0.52em] text-muted">Album</p>
+            <h1 className="font-display text-4xl leading-tight tablet:text-5xl">{album.name}</h1>
+            <p className="text-lg text-white/80">{album.artists.join(', ')}</p>
+            <p className="pt-1 text-xs uppercase tracking-[0.28em] text-muted">
               {formatReleaseDate(album.releaseDate, album.releaseYear)}
             </p>
-            <p className="mt-2 text-xs uppercase tracking-[0.3em] text-muted">
+            <p className="text-xs uppercase tracking-[0.28em] text-muted">
               Community {community.average?.toFixed(1)} • {formatLargeNumber(community.total)} ratings
             </p>
-          </div>
+          </header>
 
-          <div className="grid gap-5 rounded-3xl border border-outline bg-panel p-6 tablet:grid-cols-[0.9fr,1.1fr]">
-            <div>
-              <p className="text-xs uppercase tracking-[0.4em] text-muted">Community Avg</p>
-              <p className="text-4xl font-semibold tabular-nums text-white">{community.average?.toFixed(1)}</p>
-              <p className="text-xs text-muted">{formatLargeNumber(community.total)} ratings</p>
-
-              <div className="mt-6 border-t border-outline pt-5">
-                <p className="text-xs uppercase tracking-[0.34em] text-muted">Your Rating</p>
-                <div className="mt-2 flex items-center">
-                  <RatingStars
-                    value={userRating ?? 0}
-                    onRate={(value) => rateAlbum(album.id, value)}
-                    showValue
-                  />
-                </div>
+          <div className="grid gap-10 tablet:grid-cols-[0.62fr,1fr]">
+            <section className="space-y-3 border-b border-outline pb-8 tablet:border-b-0 tablet:border-r tablet:pb-0 tablet:pr-8">
+              <p className="text-[0.62rem] uppercase tracking-[0.38em] text-muted">Score</p>
+              <p className="text-6xl font-semibold leading-none tabular-nums text-white">{community.average?.toFixed(1)}</p>
+              <p className="text-xs uppercase tracking-[0.22em] text-muted">{formatLargeNumber(community.total)} votes</p>
+              <div className="pt-5">
+                <RatingStars value={userRating ?? 0} onRate={(value) => rateAlbum(album.id, value)} showValue />
               </div>
-            </div>
+            </section>
 
-            <div className="rounded-2xl border border-outline/90 bg-canvas/35 p-4">
-              <div className="flex items-end justify-between gap-3">
+            <section className="relative overflow-hidden rounded-[2rem] bg-[radial-gradient(120%_130%_at_95%_0%,rgba(198,170,126,0.12),rgba(198,170,126,0.02)_36%,rgba(0,0,0,0)_70%),linear-gradient(160deg,rgba(2,2,2,0.98),rgba(8,8,8,0.96))] p-5 tablet:p-6">
+              <div aria-hidden="true" className="pointer-events-none absolute -right-20 -top-20 h-56 w-56 rounded-full bg-[#c6aa7e]/10 blur-3xl" />
+              <div aria-hidden="true" className="pointer-events-none absolute -bottom-16 -left-14 h-44 w-44 rounded-full bg-black/50 blur-3xl" />
+
+              <div className="relative z-10 flex items-start justify-between gap-3">
                 <div>
-                  <p className="text-xs uppercase tracking-[0.34em] text-muted">Add To Lists</p>
-                  <p className="mt-1 text-sm text-white">
-                    {listsContainingAlbum.size
-                      ? `Saved in ${listsContainingAlbum.size} list${listsContainingAlbum.size === 1 ? '' : 's'}.`
-                      : 'Save this album to one or more lists.'}
-                  </p>
+                  <p className="text-[0.62rem] uppercase tracking-[0.35em] text-white/65">Lists</p>
+                  <p className="text-sm text-white/85">{listsContainingAlbum.size} selected</p>
                 </div>
-                <p className="text-xs uppercase tracking-[0.25em] text-muted tabular-nums">{lists.length} total</p>
+                <p className="text-xs uppercase tracking-[0.2em] text-white/60">{lists.length} total</p>
               </div>
 
-              <form onSubmit={handleCreateList} className="mt-4 flex flex-wrap gap-2">
+              <form onSubmit={handleCreateList} className="relative z-10 mt-4 flex items-center gap-2 border-b border-white/20 pb-2">
                 <label className="sr-only" htmlFor="new-list-name">
                   New List Name
                 </label>
@@ -232,72 +230,85 @@ const AlbumDetails = () => {
                   name="newListName"
                   value={newListName}
                   onChange={(event) => setNewListName(event.target.value)}
-                  placeholder="Late Night Rotation…"
+                  placeholder="New list"
                   autoComplete="off"
-                  className="min-w-0 flex-1 rounded-xl border border-outline bg-panel px-3 py-2 text-sm text-white placeholder:text-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
+                  className="min-w-0 flex-1 bg-transparent text-sm text-white placeholder:text-white/45 focus-visible:outline-none"
                 />
                 <button
                   type="submit"
-                  className="inline-flex touch-manipulation items-center gap-2 rounded-xl border border-white/20 bg-white px-3 py-2 text-xs uppercase tracking-[0.25em] text-canvas transition-colors duration-200 hover:bg-white/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
+                  className="inline-flex h-9 w-9 touch-manipulation items-center justify-center rounded-full border border-white/35 bg-white/90 text-canvas transition-colors duration-200 hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
                 >
                   <FiPlus aria-hidden="true" />
-                  New List
                 </button>
               </form>
 
-              <div className="mt-4 flex flex-wrap gap-2">
+              <div className="relative z-10 mt-5 flex flex-wrap gap-2.5">
                 {lists.length ? (
-                  lists.map((list) => {
+                  lists.map((list, index) => {
                     const isActive = listsContainingAlbum.has(list.id)
+                    const variants = [
+                      'rotate-[-1.8deg]',
+                      'rotate-[1.4deg]',
+                      'rotate-[-0.8deg]',
+                      'rotate-[1.9deg]',
+                    ]
+                    const tilt = variants[index % variants.length]
+
                     return (
                       <button
                         key={list.id}
                         type="button"
                         onClick={() => handleToggleList(list.id)}
-                        className={`inline-flex touch-manipulation items-center gap-2 rounded-full border px-3 py-1.5 text-xs uppercase tracking-[0.24em] transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas ${
+                        className={`inline-flex touch-manipulation items-center gap-2 rounded-full border px-4 py-2 text-xs uppercase tracking-[0.2em] transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas ${
                           isActive
-                            ? 'border-white/45 bg-white/15 text-white hover:bg-white/20'
-                            : 'border-outline bg-panel text-muted hover:border-white/35 hover:text-white'
+                            ? `border-white/70 bg-white text-canvas shadow-[0_8px_24px_rgba(255,255,255,0.25)] ${tilt}`
+                            : `border-white/25 bg-white/[0.06] text-white/80 hover:border-white/55 hover:bg-white/[0.14] ${tilt}`
                         }`}
                       >
                         {isActive ? <FiCheck aria-hidden="true" /> : <FiPlus aria-hidden="true" />}
-                        <span className="max-w-44 truncate">{list.name}</span>
-                        <span className="tabular-nums text-[0.62rem] text-muted">{list.albums.length}</span>
+                        <span className="max-w-36 truncate">{list.name}</span>
+                        <span className={`${isActive ? 'text-canvas/70' : 'text-white/55'} tabular-nums text-[0.62rem]`}>
+                          {list.albums.length}
+                        </span>
                       </button>
                     )
                   })
                 ) : (
-                  <p className="rounded-xl border border-dashed border-outline px-3 py-2 text-xs text-muted">
-                    Create your first list to start collecting favorites.
-                  </p>
+                  <p className="text-sm text-white/65">No lists yet. Create your first one above.</p>
                 )}
               </div>
 
-              <p aria-live="polite" className="mt-3 text-xs text-muted">
-                {listStatus || 'Tap a list chip to add or remove this album.'}
+              <p aria-live="polite" className="relative z-10 mt-4 text-xs text-white/60">
+                {listStatus || 'Tap chips to add or remove instantly.'}
               </p>
-            </div>
+            </section>
           </div>
 
-          <div>
-            <p className="text-xs uppercase tracking-[0.4em] text-muted">Tracklist</p>
-            <div className="mt-4 divide-y divide-outline rounded-3xl border border-outline bg-panel/70">
-              {album.tracks?.map((track) => (
-                <div key={track.id ?? track.track_number} className="flex items-center justify-between px-4 py-3 text-sm text-muted">
-                  <div className="flex items-center gap-4">
-                    <span className="text-xs text-muted">{track.track_number}</span>
-                    <span className="text-white">{track.name}</span>
+          <section>
+            <p className="text-xs uppercase tracking-[0.42em] text-muted">Tracklist</p>
+            <div className="mt-4 border-y border-outline/90">
+              {album.tracks?.length ? (
+                album.tracks.map((track, index) => (
+                  <div
+                    key={track.id ?? track.track_number}
+                    className="flex items-center justify-between border-b border-outline/80 px-2 py-3 text-sm last:border-b-0"
+                  >
+                    <div className="flex min-w-0 items-center gap-4">
+                      <span className="w-4 text-xs tabular-nums text-muted">{track.track_number ?? index + 1}</span>
+                      <span className="truncate text-white">{track.name}</span>
+                    </div>
+                    <span className="ml-3 flex shrink-0 items-center gap-2 text-xs uppercase tracking-[0.18em] text-muted">
+                      <FiClock aria-hidden="true" />
+                      {formatDuration(track.duration_ms)}
+                    </span>
                   </div>
-                  <span className="flex items-center gap-2 text-muted">
-                    <FiClock />
-                    {formatDuration(track.duration_ms)}
-                  </span>
-                </div>
-              ))}
+                ))
+              ) : (
+                <p className="px-4 py-6 text-sm text-muted">Track details are not available for this release.</p>
+              )}
             </div>
-          </div>
-
-        </div>
+          </section>
+        </section>
       </div>
     </PageTransition>
   )
