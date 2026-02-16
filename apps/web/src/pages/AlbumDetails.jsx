@@ -5,8 +5,10 @@ import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import PageTransition from '../components/PageTransition.jsx'
 import RatingStars from '../components/RatingStars.jsx'
 import StreamingLinks from '../components/StreamingLinks.jsx'
+import { useAuth } from '../hooks/useAuth.js'
 import { useLists } from '../hooks/useLists.js'
 import { useRatings } from '../hooks/useRatings.js'
+import { trackOpenedAlbumGenres } from '../services/recommendationProfileService.js'
 import { getReleaseDetails } from '../services/discogsService.js'
 import {
   formatDuration,
@@ -20,8 +22,10 @@ const AlbumDetails = () => {
   const navigate = useNavigate()
   const location = useLocation()
   const { albumId } = useParams()
+  const { user } = useAuth()
   const { lists, createList, toggleAlbumInList, getListsContainingAlbum } = useLists()
   const { rateAlbum, getUserRating, getCommunityStats } = useRatings()
+  const isSignedIn = Boolean(user?.id)
 
   const [album, setAlbum] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -73,8 +77,22 @@ const AlbumDetails = () => {
     setNewListName('')
   }, [album?.id])
 
+  useEffect(() => {
+    if (!album || !isSignedIn) return
+    if (location.state?.from !== '/search') return
+
+    trackOpenedAlbumGenres({
+      album,
+      scope: user.id,
+    })
+  }, [album, isSignedIn, location.state, user?.id])
+
   const handleCreateList = async (event) => {
     event.preventDefault()
+    if (!isSignedIn) {
+      setListStatus('Sign in to create and manage lists.')
+      return
+    }
     const result = await createList(newListName)
 
     if (!result.ok) {
@@ -100,6 +118,10 @@ const AlbumDetails = () => {
   }
 
   const handleToggleList = async (listId) => {
+    if (!isSignedIn) {
+      setListStatus('Sign in to update lists.')
+      return
+    }
     const result = await toggleAlbumInList(listId, albumSummary)
     if (!result.ok) {
       if (result.reason === 'auth') {
@@ -212,7 +234,21 @@ const AlbumDetails = () => {
               <p className="text-5xl font-semibold leading-none tabular-nums text-white tablet:text-6xl">{community.average?.toFixed(1)}</p>
               <p className="text-xs uppercase tracking-[0.22em] text-muted">{formatLargeNumber(community.total)} votes</p>
               <div className="pt-5">
-                <RatingStars value={userRating ?? 0} onRate={(value) => rateAlbum(album.id, value)} showValue />
+                <RatingStars
+                  value={userRating ?? 0}
+                  readOnly={!isSignedIn}
+                  onRate={(value) => {
+                    if (!isSignedIn) {
+                      setListStatus('Sign in to rate albums.')
+                      return
+                    }
+                    rateAlbum(album.id, value)
+                  }}
+                  showValue
+                />
+                {!isSignedIn && (
+                  <p className="mt-2 text-xs uppercase tracking-[0.2em] text-muted">Sign in required to rate</p>
+                )}
               </div>
             </section>
 
@@ -239,15 +275,30 @@ const AlbumDetails = () => {
                   onChange={(event) => setNewListName(event.target.value)}
                   placeholder="New list"
                   autoComplete="off"
-                  className="min-w-0 flex-1 bg-transparent text-sm text-white placeholder:text-white/45 focus-visible:outline-none"
+                  disabled={!isSignedIn}
+                  className="min-w-0 flex-1 bg-transparent text-sm text-white placeholder:text-white/45 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
                 />
                 <button
                   type="submit"
-                  className="inline-flex h-9 w-9 touch-manipulation items-center justify-center rounded-full border border-white/35 bg-white/90 text-canvas transition-colors duration-200 hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
+                  disabled={!isSignedIn}
+                  className="inline-flex h-9 w-9 touch-manipulation items-center justify-center rounded-full border border-white/35 bg-white/90 text-canvas transition-colors duration-200 hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas disabled:cursor-not-allowed disabled:opacity-45"
                 >
                   <FiPlus aria-hidden="true" />
                 </button>
               </form>
+
+              {!isSignedIn && (
+                <div className="relative z-10 mt-4 rounded-xl border border-outline/80 bg-canvas/30 px-3 py-2 text-xs text-muted">
+                  Sign in to create lists and save albums.
+                  <button
+                    type="button"
+                    onClick={() => navigate('/auth')}
+                    className="ml-2 uppercase tracking-[0.2em] text-white transition hover:text-muted"
+                  >
+                    Sign In
+                  </button>
+                </div>
+              )}
 
               <div className="relative z-10 mt-5 flex flex-wrap gap-2.5">
                 {lists.length ? (
@@ -265,8 +316,9 @@ const AlbumDetails = () => {
                       <button
                         key={list.id}
                         type="button"
+                        disabled={!isSignedIn}
                         onClick={() => handleToggleList(list.id)}
-                        className={`inline-flex touch-manipulation items-center gap-2 rounded-full border px-4 py-2 text-xs uppercase tracking-[0.2em] transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas ${
+                        className={`inline-flex touch-manipulation items-center gap-2 rounded-full border px-4 py-2 text-xs uppercase tracking-[0.2em] transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas disabled:cursor-not-allowed disabled:opacity-55 ${
                           isActive
                             ? `border-white/70 bg-white text-canvas shadow-[0_8px_24px_rgba(255,255,255,0.25)] ${tilt}`
                             : `border-white/25 bg-white/[0.06] text-white/80 hover:border-white/55 hover:bg-white/[0.14] ${tilt}`

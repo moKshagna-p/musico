@@ -4,11 +4,14 @@ import { Link, useNavigate } from 'react-router-dom'
 import AlbumGrid from '../components/AlbumGrid.jsx'
 import Hero from '../components/Hero.jsx'
 import PageTransition from '../components/PageTransition.jsx'
+import { useAuth } from '../hooks/useAuth.js'
 import { searchReleases, getFeaturedReleases } from '../services/discogsService.js'
-import { getSearchHistory } from '../services/searchHistoryService.js'
+import { getTopGenresForRecommendations } from '../services/recommendationProfileService.js'
 
 const Home = () => {
   const navigate = useNavigate()
+  const { user, isPending } = useAuth()
+  const recommendationScope = !isPending && user?.id ? user.id : ''
   const [featuredAlbums, setFeaturedAlbums] = useState([])
   const [recommendedAlbums, setRecommendedAlbums] = useState([])
   const [showAllTopAlbums, setShowAllTopAlbums] = useState(false)
@@ -35,34 +38,40 @@ const Home = () => {
 
   useEffect(() => {
     const loadRecommendations = async () => {
-      const history = getSearchHistory()
-      if (history.length === 0) return
+      if (!recommendationScope) {
+        setRecommendedAlbums([])
+        return
+      }
+
+      const topGenres = getTopGenresForRecommendations(recommendationScope, 3)
+      if (!topGenres.length) {
+        setRecommendedAlbums([])
+        return
+      }
 
       setRecommendedLoading(true)
       try {
-        // Get recommendations based on most recent searches
-        const recentSearches = history.slice(0, 3)
         const allResults = []
-        
-        for (const query of recentSearches) {
-          const results = await searchReleases(query)
-          allResults.push(...results.slice(0, 2))
+
+        for (const genre of topGenres) {
+          const results = await searchReleases(genre)
+          allResults.push(...results.slice(0, 4))
         }
-        
-        // Remove duplicates
+
         const uniqueResults = Array.from(
-          new Map(allResults.map(item => [item.id, item])).values()
+          new Map(allResults.map((item) => [item.id, item])).values(),
         )
-        
+
         setRecommendedAlbums(uniqueResults.slice(0, 6))
       } catch (err) {
         console.warn('Unable to load recommendations', err)
+        setRecommendedAlbums([])
       } finally {
         setRecommendedLoading(false)
       }
     }
     loadRecommendations()
-  }, [])
+  }, [recommendationScope])
 
   const handleAlbumSelect = (id) => {
     navigate(`/album/${id}`, { state: { from: '/', query: '' } })
@@ -79,7 +88,7 @@ const Home = () => {
           <section className="space-y-6">
             <div className="flex flex-col gap-3 tablet:flex-row tablet:items-center tablet:justify-between">
               <div>
-                <p className="text-xs uppercase tracking-[0.4em] text-muted">Based On Your Searches</p>
+                <p className="text-xs uppercase tracking-[0.4em] text-muted">Based On Albums You Opened</p>
                 <h2 className="font-display text-2xl tablet:text-3xl">For You</h2>
               </div>
               <Link

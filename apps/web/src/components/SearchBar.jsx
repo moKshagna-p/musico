@@ -12,7 +12,16 @@ import {
 const MIN_SUGGEST_QUERY_LENGTH = 3
 const SUGGESTION_LIMIT = 5
 
-const SearchBar = ({ query = '', onSearch, onValueChange, placeholder, autoFocus, enablePredictive = false }) => {
+const SearchBar = ({
+  query = '',
+  onSearch,
+  onValueChange,
+  placeholder,
+  autoFocus,
+  enablePredictive = false,
+  historyScope = 'guest',
+  enableHistory = true,
+}) => {
   const [value, setValue] = useState(query)
   const [recentSearches, setRecentSearches] = useState([])
   const [suggestions, setSuggestions] = useState([])
@@ -27,8 +36,12 @@ const SearchBar = ({ query = '', onSearch, onValueChange, placeholder, autoFocus
   }, [query])
 
   useEffect(() => {
-    setRecentSearches(getSearchHistory())
-  }, [])
+    if (!enableHistory) {
+      setRecentSearches([])
+      return
+    }
+    setRecentSearches(getSearchHistory(historyScope))
+  }, [enableHistory, historyScope])
 
   useEffect(() => {
     if (!enablePredictive) {
@@ -96,8 +109,10 @@ const SearchBar = ({ query = '', onSearch, onValueChange, placeholder, autoFocus
       return
     }
 
-    addToSearchHistory(trimmed)
-    setRecentSearches(getSearchHistory())
+    if (enableHistory) {
+      addToSearchHistory(trimmed, historyScope)
+      setRecentSearches(getSearchHistory(historyScope))
+    }
     onSearch?.(trimmed)
     setShowSuggestions(false)
     setActiveSuggestionIndex(-1)
@@ -148,12 +163,14 @@ const SearchBar = ({ query = '', onSearch, onValueChange, placeholder, autoFocus
   }
 
   const handleDeleteRecentSearch = (term) => {
-    removeFromSearchHistory(term)
-    setRecentSearches(getSearchHistory())
+    if (!enableHistory) return
+    removeFromSearchHistory(term, historyScope)
+    setRecentSearches(getSearchHistory(historyScope))
   }
 
   const handleClearHistory = () => {
-    clearSearchHistory()
+    if (!enableHistory) return
+    clearSearchHistory(historyScope)
     setRecentSearches([])
   }
 
@@ -209,7 +226,8 @@ const SearchBar = ({ query = '', onSearch, onValueChange, placeholder, autoFocus
         )}
       </div>
 
-      <div className="mt-5 rounded-2xl border border-outline/80 bg-canvas/25 p-4">
+      {enableHistory && (
+        <div className="mt-5 rounded-2xl border border-outline/80 bg-canvas/25 p-4">
         <div className="mb-3 flex items-center justify-between">
           <p className="text-xs uppercase tracking-[0.34em] text-muted">
             Recent Searches
@@ -258,7 +276,8 @@ const SearchBar = ({ query = '', onSearch, onValueChange, placeholder, autoFocus
             <p className="mt-1 text-xs text-muted/80">Search an artist or album to start building history.</p>
           </div>
         )}
-      </div>
+        </div>
+      )}
     </div>
   )
 }

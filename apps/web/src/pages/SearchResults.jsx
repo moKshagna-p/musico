@@ -6,11 +6,15 @@ import AlbumGrid from '../components/AlbumGrid.jsx'
 import PageTransition from '../components/PageTransition.jsx'
 import SearchBar from '../components/SearchBar.jsx'
 import { useAlbums } from '../hooks/useAlbums.js'
+import { useAuth } from '../hooks/useAuth.js'
 import { addToSearchHistory } from '../services/searchHistoryService.js'
 
 const SearchResults = () => {
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
+  const { user, isPending } = useAuth()
+  const historyScope = user?.id ?? 'guest'
+  const enableHistory = !isPending && Boolean(user?.id)
   const initialQuery = searchParams.get('q') ?? ''
 
   const { albums, query, setQuery, loading, error } = useAlbums(initialQuery)
@@ -18,14 +22,18 @@ const SearchResults = () => {
   useEffect(() => {
     if (initialQuery) {
       setQuery(initialQuery)
-      addToSearchHistory(initialQuery)
+      if (enableHistory) {
+        addToSearchHistory(initialQuery, historyScope)
+      }
     }
-  }, [initialQuery, setQuery])
+  }, [enableHistory, historyScope, initialQuery, setQuery])
 
   const updateQuery = (value) => {
     setQuery(value)
     if (value?.trim()) {
-      addToSearchHistory(value)
+      if (enableHistory) {
+        addToSearchHistory(value, historyScope)
+      }
       const params = new URLSearchParams()
       params.set('q', value)
       setSearchParams(params, { replace: true })
@@ -52,7 +60,13 @@ const SearchResults = () => {
           </h1>
         </div>
 
-        <SearchBar query={query} onSearch={updateQuery} autoFocus />
+        <SearchBar
+          query={query}
+          onSearch={updateQuery}
+          autoFocus
+          historyScope={historyScope}
+          enableHistory={enableHistory}
+        />
 
         {query && (
           <AlbumGrid

@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom'
 import AlbumGrid from '../components/AlbumGrid.jsx'
 import PageTransition from '../components/PageTransition.jsx'
 import SearchBar from '../components/SearchBar.jsx'
+import { useAuth } from '../hooks/useAuth.js'
 import { getRecentPopularReleases } from '../services/discogsService.js'
 
 const MIN_LIVE_SEARCH_LENGTH = 3
@@ -11,6 +12,9 @@ const LIVE_SEARCH_DEBOUNCE_MS = 300
 
 const Discover = () => {
   const navigate = useNavigate()
+  const { user, isPending } = useAuth()
+  const historyScope = user?.id ?? 'guest'
+  const enableHistory = !isPending && Boolean(user?.id)
   const [albums, setAlbums] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -67,6 +71,8 @@ const Discover = () => {
           onValueChange={setLiveQuery}
           placeholder="Search artists or albums..."
           enablePredictive
+          historyScope={historyScope}
+          enableHistory={enableHistory}
         />
 
         <div>
