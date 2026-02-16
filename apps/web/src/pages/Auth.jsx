@@ -16,6 +16,10 @@ const Auth = () => {
   const [error, setError] = useState('')
 
   const title = useMemo(() => (mode === 'sign-in' ? 'Sign In' : 'Create Account'), [mode])
+  const submitLabel = useMemo(
+    () => (submitting ? (mode === 'sign-in' ? 'Signing In…' : 'Creating Account…') : title),
+    [submitting, mode, title],
+  )
 
   const onSubmit = async (event) => {
     event.preventDefault()
@@ -52,8 +56,8 @@ const Auth = () => {
   if (isPending) {
     return (
       <PageTransition>
-        <div className="mx-auto max-w-xl rounded-3xl border border-outline bg-panel p-6 text-center text-muted tablet:p-8">
-          Loading session...
+        <div aria-live="polite" className="mx-auto max-w-xl rounded-3xl border border-outline bg-panel p-6 text-center text-muted tablet:p-8">
+          Loading Session…
         </div>
       </PageTransition>
     )
@@ -79,72 +83,114 @@ const Auth = () => {
 
   return (
     <PageTransition>
-      <div className="mx-auto max-w-xl rounded-3xl border border-outline bg-panel p-5 tablet:p-8">
-        <div className="mb-6 flex flex-col items-start gap-3 tablet:flex-row tablet:items-center tablet:justify-between tablet:gap-4">
-          <h1 className="font-display text-3xl text-white tablet:text-4xl">{title}</h1>
-          <button
-            type="button"
-            onClick={() => {
-              setMode((prev) => (prev === 'sign-in' ? 'sign-up' : 'sign-in'))
-              setError('')
-            }}
-            className="text-xs uppercase tracking-[0.24em] text-muted transition hover:text-white tablet:tracking-[0.32em]"
-          >
-            {mode === 'sign-in' ? 'Need account?' : 'Have account?'}
-          </button>
-        </div>
+      <section className="mx-auto w-full max-w-xl px-2 py-8 tablet:py-14">
+        <div className="overflow-hidden rounded-3xl border border-white/15 bg-panel/95 shadow-[0_24px_84px_rgba(0,0,0,0.5)]">
+          <div className="border-b border-outline/80 bg-[linear-gradient(120deg,rgba(255,255,255,0.11),rgba(255,255,255,0.02)_52%,rgba(255,255,255,0.08))] px-5 py-6 tablet:px-8 tablet:py-8">
+            <p className="text-xs uppercase tracking-[0.33em] text-muted">Musico Account</p>
+            <h1 className="mt-3 font-display text-4xl leading-tight text-white tablet:text-5xl">{title}</h1>
+            <p className="mt-3 max-w-lg text-sm text-muted tablet:text-base">
+              Access your ratings, lists, and listening profile.
+            </p>
+          </div>
 
-        <form onSubmit={onSubmit} className="space-y-4">
-          {mode === 'sign-up' && (
-            <div>
-              <label className="mb-1 block text-xs uppercase tracking-[0.3em] text-muted">Name</label>
-              <input
-                value={name}
-                onChange={(event) => setName(event.target.value)}
-                autoComplete="name"
-                className="w-full rounded-xl border border-outline bg-canvas px-4 py-3 text-white outline-none focus:border-white/35"
-                placeholder="Your name"
-              />
+          <div className="p-5 tablet:p-8">
+            <div className="mb-6 grid grid-cols-2 rounded-full border border-outline bg-canvas p-1">
+              <button
+                type="button"
+                onClick={() => {
+                  setMode('sign-in')
+                  setError('')
+                }}
+                className={`rounded-full px-3 py-2 text-xs uppercase tracking-[0.22em] transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas ${
+                  mode === 'sign-in' ? 'bg-white/12 text-white' : 'text-muted hover:text-white'
+                }`}
+              >
+                Sign In
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setMode('sign-up')
+                  setError('')
+                }}
+                className={`rounded-full px-3 py-2 text-xs uppercase tracking-[0.22em] transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas ${
+                  mode === 'sign-up' ? 'bg-white/12 text-white' : 'text-muted hover:text-white'
+                }`}
+              >
+                Create Account
+              </button>
             </div>
-          )}
 
-          <div>
-            <label className="mb-1 block text-xs uppercase tracking-[0.3em] text-muted">Email</label>
-            <input
-              type="email"
-              required
-              value={email}
-              onChange={(event) => setEmail(event.target.value)}
-              autoComplete="email"
-              className="w-full rounded-xl border border-outline bg-canvas px-4 py-3 text-white outline-none focus:border-white/35"
-              placeholder="you@example.com"
-            />
+            <form onSubmit={onSubmit} className="space-y-4">
+              {mode === 'sign-up' && (
+                <div>
+                  <label htmlFor="name" className="mb-1 block text-xs uppercase tracking-[0.3em] text-muted">
+                    Name
+                  </label>
+                  <input
+                    id="name"
+                    name="name"
+                    value={name}
+                    onChange={(event) => setName(event.target.value)}
+                    autoComplete="name"
+                    className="w-full rounded-xl border border-outline bg-canvas px-4 py-3 text-white outline-none transition focus:border-white/35 focus-visible:ring-2 focus-visible:ring-white/35 focus-visible:ring-offset-1 focus-visible:ring-offset-canvas"
+                    placeholder="Your Name"
+                  />
+                </div>
+              )}
+
+              <div>
+                <label htmlFor="email" className="mb-1 block text-xs uppercase tracking-[0.3em] text-muted">
+                  Email
+                </label>
+                <input
+                  id="email"
+                  name="email"
+                  type="email"
+                  required
+                  value={email}
+                  onChange={(event) => setEmail(event.target.value)}
+                  autoComplete="email"
+                  spellCheck={false}
+                  className="w-full rounded-xl border border-outline bg-canvas px-4 py-3 text-white outline-none transition focus:border-white/35 focus-visible:ring-2 focus-visible:ring-white/35 focus-visible:ring-offset-1 focus-visible:ring-offset-canvas"
+                  placeholder="you@example.com"
+                />
+              </div>
+
+              <div>
+                <label htmlFor="password" className="mb-1 block text-xs uppercase tracking-[0.3em] text-muted">
+                  Password
+                </label>
+                <input
+                  id="password"
+                  name="password"
+                  type="password"
+                  required
+                  value={password}
+                  onChange={(event) => setPassword(event.target.value)}
+                  autoComplete={mode === 'sign-in' ? 'current-password' : 'new-password'}
+                  className="w-full rounded-xl border border-outline bg-canvas px-4 py-3 text-white outline-none transition focus:border-white/35 focus-visible:ring-2 focus-visible:ring-white/35 focus-visible:ring-offset-1 focus-visible:ring-offset-canvas"
+                  placeholder="••••••••"
+                />
+              </div>
+
+              {error && (
+                <p aria-live="polite" className="rounded-xl border border-red-300/30 bg-red-400/10 px-3 py-2 text-sm text-red-200">
+                  {error}
+                </p>
+              )}
+
+              <button
+                type="submit"
+                disabled={submitting}
+                className="w-full rounded-full border border-outline bg-white/10 px-4 py-3 text-xs uppercase tracking-[0.35em] text-white transition hover:bg-white/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {submitLabel}
+              </button>
+            </form>
           </div>
-
-          <div>
-            <label className="mb-1 block text-xs uppercase tracking-[0.3em] text-muted">Password</label>
-            <input
-              type="password"
-              required
-              value={password}
-              onChange={(event) => setPassword(event.target.value)}
-              autoComplete={mode === 'sign-in' ? 'current-password' : 'new-password'}
-              className="w-full rounded-xl border border-outline bg-canvas px-4 py-3 text-white outline-none focus:border-white/35"
-              placeholder="••••••••"
-            />
-          </div>
-
-          {error && <p className="text-sm text-red-300">{error}</p>}
-
-          <button
-            type="submit"
-            disabled={submitting}
-            className="w-full rounded-full border border-outline bg-white/10 px-4 py-3 text-xs uppercase tracking-[0.35em] text-white transition hover:bg-white/15 disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            {submitting ? 'Please wait...' : title}
-          </button>
-        </form>
-      </div>
+        </div>
+      </section>
     </PageTransition>
   )
 }

@@ -1,16 +1,32 @@
+import { useEffect, useState } from 'react'
+
 const artistQuotes = [
   { quote: 'Music is life itself.', artist: 'Louis Armstrong' },
   { quote: 'One good thing about music, when it hits you, you feel no pain.', artist: 'Bob Marley' },
   { quote: 'Music can change the world because it can change people.', artist: 'Bono' },
-  { quote: 'Music is the strongest form of magic.', artist: 'Marilyn Manson' },
+  { quote: 'A problem is a chance for you to do your best.', artist: 'Duke Ellington' },
   { quote: "I don't make music for eyes. I make music for ears.", artist: 'Adele' },
-  { quote: 'If everything was perfect, you would never learn and you would never grow.', artist: 'Beyoncé' },
+  { quote: 'If everything was perfect, you would never learn and you would never grow.', artist: 'Beyonce' },
   { quote: 'Lose yourself in the music, the moment.', artist: 'Eminem' },
-  { quote: 'Music is like a dream. One that I cannot hear.', artist: 'Ludwig van Beethoven' }
+  { quote: 'Music is like a dream. One that I cannot hear.', artist: 'Ludwig van Beethoven' },
+  { quote: "Do not fear mistakes. There are none.", artist: 'Miles Davis' },
+  { quote: 'If I cannot fly, let me sing.', artist: 'Stephen Sondheim' },
+  { quote: 'Music can name the unnameable and communicate the unknowable.', artist: 'Leonard Bernstein' },
+  { quote: "Music is enough for a lifetime, but a lifetime is not enough for music.", artist: 'Sergei Rachmaninoff' },
 ]
 
 const Hero = () => {
-  const quote = artistQuotes[0]
+  const [quoteIndex, setQuoteIndex] = useState(() => Math.floor(Math.random() * artistQuotes.length))
+
+  useEffect(() => {
+    const interval = window.setInterval(() => {
+      setQuoteIndex((prev) => (prev + 1) % artistQuotes.length)
+    }, 7000)
+
+    return () => window.clearInterval(interval)
+  }, [])
+
+  const quote = artistQuotes[quoteIndex]
 
   return (
     <section className="rounded-3xl border border-outline bg-panel px-5 py-10 shadow-panel tablet:px-10 tablet:py-14">
