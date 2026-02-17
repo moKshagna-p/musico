@@ -33,6 +33,11 @@ const RELEASE_CACHE_WINDOW = 1000 * 60 * 60 // 1 hour
 const FEATURED_DB_CACHE_WINDOW = parsePositiveInteger(env.FEATURED_CACHE_TTL_MS, 1000 * 60 * 60 * 24)
 const SEARCH_DB_CACHE_WINDOW = parsePositiveInteger(env.SEARCH_CACHE_TTL_MS, 1000 * 60 * 60 * 24 * 7)
 const FEATURED_REFRESH_SIZE = 50
+const SEARCH_CACHE_VERSION = 'v4'
+const SEARCH_RESULTS_PER_PAGE = 100
+const SEARCH_MAX_PAGES = 8
+const SEARCH_QUERY_PAGES = 4
+const SEARCH_ARTIST_CANDIDATE_LIMIT = 3
 
 const releaseCache = new Map<string, { data: Release; timestamp: number }>()
 const featuredRefreshInFlight = new Map<string, Promise<Release[]>>()
@@ -216,7 +221,7 @@ const requestDiscogs = async (endpoint: string, params: Record<string, string | 
 const isFresh = (timestamp: number, ttl = RELEASE_CACHE_WINDOW) => Date.now() - timestamp < ttl
 const isNotExpired = (expiresAt: Date | null | undefined) => Boolean(expiresAt && expiresAt.getTime() > Date.now())
 const normalizeCacheQuery = (query: string) => query.trim().toLowerCase().replace(/\s+/g, ' ')
-const createQueryHash = (query: string) => createHash('sha256').update(query).digest('hex')
+const createQueryHash = (query: string) => createHash('sha256').update(`${SEARCH_CACHE_VERSION}:${query}`).digest('hex')
 
 const toReleaseArray = (value: unknown): Release[] => {
   if (!Array.isArray(value)) return []
@@ -267,6 +272,8 @@ const cleanAlbumName = (release: Release) => {
 const isReleasedAlbum = (release: Release) => {
   const hasReleaseDate = Boolean(release.releaseYear || (release.releaseDate && release.releaseDate !== '0'))
   if (!hasReleaseDate) return false
+  const currentYear = new Date().getFullYear()
+  if (Number(release.releaseYear ?? 0) > currentYear) return false
   const albumType = release.albumType?.toLowerCase?.() ?? ''
   if (bannedAlbumTypes.some((item) => albumType.includes(item))) return false
   return true
@@ -298,6 +305,29 @@ const dedupeReleasedAlbums = (releases: Release[]) => {
   return Array.from(picked.values())
 }
 
+const sortReleasedAlbumsChronologically = (releases: Release[], preferredArtists: string[] = []) => {
+  const preferred = preferredArtists.map((artist) => normalizeCacheQuery(artist))
+  const getArtistRank = (release: Release) => {
+    const primaryArtist = normalizeCacheQuery(release.artists?.[0] ?? '')
+    const index = preferred.indexOf(primaryArtist)
+    return index === -1 ? Number.MAX_SAFE_INTEGER : index
+  }
+
+  return [...releases].sort((a, b) => {
+    const rankDiff = getArtistRank(a) - getArtistRank(b)
+    if (rankDiff !== 0) return rankDiff
+
+    const yearA = Number(a.releaseYear ?? 0)
+    const yearB = Number(b.releaseYear ?? 0)
+    if (yearA !== yearB) return yearA - yearB
+
+    const nameDiff = (a.name ?? '').localeCompare(b.name ?? '')
+    if (nameDiff !== 0) return nameDiff
+
+    return (a.artists?.[0] ?? '').localeCompare(b.artists?.[0] ?? '')
+  })
+}
+
 const mapDiscogsSearchResults = (results: any[]): Release[] =>
   results
     .map((entry: any) =>
@@ -317,6 +347,118 @@ const mapDiscogsSearchResults = (results: any[]): Release[] =>
       }),
     )
     .filter(Boolean) as Release[]
+
+const mapDiscogsMasterSearchResults = (results: any[]): Release[] =>
+  results
+    .map((entry: any) => {
+      const id = entry.main_release ?? entry.id
+      if (!id) return null
+      const formatName = Array.isArray(entry.format)
+        ? entry.format.filter(Boolean).map(String).join(' / ')
+        : String(entry.format ?? '').trim()
+      const labelName = Array.isArray(entry.label)
+        ? String(entry.label[0] ?? '').trim()
+        : String(entry.label ?? '').trim()
+      const year = Number(entry.year)
+      return normalizeRelease({
+        id,
+        title: entry.title,
+        artist: entry.artist,
+        year: Number.isFinite(year) && year > 0 ? year : null,
+        cover_image: entry.cover_image,
+        thumb: entry.thumb,
+        genres: entry.genre,
+        styles: entry.style,
+        labels: labelName ? [{ name: labelName }] : undefined,
+        formats: formatName ? [{ name: formatName }] : [{ name: 'Album' }],
+        uri: entry.uri,
+        community: entry.community,
+      })
+    })
+    .filter(Boolean) as Release[]
+
+const normalizeSearchValue = (value = '') =>
+  value
+    .toLowerCase()
+    .replace(/[^\w\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+
+const extractMasterArtist = (entry: any) => {
+  const fromTitle =
+    typeof entry?.title === 'string' && entry.title.includes(' - ') ? entry.title.split(' - ')[0]?.trim() : ''
+  const fromArtist = typeof entry?.artist === 'string' ? entry.artist.trim() : ''
+  const fromArtistsArray = Array.isArray(entry?.artists)
+    ? String(entry.artists[0]?.name ?? entry.artists[0]?.title ?? '').trim()
+    : ''
+  return stripDiscogsDisambiguation(fromTitle || fromArtist || fromArtistsArray)
+}
+
+const extractMasterAlbum = (entry: any) => {
+  if (typeof entry?.title !== 'string') return ''
+  if (!entry.title.includes(' - ')) return stripDiscogsDisambiguation(entry.title)
+  return stripDiscogsDisambiguation(entry.title.split(' - ').slice(1).join(' - ').trim())
+}
+
+const inferArtistCandidates = (entries: any[], sourceQuery: string) => {
+  const normalizedQuery = normalizeSearchValue(sourceQuery)
+  const scores = new Map<string, number>()
+
+  for (const entry of entries) {
+    const artist = extractMasterArtist(entry)
+    if (!artist) continue
+    const album = extractMasterAlbum(entry)
+    const normalizedArtist = normalizeSearchValue(artist)
+    const normalizedAlbum = normalizeSearchValue(album)
+    let score = 0
+
+    if (normalizedArtist === normalizedQuery) score += 140
+    else if (normalizedArtist.startsWith(normalizedQuery) || normalizedQuery.startsWith(normalizedArtist)) score += 95
+    else if (normalizedArtist.includes(normalizedQuery) || normalizedQuery.includes(normalizedArtist)) score += 70
+
+    if (normalizedAlbum === normalizedQuery) score += 120
+    else if (normalizedAlbum.includes(normalizedQuery) || normalizedQuery.includes(normalizedAlbum)) score += 85
+
+    score += Math.min(Number(entry?.community?.have ?? 0) / 1000, 15)
+    score += Math.min(Number(entry?.community?.want ?? 0) / 2000, 8)
+
+    if (score <= 0) continue
+    const current = scores.get(artist) ?? 0
+    scores.set(artist, current + score)
+  }
+
+  return Array.from(scores.entries())
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, SEARCH_ARTIST_CANDIDATE_LIMIT)
+    .map(([artist]) => artist)
+}
+
+const fetchAllSearchPages = async (
+  params: Record<string, string | number | undefined>,
+  maxPages = SEARCH_MAX_PAGES,
+) => {
+  const firstPage = await requestDiscogs('/database/search', {
+    ...params,
+    per_page: SEARCH_RESULTS_PER_PAGE,
+    page: 1,
+  })
+  const totalPages = Math.max(
+    1,
+    Math.min(Number(firstPage?.pagination?.pages ?? 1) || 1, Math.max(1, maxPages)),
+  )
+  const nextPageRequests =
+    totalPages > 1
+      ? Array.from({ length: totalPages - 1 }, (_, index) =>
+          requestDiscogs('/database/search', {
+            ...params,
+            per_page: SEARCH_RESULTS_PER_PAGE,
+            page: index + 2,
+          }),
+        )
+      : []
+  const nextPages = nextPageRequests.length ? await Promise.all(nextPageRequests) : []
+  return [firstPage, ...nextPages].flatMap((page) => (Array.isArray(page?.results) ? page.results : []))
+}
 
 type FeaturedMode = 'featured' | 'recent-popular'
 
@@ -483,15 +625,50 @@ const refreshSearchQuery = async (queryHash: string, normalizedQuery: string, so
   if (existing) return existing
 
   const refreshPromise = (async () => {
-    const response = await requestDiscogs('/database/search', {
-      q: sourceQuery,
-      type: 'release',
-      per_page: 18,
+    const [artistScopedResults, queryResults] = await Promise.all([
+      fetchAllSearchPages({
+        artist: sourceQuery,
+        type: 'master',
+        format: 'album',
+      }, SEARCH_MAX_PAGES),
+      fetchAllSearchPages({
+        q: sourceQuery,
+        type: 'master',
+        format: 'album',
+      }, SEARCH_QUERY_PAGES),
+    ])
+
+    const inferredArtists = inferArtistCandidates([...artistScopedResults, ...queryResults], sourceQuery)
+    const supplementalArtistResults = (
+      await Promise.all(
+        inferredArtists
+          .filter((artist) => normalizeCacheQuery(artist) !== normalizeCacheQuery(sourceQuery))
+          .map((artist) =>
+            fetchAllSearchPages(
+              {
+                artist,
+                type: 'master',
+                format: 'album',
+              },
+              SEARCH_QUERY_PAGES,
+            ),
+          ),
+      )
+    ).flat()
+
+    const normalized = mapDiscogsMasterSearchResults([...artistScopedResults, ...queryResults, ...supplementalArtistResults])
+    const curated = dedupeReleasedAlbums(normalized).filter((release) => {
+      const albumType = (release.albumType ?? '').toLowerCase()
+      return albumType.includes('album') || albumType.includes('lp')
     })
-    const normalized = mapDiscogsSearchResults(response.results ?? [])
-    const curated = dedupeReleasedAlbums(normalized)
-    await upsertSearchCache(queryHash, normalizedQuery, curated)
-    return curated
+    const preferredArtists = [
+      sourceQuery,
+      ...inferredArtists,
+      ...queryResults.map((entry: any) => extractMasterArtist(entry)).filter(Boolean),
+    ]
+    const ordered = sortReleasedAlbumsChronologically(curated, preferredArtists)
+    await upsertSearchCache(queryHash, normalizedQuery, ordered)
+    return ordered
   })()
 
   searchRefreshInFlight.set(queryHash, refreshPromise)

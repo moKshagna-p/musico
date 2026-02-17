@@ -1,6 +1,7 @@
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:4000').replace(/\/$/, '')
 const CACHE_WINDOW = 1000 * 60 * 60 // 1 hour
 const FEATURED_CACHE_WINDOW = 1000 * 60 * 5 // 5 minutes
+const SEARCH_CACHE_VERSION = 'v4'
 
 const featuredCache = { timestamp: 0, data: [] }
 const recentPopularCache = { timestamp: 0, data: [] }
@@ -62,7 +63,7 @@ export const getRecentPopularReleases = async (limit = 24) => {
 export const searchReleases = async (query) => {
   const trimmed = query?.trim()
   if (!trimmed) return []
-  const cacheKey = trimmed.toLowerCase()
+  const cacheKey = `${SEARCH_CACHE_VERSION}:${trimmed.toLowerCase()}`
   const cached = searchCache.get(cacheKey)
   if (cached && isFresh(cached.timestamp)) return cached.data
 
