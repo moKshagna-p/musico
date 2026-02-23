@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto'
 
 import { eq } from 'drizzle-orm'
 
-import type { Release } from './types'
+import type { ReleaseDetails, ReleaseSummary } from './types'
 
 import { db } from './db'
 import { featuredCache as featuredCacheTable, searchCache as searchCacheTable } from './schema'
@@ -32,16 +32,22 @@ const parsePositiveInteger = (value: string | undefined, fallback: number) => {
 const RELEASE_CACHE_WINDOW = 1000 * 60 * 60 // 1 hour
 const FEATURED_DB_CACHE_WINDOW = parsePositiveInteger(env.FEATURED_CACHE_TTL_MS, 1000 * 60 * 60 * 24)
 const SEARCH_DB_CACHE_WINDOW = parsePositiveInteger(env.SEARCH_CACHE_TTL_MS, 1000 * 60 * 60 * 24 * 7)
+const FEATURED_RETRY_COOLDOWN_MS = parsePositiveInteger(env.FEATURED_RETRY_COOLDOWN_MS, 1000 * 60 * 10)
+const SEARCH_RETRY_COOLDOWN_MS = parsePositiveInteger(env.SEARCH_RETRY_COOLDOWN_MS, 1000 * 60 * 10)
 const FEATURED_REFRESH_SIZE = 50
-const SEARCH_CACHE_VERSION = 'v4'
+const FEATURED_DETAIL_HYDRATION_LIMIT = parsePositiveInteger(env.FEATURED_DETAIL_HYDRATION_LIMIT, 12)
+const SEARCH_CACHE_VERSION = 'v8'
 const SEARCH_RESULTS_PER_PAGE = 100
-const SEARCH_MAX_PAGES = 8
-const SEARCH_QUERY_PAGES = 4
-const SEARCH_ARTIST_CANDIDATE_LIMIT = 3
+const SEARCH_MAX_PAGES = 10
+const SEARCH_QUERY_PAGES = 6
+const SEARCH_ARTIST_CANDIDATE_LIMIT = 5
+const DISCOGS_MIN_REQUEST_INTERVAL_MS = parsePositiveInteger(env.DISCOGS_MIN_REQUEST_INTERVAL_MS, 350)
+const DISCOGS_MAX_RETRIES = parsePositiveInteger(env.DISCOGS_MAX_RETRIES, 4)
 
-const releaseCache = new Map<string, { data: Release; timestamp: number }>()
-const featuredRefreshInFlight = new Map<string, Promise<Release[]>>()
-const searchRefreshInFlight = new Map<string, Promise<Release[]>>()
+const releaseCache = new Map<string, { data: ReleaseDetails; timestamp: number }>()
+const featuredRefreshInFlight = new Map<string, Promise<ReleaseSummary[]>>()
+const searchRefreshInFlight = new Map<string, Promise<ReleaseSummary[]>>()
+let discogsNextRequestAt = 0
 
 const HEADERS: Record<string, string> = {
   'User-Agent': DISCOGS_USER_AGENT,
@@ -124,7 +130,7 @@ const parseArtists = (input: unknown, title = ''): string[] => {
   return []
 }
 
-const normalizeRelease = (release: any, fallbackTrackCount = 0): Release | null => {
+const normalizeRelease = (release: any, fallbackTrackCount = 0): ReleaseDetails | null => {
   if (!release) return null
   const artists =
     parseArtists(release.artists, release.title) ||
@@ -132,13 +138,19 @@ const normalizeRelease = (release: any, fallbackTrackCount = 0): Release | null 
     parseArtists(release.artist, release.title) ||
     parseArtists(release.title, release.title)
 
-  const tracklist =
-    release.tracklist?.map((track: any, index: number) => ({
+  const rawTracks = Array.isArray(release.tracklist) ? release.tracklist : []
+  const tracklist = rawTracks
+    .filter((track: any) => {
+      const type = (track.type_ ?? track.type ?? '').toLowerCase()
+      // Only include actual tracks (type 'track' or no type but has position)
+      return type === 'track' || (!type && track.position)
+    })
+    .map((track: any, index: number) => ({
       id: `${release.id}-${track.position ?? index}`,
       name: track.title ?? `Track ${index + 1}`,
       duration_ms: convertDurationToMs(track.duration),
       track_number: Number(track.position?.replace(/[^\d]/g, '')) || index + 1,
-    })) ?? []
+    }))
 
   const cover =
     release.images?.[0]?.uri ||
@@ -177,7 +189,50 @@ const normalizeRelease = (release: any, fallbackTrackCount = 0): Release | null 
   }
 }
 
+const toReleaseSummary = (release: ReleaseDetails | ReleaseSummary): ReleaseSummary => ({
+  id: release.id,
+  name: release.name,
+  artists: Array.isArray(release.artists) ? release.artists : [],
+  releaseDate: release.releaseDate ?? null,
+  releaseYear: release.releaseYear ?? null,
+  cover: release.cover ?? '',
+  totalTracks: Number(release.totalTracks ?? 0),
+  albumType: release.albumType ?? 'Release',
+  label: release.label,
+  popularity: Number(release.popularity ?? 0),
+  external_urls: {
+    discogs: release.external_urls?.discogs,
+  },
+  genres: Array.isArray(release.genres) ? release.genres : [],
+  communityRating: Number(release.communityRating ?? 0),
+  reviewCount: Number(release.reviewCount ?? 0),
+})
+
 const requestDiscogs = async (endpoint: string, params: Record<string, string | number | undefined> = {}) => {
+  const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
+  const throttleDiscogs = async () => {
+    const now = Date.now()
+    const waitMs = Math.max(0, discogsNextRequestAt - now)
+    discogsNextRequestAt = Math.max(discogsNextRequestAt, now) + DISCOGS_MIN_REQUEST_INTERVAL_MS
+    if (waitMs > 0) await wait(waitMs)
+  }
+
+  const parseRetryAfterMs = (headerValue: string | null) => {
+    if (!headerValue) return null
+    const seconds = Number.parseFloat(headerValue)
+    if (Number.isFinite(seconds) && seconds >= 0) {
+      return Math.round(seconds * 1000)
+    }
+    const asDate = new Date(headerValue)
+    if (!Number.isNaN(asDate.getTime())) {
+      return Math.max(0, asDate.getTime() - Date.now())
+    }
+    return null
+  }
+
+  const jitterMs = () => Math.round(Math.random() * 150)
+  const backoffMs = (attempt: number) => Math.min(8000, 500 * 2 ** attempt) + jitterMs()
+
   const makeUrl = (useTokenQuery = false) => {
     const url = new URL(`${DISCOGS_BASE}${endpoint}`)
     Object.entries(params).forEach(([key, value]) => {
@@ -197,25 +252,45 @@ const requestDiscogs = async (endpoint: string, params: Record<string, string | 
     return headers
   }
 
-  let response = await fetch(makeUrl(false), { headers: makeHeaders(true) })
+  const fetchWithAuthFallback = async () => {
+    await throttleDiscogs()
+    let response = await fetch(makeUrl(false), { headers: makeHeaders(true) })
 
-  // Some Discogs setups only accept user token via query param.
-  if (response.status === 401 && DISCOGS_TOKEN) {
-    response = await fetch(makeUrl(true), { headers: makeHeaders(false) })
+    // Some Discogs setups only accept user token via query param.
+    if (response.status === 401 && DISCOGS_TOKEN) {
+      await throttleDiscogs()
+      response = await fetch(makeUrl(true), { headers: makeHeaders(false) })
+    }
+
+    // If token auth fails entirely and no key/secret exists, retry as anonymous public request.
+    if (response.status === 401 && DISCOGS_TOKEN && !(DISCOGS_KEY && DISCOGS_SECRET)) {
+      await throttleDiscogs()
+      response = await fetch(makeUrl(false), { headers: makeHeaders(false) })
+    }
+
+    return response
   }
 
-  // If token auth fails entirely and no key/secret exists, retry as anonymous public request.
-  if (response.status === 401 && DISCOGS_TOKEN && !(DISCOGS_KEY && DISCOGS_SECRET)) {
-    response = await fetch(makeUrl(false), { headers: makeHeaders(false) })
-  }
+  for (let attempt = 0; attempt <= DISCOGS_MAX_RETRIES; attempt += 1) {
+    const response = await fetchWithAuthFallback()
+    if (response.ok) {
+      return response.json()
+    }
 
-  if (!response.ok) {
+    const retryableStatus = response.status === 429 || response.status >= 500
+    if (retryableStatus && attempt < DISCOGS_MAX_RETRIES) {
+      const retryAfterMs = parseRetryAfterMs(response.headers.get('retry-after'))
+      await wait(Math.max(backoffMs(attempt), retryAfterMs ?? 0))
+      continue
+    }
+
     const errorBody = await response.text().catch(() => '')
     const hasCredentials = Boolean(DISCOGS_TOKEN || (DISCOGS_KEY && DISCOGS_SECRET))
     const reason = errorBody ? ` - ${errorBody.slice(0, 200)}` : ''
     throw new Error(`Discogs request failed: ${response.status}${hasCredentials ? ' (with credentials)' : ''}${reason}`)
   }
-  return response.json()
+
+  throw new Error('Discogs request failed: exhausted retries')
 }
 
 const isFresh = (timestamp: number, ttl = RELEASE_CACHE_WINDOW) => Date.now() - timestamp < ttl
@@ -223,9 +298,9 @@ const isNotExpired = (expiresAt: Date | null | undefined) => Boolean(expiresAt &
 const normalizeCacheQuery = (query: string) => query.trim().toLowerCase().replace(/\s+/g, ' ')
 const createQueryHash = (query: string) => createHash('sha256').update(`${SEARCH_CACHE_VERSION}:${query}`).digest('hex')
 
-const toReleaseArray = (value: unknown): Release[] => {
+const toReleaseSummaryArray = (value: unknown): ReleaseSummary[] => {
   if (!Array.isArray(value)) return []
-  return value.filter(Boolean) as Release[]
+  return value.filter(Boolean).map((entry) => toReleaseSummary(entry as ReleaseSummary))
 }
 
 const variantMarkers = [
@@ -254,7 +329,7 @@ const hasVariantMarker = (value = '') => {
   return variantMarkers.some((marker) => lower.includes(marker))
 }
 
-const cleanAlbumName = (release: Release) => {
+const cleanAlbumName = (release: ReleaseSummary) => {
   const primaryArtist = release.artists?.[0] ?? ''
   let name = release.name ?? ''
   if (primaryArtist && name.toLowerCase().startsWith(`${primaryArtist.toLowerCase()} - `)) {
@@ -269,7 +344,7 @@ const cleanAlbumName = (release: Release) => {
   return normalizeWhitespace(name).toLowerCase()
 }
 
-const isReleasedAlbum = (release: Release) => {
+const isReleasedAlbum = (release: ReleaseSummary) => {
   const hasReleaseDate = Boolean(release.releaseYear || (release.releaseDate && release.releaseDate !== '0'))
   if (!hasReleaseDate) return false
   const currentYear = new Date().getFullYear()
@@ -279,19 +354,26 @@ const isReleasedAlbum = (release: Release) => {
   return true
 }
 
-const releaseScore = (release: Release) => {
+const releaseScore = (release: ReleaseSummary) => {
   let score = 0
-  if (release.releaseYear) score += 4
-  if (release.cover) score += 2
-  if ((release.reviewCount ?? 0) > 0) score += 1
-  if (/album|lp/i.test(release.albumType ?? '')) score += 2
-  if (/single|ep/i.test(release.albumType ?? '')) score -= 2
-  if (hasVariantMarker(release.name)) score -= 3
+  if (release.releaseYear) score += 5
+  if (release.cover) score += 3
+  if ((release.reviewCount ?? 0) > 0) score += 2
+  if (release.communityRating && release.communityRating > 0) score += Math.floor(release.communityRating)
+  
+  const albumType = (release.albumType ?? '').toLowerCase()
+  if (albumType === 'album' || albumType === 'lp') score += 10
+  if (albumType.includes('single') || albumType.includes('ep')) score -= 5
+  if (hasVariantMarker(release.name)) score -= 10
+  
+  // High popularity boost
+  if (release.popularity && release.popularity > 500) score += 5
+
   return score
 }
 
-const dedupeReleasedAlbums = (releases: Release[]) => {
-  const picked = new Map<string, Release>()
+const dedupeReleasedAlbums = (releases: ReleaseSummary[]) => {
+  const picked = new Map<string, ReleaseSummary>()
   for (const release of releases) {
     if (!isReleasedAlbum(release)) continue
     const primaryArtist = (release.artists?.[0] ?? 'unknown artist').toLowerCase()
@@ -305,8 +387,8 @@ const dedupeReleasedAlbums = (releases: Release[]) => {
   return Array.from(picked.values())
 }
 
-const dedupeByReleaseId = (releases: Release[]) => {
-  const picked = new Map<string, Release>()
+const dedupeByReleaseId = (releases: ReleaseSummary[]) => {
+  const picked = new Map<string, ReleaseSummary>()
 
   for (const release of releases) {
     const id = String(release?.id ?? '').trim()
@@ -328,39 +410,49 @@ const dedupeByReleaseId = (releases: Release[]) => {
   return Array.from(picked.values())
 }
 
-const hydrateReleasesWithDetails = async (releases: Release[]) => {
+const hydrateReleasesWithDetails = async (releases: ReleaseSummary[]) => {
   const unique = dedupeByReleaseId(releases)
+  const hydrationTargetIds = new Set(
+    unique
+      .filter((release) => !release.cover || Number(release.reviewCount ?? 0) <= 0)
+      .sort((a, b) => Number(b.popularity ?? 0) - Number(a.popularity ?? 0))
+      .slice(0, FEATURED_DETAIL_HYDRATION_LIMIT)
+      .map((release) => String(release.id)),
+  )
+
   const hydrated = await Promise.allSettled(
     unique.map(async (release) => {
       const releaseId = String(release?.id ?? '').trim()
-      if (!releaseId) return release
+      if (!releaseId) return toReleaseSummary(release)
+
+      if (!hydrationTargetIds.has(releaseId)) return toReleaseSummary(release)
 
       const hasCommunityStats = Number(release.reviewCount ?? 0) > 0
       const hasCover = Boolean(release.cover)
-      if (hasCommunityStats && hasCover) return release
+      if (hasCommunityStats && hasCover) return toReleaseSummary(release)
 
       try {
         const details = await getReleaseDetails(releaseId)
-        return {
+        return toReleaseSummary({
           ...release,
           ...details,
-        }
+        })
       } catch {
-        return release
+        return toReleaseSummary(release)
       }
     }),
   )
 
   return dedupeByReleaseId(
     hydrated
-      .filter((entry): entry is PromiseFulfilledResult<Release> => entry.status === 'fulfilled')
+      .filter((entry): entry is PromiseFulfilledResult<ReleaseSummary> => entry.status === 'fulfilled')
       .map((entry) => entry.value),
   )
 }
 
-const sortReleasedAlbumsChronologically = (releases: Release[], preferredArtists: string[] = []) => {
+const sortReleasedAlbumsChronologically = (releases: ReleaseSummary[], preferredArtists: string[] = []) => {
   const preferred = preferredArtists.map((artist) => normalizeCacheQuery(artist))
-  const getArtistRank = (release: Release) => {
+  const getArtistRank = (release: ReleaseSummary) => {
     const primaryArtist = normalizeCacheQuery(release.artists?.[0] ?? '')
     const index = preferred.indexOf(primaryArtist)
     return index === -1 ? Number.MAX_SAFE_INTEGER : index
@@ -381,11 +473,12 @@ const sortReleasedAlbumsChronologically = (releases: Release[], preferredArtists
   })
 }
 
-const mapDiscogsSearchResults = (results: any[]): Release[] =>
+const mapDiscogsSearchResults = (results: any[]): ReleaseSummary[] =>
   results
-    .map((entry: any) =>
-      normalizeRelease({
-        id: entry.id,
+    .map((entry: any) => {
+      const normalized = normalizeRelease({
+        ...entry,
+        id: `r:${entry.id}`,
         title: entry.title,
         artist: entry.artist,
         year: entry.year,
@@ -397,14 +490,15 @@ const mapDiscogsSearchResults = (results: any[]): Release[] =>
         formats: entry.format ? [{ name: entry.format }] : undefined,
         uri: entry.uri,
         community: entry.community,
-      }),
-    )
-    .filter(Boolean) as Release[]
+      })
+      return normalized ? toReleaseSummary(normalized) : null
+    })
+    .filter(Boolean) as ReleaseSummary[]
 
-const mapDiscogsMasterSearchResults = (results: any[]): Release[] =>
+const mapDiscogsMasterSearchResults = (results: any[]): ReleaseSummary[] =>
   results
     .map((entry: any) => {
-      const id = entry.main_release ?? entry.id
+      const id = entry.id
       if (!id) return null
       const formatName = Array.isArray(entry.format)
         ? entry.format.filter(Boolean).map(String).join(' / ')
@@ -413,8 +507,8 @@ const mapDiscogsMasterSearchResults = (results: any[]): Release[] =>
         ? String(entry.label[0] ?? '').trim()
         : String(entry.label ?? '').trim()
       const year = Number(entry.year)
-      return normalizeRelease({
-        id,
+      const normalized = normalizeRelease({
+        id: `m:${id}`,
         title: entry.title,
         artist: entry.artist,
         year: Number.isFinite(year) && year > 0 ? year : null,
@@ -427,8 +521,9 @@ const mapDiscogsMasterSearchResults = (results: any[]): Release[] =>
         uri: entry.uri,
         community: entry.community,
       })
+      return normalized ? toReleaseSummary(normalized) : null
     })
-    .filter(Boolean) as Release[]
+    .filter(Boolean) as ReleaseSummary[]
 
 const normalizeSearchValue = (value = '') =>
   value
@@ -520,9 +615,11 @@ const clampLimit = (value: number, fallback = 24) => {
   return Math.min(Math.max(Math.round(safe), 1), FEATURED_REFRESH_SIZE)
 }
 
-const shouldRefreshFeaturedPayload = (payload: Release[]) => {
+const shouldRefreshSummaryPayload = (payload: ReleaseSummary[]) => {
   if (!payload.length) return true
   const sample = payload.slice(0, Math.min(payload.length, 24))
+  const containsTracksField = sample.some((release) => Array.isArray((release as { tracks?: unknown }).tracks))
+  if (containsTracksField) return true
   const albumsWithCommunity = sample.filter(
     (release) => Number(release.reviewCount ?? 0) > 0 && Number(release.communityRating ?? 0) > 0,
   ).length
@@ -534,7 +631,7 @@ const getCachedFeatured = async (mode: FeaturedMode) => {
   return rows[0]
 }
 
-const upsertFeatured = async (mode: FeaturedMode, payload: Release[]) => {
+const upsertFeatured = async (mode: FeaturedMode, payload: ReleaseSummary[]) => {
   const now = new Date()
   const expiresAt = new Date(now.getTime() + FEATURED_DB_CACHE_WINDOW)
 
@@ -628,10 +725,17 @@ const refreshFeaturedMode = async (mode: FeaturedMode) => {
 const getFeaturedByMode = async (mode: FeaturedMode, limit = 24, forceRefresh = false) => {
   const safeLimit = clampLimit(limit)
   const cached = await getCachedFeatured(mode)
-  const cachedPayload = toReleaseArray(cached?.payload)
+  const cachedPayload = toReleaseSummaryArray(cached?.payload)
+  const refreshedAt = cached?.refreshedAt?.getTime?.() ?? 0
+  const recentRefresh = refreshedAt > 0 && Date.now() - refreshedAt < FEATURED_RETRY_COOLDOWN_MS
 
-  const cachedNeedsRefresh = shouldRefreshFeaturedPayload(cachedPayload)
-  if (!forceRefresh && cachedPayload.length && isNotExpired(cached?.expiresAt) && !cachedNeedsRefresh) {
+  const cachedNeedsRefresh = shouldRefreshSummaryPayload(cachedPayload)
+  if (
+    !forceRefresh &&
+    cachedPayload.length &&
+    isNotExpired(cached?.expiresAt) &&
+    (!cachedNeedsRefresh || recentRefresh)
+  ) {
     return cachedPayload.slice(0, safeLimit)
   }
 
@@ -657,7 +761,7 @@ const getCachedSearch = async (queryHash: string) => {
   return rows[0]
 }
 
-const upsertSearchCache = async (queryHash: string, normalizedQuery: string, payload: Release[]) => {
+const upsertSearchCache = async (queryHash: string, normalizedQuery: string, payload: ReleaseSummary[]) => {
   const now = new Date()
   const expiresAt = new Date(now.getTime() + SEARCH_DB_CACHE_WINDOW)
 
@@ -702,35 +806,38 @@ const refreshSearchQuery = async (queryHash: string, normalizedQuery: string, so
       }, SEARCH_QUERY_PAGES),
     ])
 
-    const inferredArtists = inferArtistCandidates([...artistScopedResults, ...queryResults], sourceQuery)
-    const supplementalArtistResults = (
-      await Promise.all(
-        inferredArtists
-          .filter((artist) => normalizeCacheQuery(artist) !== normalizeCacheQuery(sourceQuery))
-          .map((artist) =>
-            fetchAllSearchPages(
-              {
-                artist,
-                type: 'master',
-                format: 'album',
-              },
-              SEARCH_QUERY_PAGES,
-            ),
-          ),
-      )
-    ).flat()
-
-    const normalized = mapDiscogsMasterSearchResults([...artistScopedResults, ...queryResults, ...supplementalArtistResults])
+    const normalized = mapDiscogsMasterSearchResults([...artistScopedResults, ...queryResults])
     const curated = dedupeReleasedAlbums(normalized).filter((release) => {
       const albumType = (release.albumType ?? '').toLowerCase()
-      return albumType.includes('album') || albumType.includes('lp')
+      // Broaden filter to catch things labeled slightly differently but still likely albums
+      return albumType.includes('album') || albumType.includes('lp') || albumType === 'release' || !albumType
     })
+
     const preferredArtists = [
       sourceQuery,
-      ...inferredArtists,
+      ...artistScopedResults.map((entry: any) => extractMasterArtist(entry)).filter(Boolean),
       ...queryResults.map((entry: any) => extractMasterArtist(entry)).filter(Boolean),
     ]
+
+    // Final sorting: Exact matches on query string (artist or album) get top priority
+    const lowerQuery = sourceQuery.toLowerCase()
     const ordered = dedupeByReleaseId(sortReleasedAlbumsChronologically(curated, preferredArtists))
+      .sort((a, b) => {
+        const aName = (a.name ?? '').toLowerCase()
+        const bName = (b.name ?? '').toLowerCase()
+        const aArtist = (a.artists?.[0] ?? '').toLowerCase()
+        const bArtist = (b.artists?.[0] ?? '').toLowerCase()
+
+        const aExact = aName === lowerQuery || aArtist === lowerQuery
+        const bExact = bName === lowerQuery || bArtist === lowerQuery
+
+        if (aExact && !bExact) return -1
+        if (!aExact && bExact) return 1
+        
+        // If both or neither are exact, use release quality score
+        return releaseScore(b) - releaseScore(a)
+      })
+
     await upsertSearchCache(queryHash, normalizedQuery, ordered)
     return ordered
   })()
@@ -748,9 +855,15 @@ export const searchReleases = async (query: string) => {
   const normalizedQuery = normalizeCacheQuery(trimmed)
   const queryHash = createQueryHash(normalizedQuery)
   const cached = await getCachedSearch(queryHash)
-  const cachedPayload = toReleaseArray(cached?.payload)
+  const cachedPayload = toReleaseSummaryArray(cached?.payload)
+  const refreshedAt = cached?.refreshedAt?.getTime?.() ?? 0
+  const recentRefresh = refreshedAt > 0 && Date.now() - refreshedAt < SEARCH_RETRY_COOLDOWN_MS
 
-  if (cachedPayload.length && isNotExpired(cached?.expiresAt)) {
+  if (
+    cachedPayload.length &&
+    isNotExpired(cached?.expiresAt) &&
+    (!shouldRefreshSummaryPayload(cachedPayload) || recentRefresh)
+  ) {
     return cachedPayload
   }
 
@@ -767,10 +880,70 @@ export const getReleaseDetails = async (releaseId: string) => {
   const cached = releaseCache.get(releaseId)
   if (cached && isFresh(cached.timestamp)) return cached.data
 
-  const response = await requestDiscogs(`/releases/${releaseId}`)
-  const normalized = normalizeRelease(response, response.tracklist?.length)
-  if (!normalized) throw new Error('Unable to normalize release')
+  // Extract the real Discogs ID and type from the prefixed ID
+  const isMaster = releaseId.startsWith('m:')
+  const isRelease = releaseId.startsWith('r:')
+  const cleanId = isMaster || isRelease ? releaseId.slice(2) : releaseId
 
-  releaseCache.set(releaseId, { data: normalized, timestamp: Date.now() })
-  return normalized
+  const normalizeAndCache = (payload: any, fallbackTrackCount = 0) => {
+    const normalized = normalizeRelease(payload, fallbackTrackCount)
+    if (!normalized) throw new Error('Unable to normalize release')
+    // Keep the prefixed ID in the cached object for consistency
+    normalized.id = releaseId
+    releaseCache.set(releaseId, { data: normalized, timestamp: Date.now() })
+    return normalized
+  }
+
+  try {
+    // If we KNOW it's a master, go straight to masters endpoint
+    if (isMaster) {
+      const master = await requestDiscogs(`/masters/${cleanId}`)
+      const mainReleaseId = String(master?.main_release ?? '').trim()
+      
+      if (mainReleaseId) {
+        try {
+          const mainRelease = await requestDiscogs(`/releases/${mainReleaseId}`)
+          return normalizeAndCache(mainRelease, mainRelease.tracklist?.length)
+        } catch {
+          // fallback to master payload if main release fetch fails
+        }
+      }
+
+      return normalizeAndCache({
+        ...master,
+        id: master.id,
+        title: master.title,
+        tracklist: master.tracklist ?? [],
+      })
+    }
+
+    // Otherwise (isRelease or unprefixed), try releases endpoint first
+    const response = await requestDiscogs(`/releases/${cleanId}`)
+    return normalizeAndCache(response, response.tracklist?.length)
+  } catch (error) {
+    // Fallback logic for unprefixed IDs or failed release fetches
+    if (isRelease) throw error // If we specifically asked for a release and it failed, stop.
+
+    const message = error instanceof Error ? error.message : ''
+    const isNotFound = message.includes('Discogs request failed: 404')
+    if (!isNotFound && !isMaster) throw error
+
+    try {
+      const master = await requestDiscogs(`/masters/${cleanId}`)
+      const mainReleaseId = String(master?.main_release ?? '').trim()
+      if (mainReleaseId) {
+        const mainRelease = await requestDiscogs(`/releases/${mainReleaseId}`)
+        return normalizeAndCache(mainRelease, mainRelease.tracklist?.length)
+      }
+      
+      return normalizeAndCache({
+        ...master,
+        id: master.id,
+        title: master.title,
+        tracklist: master.tracklist ?? [],
+      })
+    } catch {
+      throw error
+    }
+  }
 }

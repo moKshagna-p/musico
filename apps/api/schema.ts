@@ -1,4 +1,4 @@
-import type { Release } from './types'
+import type { ReleaseSummary } from './types'
 
 import { boolean, index, integer, jsonb, pgTable, text, timestamp, uniqueIndex } from 'drizzle-orm/pg-core'
 
@@ -75,7 +75,7 @@ export const featuredCache = pgTable(
   'featured_cache',
   {
     mode: text('mode').primaryKey(),
-    payload: jsonb('payload').$type<Release[]>().notNull(),
+    payload: jsonb('payload').$type<ReleaseSummary[]>().notNull(),
     expiresAt: timestamp('expiresAt', { withTimezone: true, mode: 'date' }).notNull(),
     refreshedAt: timestamp('refreshedAt', { withTimezone: true, mode: 'date' }).notNull(),
     createdAt: timestamp('createdAt', { withTimezone: true, mode: 'date' }).notNull(),
@@ -89,7 +89,7 @@ export const searchCache = pgTable(
   {
     queryHash: text('queryHash').primaryKey(),
     normalizedQuery: text('normalizedQuery').notNull(),
-    payload: jsonb('payload').$type<Release[]>().notNull(),
+    payload: jsonb('payload').$type<ReleaseSummary[]>().notNull(),
     expiresAt: timestamp('expiresAt', { withTimezone: true, mode: 'date' }).notNull(),
     refreshedAt: timestamp('refreshedAt', { withTimezone: true, mode: 'date' }).notNull(),
     createdAt: timestamp('createdAt', { withTimezone: true, mode: 'date' }).notNull(),

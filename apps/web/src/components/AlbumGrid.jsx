@@ -24,9 +24,9 @@ const AlbumGrid = ({ albums = [], loading, error, onSelect }) => {
       {loading ? (
         <LoadingSkeleton count={6} />
       ) : (
-        albums.map((album, index) => (
+        albums.map((album) => (
           <AlbumCard
-            key={`${album.id ?? 'album'}-${album.name ?? 'untitled'}-${album.releaseYear ?? 'year'}-${index}`}
+            key={`${album.id ?? 'album'}-${album.name ?? 'untitled'}-${(album.artists ?? []).join('|')}-${album.releaseYear ?? 'year'}`}
             album={album}
             onSelect={onSelect}
           />

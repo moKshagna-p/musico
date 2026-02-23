@@ -5,7 +5,7 @@ export interface Track {
   track_number: number
 }
 
-export interface Release {
+export interface ReleaseSummary {
   id: string
   name: string
   artists: string[]
@@ -22,5 +22,11 @@ export interface Release {
   genres: string[]
   communityRating: number
   reviewCount: number
+}
+
+export interface ReleaseDetails extends ReleaseSummary {
   tracks: Track[]
 }
+
+// Backward-compatible alias used by existing internals.
+export type Release = ReleaseDetails
