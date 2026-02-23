@@ -22,7 +22,10 @@ const RatingStars = ({ value = 0, onRate, readOnly = false, showValue = false })
               disabled={readOnly}
               whileTap={{ scale: 0.9 }}
               whileHover={!readOnly ? { scale: 1.08 } : undefined}
-              onClick={() => !readOnly && onRate?.(star)}
+              onClick={(event) => {
+                event.stopPropagation()
+                if (!readOnly) onRate?.(star)
+              }}
               onMouseEnter={() => !readOnly && setHoverValue(star)}
               onMouseLeave={() => !readOnly && setHoverValue(null)}
               className={`rounded p-1 ${

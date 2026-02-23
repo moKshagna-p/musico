@@ -9,10 +9,8 @@ import RatingStars from './RatingStars.jsx'
 
 const AlbumCard = ({ album, onSelect }) => {
   const MotionArticle = motion.article
-  const { getUserRating, rateAlbum } = useRatings()
-  const userRating = getUserRating(album.id)
-  const communityAverage = Number(album.communityRating ?? 0)
-  const communityCount = Number(album.reviewCount ?? 0)
+  const { getCommunityStats } = useRatings()
+  const community = getCommunityStats(album)
   const genres = Array.isArray(album.genres) ? album.genres.filter(Boolean) : []
   const genreLabel = genres.slice(0, 2).join(' • ')
 
@@ -30,14 +28,14 @@ const AlbumCard = ({ album, onSelect }) => {
       onMouseEnter={() => prefetchReleaseDetails(album.id)}
       className="group relative flex cursor-pointer flex-col gap-4 rounded-3xl border border-outline bg-panel p-4 text-white transition hover:border-white/40"
     >
-      <div className="relative overflow-hidden rounded-2xl">
+      <div className="relative aspect-square overflow-hidden rounded-2xl bg-black/40">
         <img
           src={album.cover}
           alt={album.name}
           width="320"
           height="320"
           loading="lazy"
-          className="h-56 w-full rounded-2xl object-cover transition duration-500 group-hover:scale-105 tablet:h-64"
+          className="h-full w-full rounded-2xl object-contain p-2 transition duration-500 group-hover:scale-[1.02]"
         />
       </div>
 
@@ -56,17 +54,17 @@ const AlbumCard = ({ album, onSelect }) => {
         <div>
           <p className="text-xs uppercase tracking-[0.4em] text-muted">Community</p>
           <p className="text-xl font-semibold text-white tablet:text-2xl">
-            {communityAverage.toFixed(1)}
+            {community.average.toFixed(1)}
           </p>
           <p className="text-xs text-muted">
-            {communityCount.toLocaleString()} ratings
+            {community.total.toLocaleString()} ratings
           </p>
         </div>
 
         <RatingStars
-          value={userRating ?? communityAverage}
-          onRate={(value) => rateAlbum(album.id, value)}
-          showValue
+          value={community.average}
+          readOnly
+          showValue={community.total > 0}
         />
       </div>
 

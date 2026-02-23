@@ -209,7 +209,7 @@ const AlbumDetails = () => {
               alt={album.name}
               width="640"
               height="640"
-              className="aspect-square rounded-xl object-cover"
+              className="aspect-square w-full rounded-xl bg-black/40 object-contain p-1"
             />
           </div>
           <StreamingLinks links={streamingLinks} />

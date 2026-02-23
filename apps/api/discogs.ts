@@ -305,6 +305,59 @@ const dedupeReleasedAlbums = (releases: Release[]) => {
   return Array.from(picked.values())
 }
 
+const dedupeByReleaseId = (releases: Release[]) => {
+  const picked = new Map<string, Release>()
+
+  for (const release of releases) {
+    const id = String(release?.id ?? '').trim()
+    if (!id) continue
+
+    const current = picked.get(id)
+    if (!current) {
+      picked.set(id, release)
+      continue
+    }
+
+    const currentQuality = releaseScore(current) + Number(current.reviewCount ?? 0)
+    const candidateQuality = releaseScore(release) + Number(release.reviewCount ?? 0)
+    if (candidateQuality >= currentQuality) {
+      picked.set(id, release)
+    }
+  }
+
+  return Array.from(picked.values())
+}
+
+const hydrateReleasesWithDetails = async (releases: Release[]) => {
+  const unique = dedupeByReleaseId(releases)
+  const hydrated = await Promise.allSettled(
+    unique.map(async (release) => {
+      const releaseId = String(release?.id ?? '').trim()
+      if (!releaseId) return release
+
+      const hasCommunityStats = Number(release.reviewCount ?? 0) > 0
+      const hasCover = Boolean(release.cover)
+      if (hasCommunityStats && hasCover) return release
+
+      try {
+        const details = await getReleaseDetails(releaseId)
+        return {
+          ...release,
+          ...details,
+        }
+      } catch {
+        return release
+      }
+    }),
+  )
+
+  return dedupeByReleaseId(
+    hydrated
+      .filter((entry): entry is PromiseFulfilledResult<Release> => entry.status === 'fulfilled')
+      .map((entry) => entry.value),
+  )
+}
+
 const sortReleasedAlbumsChronologically = (releases: Release[], preferredArtists: string[] = []) => {
   const preferred = preferredArtists.map((artist) => normalizeCacheQuery(artist))
   const getArtistRank = (release: Release) => {
@@ -467,6 +520,15 @@ const clampLimit = (value: number, fallback = 24) => {
   return Math.min(Math.max(Math.round(safe), 1), FEATURED_REFRESH_SIZE)
 }
 
+const shouldRefreshFeaturedPayload = (payload: Release[]) => {
+  if (!payload.length) return true
+  const sample = payload.slice(0, Math.min(payload.length, 24))
+  const albumsWithCommunity = sample.filter(
+    (release) => Number(release.reviewCount ?? 0) > 0 && Number(release.communityRating ?? 0) > 0,
+  ).length
+  return albumsWithCommunity === 0
+}
+
 const getCachedFeatured = async (mode: FeaturedMode) => {
   const rows = await db.select().from(featuredCacheTable).where(eq(featuredCacheTable.mode, mode)).limit(1)
   return rows[0]
@@ -508,7 +570,8 @@ const fetchFeaturedFromDiscogs = async (targetSize = FEATURED_REFRESH_SIZE) => {
 
   const normalized = mapDiscogsSearchResults(response.results ?? [])
   const curated = dedupeReleasedAlbums(normalized)
-  return curated.slice(0, targetSize)
+  const trimmed = curated.slice(0, targetSize)
+  return hydrateReleasesWithDetails(trimmed)
 }
 
 const fetchRecentPopularFromDiscogs = async (targetSize = FEATURED_REFRESH_SIZE) => {
@@ -540,7 +603,7 @@ const fetchRecentPopularFromDiscogs = async (targetSize = FEATURED_REFRESH_SIZE)
     )
 
   const ranked = [...recentFirst, ...olderFallback]
-  return ranked.slice(0, targetSize)
+  return hydrateReleasesWithDetails(ranked.slice(0, targetSize))
 }
 
 const refreshFeaturedMode = async (mode: FeaturedMode) => {
@@ -567,7 +630,8 @@ const getFeaturedByMode = async (mode: FeaturedMode, limit = 24, forceRefresh = 
   const cached = await getCachedFeatured(mode)
   const cachedPayload = toReleaseArray(cached?.payload)
 
-  if (!forceRefresh && cachedPayload.length && isNotExpired(cached?.expiresAt)) {
+  const cachedNeedsRefresh = shouldRefreshFeaturedPayload(cachedPayload)
+  if (!forceRefresh && cachedPayload.length && isNotExpired(cached?.expiresAt) && !cachedNeedsRefresh) {
     return cachedPayload.slice(0, safeLimit)
   }
 
@@ -666,7 +730,7 @@ const refreshSearchQuery = async (queryHash: string, normalizedQuery: string, so
       ...inferredArtists,
       ...queryResults.map((entry: any) => extractMasterArtist(entry)).filter(Boolean),
     ]
-    const ordered = sortReleasedAlbumsChronologically(curated, preferredArtists)
+    const ordered = dedupeByReleaseId(sortReleasedAlbumsChronologically(curated, preferredArtists))
     await upsertSearchCache(queryHash, normalizedQuery, ordered)
     return ordered
   })()
