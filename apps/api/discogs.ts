@@ -38,8 +38,9 @@ const FEATURED_REFRESH_SIZE = 50
 const FEATURED_DETAIL_HYDRATION_LIMIT = parsePositiveInteger(env.FEATURED_DETAIL_HYDRATION_LIMIT, 12)
 const SEARCH_CACHE_VERSION = 'v8'
 const SEARCH_RESULTS_PER_PAGE = 100
-const SEARCH_MAX_PAGES = 10
-const SEARCH_QUERY_PAGES = 6
+const SEARCH_MAX_PAGES = parsePositiveInteger(env.SEARCH_MAX_PAGES, 4)
+const SEARCH_QUERY_PAGES = parsePositiveInteger(env.SEARCH_QUERY_PAGES, 3)
+const SEARCH_MIN_RESULTS_BEFORE_PAGING = parsePositiveInteger(env.SEARCH_MIN_RESULTS_BEFORE_PAGING, 60)
 const SEARCH_ARTIST_CANDIDATE_LIMIT = 5
 const DISCOGS_MIN_REQUEST_INTERVAL_MS = parsePositiveInteger(env.DISCOGS_MIN_REQUEST_INTERVAL_MS, 350)
 const DISCOGS_MAX_RETRIES = parsePositiveInteger(env.DISCOGS_MAX_RETRIES, 4)
@@ -584,28 +585,37 @@ const inferArtistCandidates = (entries: any[], sourceQuery: string) => {
 const fetchAllSearchPages = async (
   params: Record<string, string | number | undefined>,
   maxPages = SEARCH_MAX_PAGES,
+  minResultsBeforePaging = SEARCH_MIN_RESULTS_BEFORE_PAGING,
 ) => {
   const firstPage = await requestDiscogs('/database/search', {
     ...params,
     per_page: SEARCH_RESULTS_PER_PAGE,
     page: 1,
   })
+  const firstResults = Array.isArray(firstPage?.results) ? firstPage.results : []
+  if (firstResults.length >= minResultsBeforePaging) return firstResults
+
   const totalPages = Math.max(
     1,
     Math.min(Number(firstPage?.pagination?.pages ?? 1) || 1, Math.max(1, maxPages)),
   )
-  const nextPageRequests =
-    totalPages > 1
-      ? Array.from({ length: totalPages - 1 }, (_, index) =>
-          requestDiscogs('/database/search', {
-            ...params,
-            per_page: SEARCH_RESULTS_PER_PAGE,
-            page: index + 2,
-          }),
-        )
-      : []
-  const nextPages = nextPageRequests.length ? await Promise.all(nextPageRequests) : []
-  return [firstPage, ...nextPages].flatMap((page) => (Array.isArray(page?.results) ? page.results : []))
+  if (totalPages <= 1) return firstResults
+
+  const results = [...firstResults]
+  for (let page = 2; page <= totalPages; page += 1) {
+    const nextPage = await requestDiscogs('/database/search', {
+      ...params,
+      per_page: SEARCH_RESULTS_PER_PAGE,
+      page,
+    })
+    const nextResults = Array.isArray(nextPage?.results) ? nextPage.results : []
+    if (nextResults.length) {
+      results.push(...nextResults)
+    }
+    if (results.length >= minResultsBeforePaging) break
+  }
+
+  return results
 }
 
 type FeaturedMode = 'featured' | 'recent-popular'
