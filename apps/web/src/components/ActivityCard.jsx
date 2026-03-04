@@ -36,10 +36,11 @@ const ActivityCard = ({ item }) => {
         return (
           <p className="text-sm text-white/80">
             {userLink} rated {albumLink}{' '}
-            <span className="inline-flex items-center gap-0.5 text-white/70">
+            <span className="inline-flex items-center gap-0.5 text-white/70" aria-label={`${rating} out of 5 stars`}>
               {Array.from({ length: 5 }).map((_, i) => (
                 <FaStar
                   key={i}
+                  aria-hidden="true"
                   className={`h-3 w-3 ${i < rating ? 'text-white' : 'text-white/20'}`}
                 />
               ))}
@@ -54,7 +55,7 @@ const ActivityCard = ({ item }) => {
               {userLink} reviewed {albumLink}
             </p>
             {metadata?.snippet && (
-              <p className="mt-1 text-sm italic text-muted">"{metadata.snippet}"</p>
+              <p className="mt-1 text-sm italic text-muted">&ldquo;{metadata.snippet}&rdquo;</p>
             )}
           </div>
         )
@@ -77,24 +78,27 @@ const ActivityCard = ({ item }) => {
   }
 
   return (
-    <div className="flex gap-4 rounded-xl border border-outline/60 bg-panel/50 p-4 transition-colors hover:bg-panel/80">
+    <div className="flex gap-4 rounded-2xl border border-outline/40 bg-panel/30 p-4 transition-all hover:border-outline/60 hover:bg-panel/50">
       {albumCover && (type === 'rated' || type === 'reviewed' || type === 'listed') ? (
         <Link to={`/album/${albumId}`} className="shrink-0">
           <img
             src={albumCover}
             alt={albumName ?? ''}
-            className="h-14 w-14 rounded-lg object-cover"
+            width={56}
+            height={56}
+            loading="lazy"
+            className="h-14 w-14 rounded-xl object-cover ring-1 ring-white/10"
           />
         </Link>
       ) : (
-        <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-lg bg-outline/50 text-lg font-bold text-muted">
+        <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-white/[0.06] text-lg font-bold text-white/40 ring-1 ring-white/10" aria-hidden="true">
           {actor?.name?.charAt(0)?.toUpperCase() ?? '?'}
         </div>
       )}
 
       <div className="min-w-0 flex-1">
         {renderContent()}
-        <p className="mt-1 text-xs text-muted">{timeAgo}</p>
+        <p className="mt-1.5 text-xs text-muted/50">{timeAgo}</p>
       </div>
     </div>
   )

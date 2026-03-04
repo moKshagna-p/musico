@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { FiShare2 } from 'react-icons/fi'
+import { FiLock, FiShare2 } from 'react-icons/fi'
 import { FaStar } from 'react-icons/fa'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 
@@ -83,7 +83,7 @@ const PublicProfile = () => {
   if (loading) {
     return (
       <PageTransition>
-        <div className="mx-auto max-w-5xl py-16 text-center text-muted">Loading profile...</div>
+        <div className="mx-auto max-w-5xl py-16 text-center text-muted">Loading\u2026</div>
       </PageTransition>
     )
   }
@@ -92,12 +92,12 @@ const PublicProfile = () => {
     return (
       <PageTransition>
         <div className="mx-auto max-w-5xl py-16 text-center">
-          <h1 className="font-display text-3xl font-bold">User not found</h1>
-          <p className="mt-3 text-muted">{error ?? "This profile doesn't exist or is private."}</p>
+          <h1 className="font-display text-3xl font-bold" style={{ textWrap: 'balance' }}>User Not Found</h1>
+          <p className="mt-3 text-muted">{error ?? "This profile doesn\u2019t exist."}</p>
           <button
             type="button"
             onClick={() => navigate('/discover')}
-            className="mt-6 rounded-full border border-outline px-5 py-2 text-xs uppercase tracking-[0.2em] text-muted hover:text-white"
+            className="mt-6 rounded-full border border-outline px-5 py-2 text-xs uppercase tracking-[0.2em] text-muted transition-colors hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
           >
             Discover Music
           </button>
@@ -108,16 +108,98 @@ const PublicProfile = () => {
 
   const isOwnProfile = profile.isOwnProfile
 
+  // ── Private Profile View ──
+  if (profile.isPrivate) {
+    return (
+      <PageTransition>
+        <div className="mx-auto w-full max-w-6xl py-4 tablet:py-8">
+          <header className="py-8 text-center tablet:py-14">
+            {/* Avatar */}
+            <div className="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-outline/60 text-3xl font-bold text-muted ring-1 ring-white/10">
+              {profile.name?.charAt(0)?.toUpperCase() ?? '?'}
+            </div>
+
+            <h1
+              className="mx-auto max-w-4xl break-words font-display text-4xl font-bold leading-tight tablet:text-7xl"
+              style={{ textWrap: 'balance' }}
+            >
+              {profile.name}
+            </h1>
+
+            <p className="mt-2 text-lg text-muted">@{profile.username}</p>
+
+            {/* Stats row */}
+            <div className="mt-6 flex items-center justify-center gap-8 text-sm">
+              <div>
+                <span className="font-semibold tabular-nums text-white">{profile.followerCount}</span>
+                <span className="ml-1 text-muted">followers</span>
+              </div>
+              <div>
+                <span className="font-semibold tabular-nums text-white">{profile.followingCount}</span>
+                <span className="ml-1 text-muted">following</span>
+              </div>
+            </div>
+
+            {/* Action buttons */}
+            <div className="mt-6 flex items-center justify-center gap-3">
+              {user && (
+                <FollowButton
+                  username={profile.username}
+                  initialFollowing={profile.isFollowing}
+                />
+              )}
+              <button
+                type="button"
+                onClick={handleShare}
+                aria-label={copied ? 'Link copied' : 'Share profile'}
+                className="inline-flex items-center gap-2 rounded-full border border-outline px-4 py-2 text-xs uppercase tracking-[0.2em] text-muted transition-colors hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
+              >
+                <FiShare2 aria-hidden="true" />
+                {copied ? 'Copied' : 'Share'}
+              </button>
+            </div>
+
+            {!user && (
+              <p className="mt-4 text-xs text-muted">
+                <Link to="/auth" className="text-white hover:underline">
+                  Sign in
+                </Link>{' '}
+                to follow this user.
+              </p>
+            )}
+          </header>
+
+          {/* Private Profile Gate */}
+          <div className="mx-auto max-w-md rounded-2xl border border-outline/40 bg-panel/30 px-8 py-12 text-center">
+            <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-2xl bg-white/[0.04] ring-1 ring-white/10">
+              <FiLock className="h-7 w-7 text-muted/60" aria-hidden="true" />
+            </div>
+            <h2 className="font-display text-xl font-bold" style={{ textWrap: 'balance' }}>
+              This Account Is Private
+            </h2>
+            <p className="mt-3 text-sm text-muted/70" style={{ textWrap: 'pretty' }}>
+              Follow this user to see their ratings, reviews, and lists once they approve your request.
+            </p>
+          </div>
+        </div>
+      </PageTransition>
+    )
+  }
+
+  // ── Public Profile View ──
   return (
     <PageTransition>
       <div className="mx-auto w-full max-w-6xl py-4 tablet:py-8">
         {/* Header */}
         <header className="py-8 text-center tablet:py-14">
-          <div className="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-outline/60 text-3xl font-bold text-muted">
+          <div className="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-outline/60 text-3xl font-bold text-muted ring-1 ring-white/10">
             {profile.name?.charAt(0)?.toUpperCase() ?? '?'}
           </div>
 
-          <h1 className="mx-auto max-w-4xl break-words font-display text-4xl font-bold leading-tight tablet:text-7xl">
+          <h1
+            className="mx-auto max-w-4xl break-words font-display text-4xl font-bold leading-tight tablet:text-7xl"
+            style={{ textWrap: 'balance' }}
+          >
             {profile.name}
           </h1>
 
@@ -130,11 +212,11 @@ const PublicProfile = () => {
           {/* Stats row */}
           <div className="mt-6 flex items-center justify-center gap-8 text-sm">
             <div>
-              <span className="font-semibold text-white">{profile.followerCount}</span>
+              <span className="font-semibold tabular-nums text-white">{profile.followerCount}</span>
               <span className="ml-1 text-muted">followers</span>
             </div>
             <div>
-              <span className="font-semibold text-white">{profile.followingCount}</span>
+              <span className="font-semibold tabular-nums text-white">{profile.followingCount}</span>
               <span className="ml-1 text-muted">following</span>
             </div>
           </div>
@@ -151,7 +233,7 @@ const PublicProfile = () => {
             {isOwnProfile && (
               <Link
                 to="/profile"
-                className="rounded-full border border-outline px-5 py-2 text-xs uppercase tracking-[0.2em] text-muted hover:text-white"
+                className="rounded-full border border-outline px-5 py-2 text-xs uppercase tracking-[0.2em] text-muted transition-colors hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
               >
                 Edit Profile
               </Link>
@@ -160,7 +242,8 @@ const PublicProfile = () => {
             <button
               type="button"
               onClick={handleShare}
-              className="inline-flex items-center gap-2 rounded-full border border-outline px-4 py-2 text-xs uppercase tracking-[0.2em] text-muted transition-colors hover:text-white"
+              aria-label={copied ? 'Link copied' : 'Share profile'}
+              className="inline-flex items-center gap-2 rounded-full border border-outline px-4 py-2 text-xs uppercase tracking-[0.2em] text-muted transition-colors hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
             >
               <FiShare2 aria-hidden="true" />
               {copied ? 'Copied' : 'Share'}
@@ -188,7 +271,7 @@ const PublicProfile = () => {
         {/* Recently Rated */}
         {ratedAlbumDetails.length > 0 && (
           <section className="mt-16">
-            <h2 className="mb-8 text-center font-display text-3xl font-bold tablet:text-4xl">
+            <h2 className="mb-8 text-center font-display text-3xl font-bold tablet:text-4xl" style={{ textWrap: 'balance' }}>
               Recently Rated
             </h2>
             <div className="grid grid-cols-2 gap-4 tablet:grid-cols-3 laptop:grid-cols-4">
@@ -197,17 +280,21 @@ const PublicProfile = () => {
                   <div className="group relative overflow-hidden rounded-lg">
                     <img
                       src={album.cover}
-                      alt={album.name}
+                      alt={`${album.name} by ${album.artists?.[0] ?? 'Unknown'}`}
+                      width={300}
+                      height={300}
+                      loading="lazy"
                       className="aspect-square w-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"
                     />
                     <div className="absolute inset-0 bg-black/50 opacity-0 transition-opacity duration-300 group-hover:opacity-100">
                       <div className="flex h-full flex-col items-center justify-center text-center">
                         <h3 className="px-2 font-bold text-white">{album.name}</h3>
                         <p className="text-sm text-white/80">{album.artists?.[0] ?? ''}</p>
-                        <div className="mt-2 flex gap-0.5">
+                        <div className="mt-2 flex gap-0.5" aria-label={`Rating: ${album.rating} out of 5`}>
                           {Array.from({ length: 5 }).map((_, i) => (
                             <FaStar
                               key={i}
+                              aria-hidden="true"
                               className={`h-3 w-3 ${i < album.rating ? 'text-white' : 'text-white/30'}`}
                             />
                           ))}
@@ -224,7 +311,7 @@ const PublicProfile = () => {
         {/* Reviews */}
         {profile.recentReviews?.length > 0 && (
           <section className="mt-16">
-            <h2 className="mb-8 text-center font-display text-3xl font-bold tablet:text-4xl">
+            <h2 className="mb-8 text-center font-display text-3xl font-bold tablet:text-4xl" style={{ textWrap: 'balance' }}>
               Recent Reviews
             </h2>
             <div className="space-y-4">
@@ -237,7 +324,10 @@ const PublicProfile = () => {
                     <Link to={`/album/${review.albumId}`} className="shrink-0">
                       <img
                         src={review.albumCover}
-                        alt={review.albumName}
+                        alt={review.albumName ?? 'Album cover'}
+                        width={56}
+                        height={56}
+                        loading="lazy"
                         className="h-14 w-14 rounded-lg object-cover"
                       />
                     </Link>
@@ -265,7 +355,7 @@ const PublicProfile = () => {
         {/* Lists */}
         {profile.lists?.length > 0 && (
           <section className="mt-16">
-            <h2 className="mb-8 text-center font-display text-3xl font-bold tablet:text-4xl">
+            <h2 className="mb-8 text-center font-display text-3xl font-bold tablet:text-4xl" style={{ textWrap: 'balance' }}>
               Lists
             </h2>
             <div className="grid grid-cols-1 gap-6 tablet:grid-cols-2">
@@ -273,11 +363,11 @@ const PublicProfile = () => {
                 <Link
                   to={`/lists/${list.id}`}
                   key={list.id}
-                  className="group rounded-lg border border-outline p-4 transition-colors hover:border-white/20"
+                  className="group rounded-lg border border-outline p-4 transition-colors hover:border-white/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
                 >
                   <div className="flex items-start justify-between">
                     <h3 className="text-lg font-bold">{list.name}</h3>
-                    <span className="text-xs text-muted">{list.albumCount} albums</span>
+                    <span className="text-xs tabular-nums text-muted">{list.albumCount} albums</span>
                   </div>
                   {list.albums?.length > 0 && (
                     <div className="mt-4 grid grid-cols-3 gap-2">
@@ -286,6 +376,9 @@ const PublicProfile = () => {
                           key={album.id}
                           src={album.cover}
                           alt={album.name}
+                          width={100}
+                          height={100}
+                          loading="lazy"
                           className="aspect-square w-full rounded-md object-cover"
                         />
                       ))}

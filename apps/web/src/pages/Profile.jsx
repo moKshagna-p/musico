@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { FiExternalLink, FiLogOut } from 'react-icons/fi'
+import { FiEdit2, FiExternalLink, FiLogOut, FiX } from 'react-icons/fi'
 import { Link, useNavigate } from 'react-router-dom'
 
 import PageTransition from '../components/PageTransition.jsx'
@@ -23,6 +23,7 @@ const Profile = () => {
   const [socialProfile, setSocialProfile] = useState(null)
   const [profileLoading, setProfileLoading] = useState(true)
   const [showUsernameSetup, setShowUsernameSetup] = useState(false)
+  const [showEditModal, setShowEditModal] = useState(false)
   const [editBio, setEditBio] = useState('')
   const [editIsPublic, setEditIsPublic] = useState(true)
   const [savingProfile, setSavingProfile] = useState(false)
@@ -47,13 +48,11 @@ const Profile = () => {
           setSocialProfile(data)
           setEditBio(data.bio ?? '')
           setEditIsPublic(data.isPublic ?? true)
-          // Show username setup if no username set
           if (!data.username) {
             setShowUsernameSetup(true)
           }
         }
       } catch {
-        // Profile may not exist yet, prompt for username
         if (!cancelled) {
           setShowUsernameSetup(true)
         }
@@ -66,6 +65,13 @@ const Profile = () => {
     return () => { cancelled = true }
   }, [user?.id])
 
+  const openEditModal = useCallback(() => {
+    setEditBio(socialProfile?.bio ?? '')
+    setEditIsPublic(socialProfile?.isPublic ?? true)
+    setProfileStatus('')
+    setShowEditModal(true)
+  }, [socialProfile])
+
   const handleProfileSave = useCallback(async () => {
     if (savingProfile) return
     setSavingProfile(true)
@@ -75,8 +81,9 @@ const Profile = () => {
         bio: editBio.trim(),
         isPublic: editIsPublic,
       })
-      setSocialProfile(updated)
-      setProfileStatus('Profile updated.')
+      setSocialProfile((prev) => ({ ...prev, ...updated }))
+      setProfileStatus('Saved.')
+      setTimeout(() => setShowEditModal(false), 600)
     } catch (err) {
       setProfileStatus(err?.message ?? 'Failed to update profile.')
     } finally {
@@ -147,7 +154,7 @@ const Profile = () => {
     return (
       <PageTransition>
         <div className="mx-auto max-w-5xl rounded-3xl border border-outline bg-panel p-8 text-center text-muted">
-          Loading profile…
+          Loading profile...
         </div>
       </PageTransition>
     )
@@ -162,29 +169,160 @@ const Profile = () => {
         />
       )}
 
+      {/* Edit Profile Modal */}
+      {showEditModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm">
+          <div className="relative mx-4 w-full max-w-md rounded-2xl border border-outline bg-panel p-8">
+            <button
+              type="button"
+              onClick={() => setShowEditModal(false)}
+              className="absolute right-4 top-4 p-1 text-muted transition-colors hover:text-white"
+              aria-label="Close"
+            >
+              <FiX className="h-5 w-5" />
+            </button>
+
+            <h2 className="font-display text-2xl font-bold">Edit Profile</h2>
+            <p className="mt-1 text-sm text-muted">Update your bio and privacy settings.</p>
+
+            <div className="mt-6 space-y-5">
+              {socialProfile?.username && (
+                <div>
+                  <label className="block text-xs uppercase tracking-[0.2em] text-muted">Username</label>
+                  <p className="mt-1.5 text-sm text-white/80">@{socialProfile.username}</p>
+                </div>
+              )}
+
+              <div>
+                <label htmlFor="edit-bio" className="block text-xs uppercase tracking-[0.2em] text-muted">
+                  Bio
+                </label>
+                <textarea
+                  id="edit-bio"
+                  value={editBio}
+                  onChange={(e) => setEditBio(e.target.value.slice(0, 160))}
+                  placeholder="Tell people about yourself..."
+                  rows={3}
+                  className="mt-2 w-full resize-none rounded-lg border border-outline bg-canvas/60 p-3 text-sm text-white placeholder:text-muted/50 focus:border-white/30 focus:outline-none"
+                />
+                <p className="mt-1 text-right text-xs tabular-nums text-muted/60">{editBio.length}/160</p>
+              </div>
+
+              <div className="flex items-center justify-between rounded-lg border border-outline/60 bg-canvas/30 px-4 py-3">
+                <div>
+                  <p className="text-sm text-white">Public Profile</p>
+                  <p className="text-xs text-muted">{editIsPublic ? 'Anyone can see your profile' : 'Only you can see your profile'}</p>
+                </div>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={editIsPublic}
+                  onClick={() => setEditIsPublic((prev) => !prev)}
+                  className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full transition-colors duration-200 ${
+                    editIsPublic ? 'bg-white' : 'bg-outline'
+                  }`}
+                >
+                  <span
+                    className={`inline-block h-4 w-4 rounded-full transition-transform duration-200 ${
+                      editIsPublic ? 'translate-x-5 bg-canvas' : 'translate-x-1 bg-muted'
+                    }`}
+                  />
+                </button>
+              </div>
+
+              {profileStatus && (
+                <p className={`text-xs ${profileStatus === 'Saved.' ? 'text-green-400' : 'text-red-400'}`} aria-live="polite">
+                  {profileStatus}
+                </p>
+              )}
+
+              <div className="flex gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={handleProfileSave}
+                  disabled={savingProfile}
+                  className="flex-1 rounded-full bg-white py-3 text-xs font-semibold uppercase tracking-[0.2em] text-canvas transition-opacity hover:opacity-90 disabled:opacity-40"
+                >
+                  {savingProfile ? 'Saving...' : 'Save Changes'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowEditModal(false)}
+                  className="rounded-full border border-outline px-5 py-3 text-xs uppercase tracking-[0.2em] text-muted transition-colors hover:text-white"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="mx-auto w-full max-w-6xl py-4 tablet:py-8">
         <header className="py-8 text-center tablet:py-14">
+          {/* Avatar circle */}
+          <div className="mx-auto mb-5 flex h-20 w-20 items-center justify-center rounded-full bg-outline/60 text-3xl font-bold text-muted">
+            {(user.name ?? user.email)?.charAt(0)?.toUpperCase() ?? '?'}
+          </div>
+
           <h1 className="mx-auto max-w-4xl break-words font-display text-4xl font-bold leading-tight tablet:text-7xl">
             {user.name || user.email}
           </h1>
           <p className="mt-3 break-all text-sm text-muted tablet:mt-4 tablet:text-lg">{user.email}</p>
 
           {socialProfile?.username && (
-            <p className="mt-2 text-sm text-muted">
-              @{socialProfile.username}
-            </p>
+            <p className="mt-2 text-sm text-muted">@{socialProfile.username}</p>
           )}
 
-          <div className="mt-6 flex items-center justify-center gap-3">
+          {socialProfile?.bio && (
+            <p className="mx-auto mt-3 max-w-md text-sm text-white/70">{socialProfile.bio}</p>
+          )}
+
+          {/* Follower / Following counts */}
+          {socialProfile && (
+            <div className="mt-5 flex items-center justify-center gap-8 text-sm">
+              <div>
+                <span className="font-semibold text-white">{socialProfile.followerCount ?? 0}</span>
+                <span className="ml-1 text-muted">followers</span>
+              </div>
+              <div>
+                <span className="font-semibold text-white">{socialProfile.followingCount ?? 0}</span>
+                <span className="ml-1 text-muted">following</span>
+              </div>
+            </div>
+          )}
+
+          {/* Action buttons */}
+          <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
+            <button
+              type="button"
+              onClick={openEditModal}
+              className="inline-flex items-center gap-2 rounded-full border border-outline px-4 py-2 text-xs uppercase tracking-[0.24em] text-muted transition-colors duration-200 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas tablet:tracking-[0.3em]"
+            >
+              <FiEdit2 aria-hidden="true" />
+              Edit Profile
+            </button>
+
             {socialProfile?.username && (
               <Link
                 to={`/u/${socialProfile.username}`}
                 className="inline-flex items-center gap-2 rounded-full border border-outline px-4 py-2 text-xs uppercase tracking-[0.24em] text-muted transition-colors duration-200 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas tablet:tracking-[0.3em]"
               >
                 <FiExternalLink aria-hidden="true" />
-                View Public Profile
+                Public Profile
               </Link>
             )}
+
+            {!socialProfile?.username && !profileLoading && (
+              <button
+                type="button"
+                onClick={() => setShowUsernameSetup(true)}
+                className="inline-flex items-center gap-2 rounded-full bg-white px-4 py-2 text-xs font-semibold uppercase tracking-[0.24em] text-canvas transition-opacity hover:opacity-90"
+              >
+                Set Username
+              </button>
+            )}
+
             <button
               type="button"
               onClick={handleSignOut}
@@ -197,83 +335,6 @@ const Profile = () => {
         </header>
 
         <main className="mt-10 tablet:mt-16">
-          {/* Profile Settings */}
-          <section className="mb-16 rounded-2xl border border-outline/60 bg-panel/30 p-6 tablet:p-8">
-            <h2 className="mb-6 font-display text-2xl font-bold">Profile Settings</h2>
-
-            {!socialProfile?.username && !profileLoading && (
-              <div className="mb-6 rounded-xl border border-outline bg-canvas/50 p-4">
-                <p className="text-sm text-muted">You haven't set a username yet.</p>
-                <button
-                  type="button"
-                  onClick={() => setShowUsernameSetup(true)}
-                  className="mt-3 rounded-full bg-white px-5 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-canvas hover:opacity-90"
-                >
-                  Choose Username
-                </button>
-              </div>
-            )}
-
-            {socialProfile?.username && (
-              <div className="mb-4">
-                <label className="block text-xs uppercase tracking-[0.2em] text-muted">Username</label>
-                <p className="mt-1 text-sm text-white">@{socialProfile.username}</p>
-              </div>
-            )}
-
-            <div className="mb-4">
-              <label htmlFor="profile-bio" className="block text-xs uppercase tracking-[0.2em] text-muted">
-                Bio
-              </label>
-              <textarea
-                id="profile-bio"
-                value={editBio}
-                onChange={(e) => setEditBio(e.target.value.slice(0, 160))}
-                placeholder="Tell people about yourself..."
-                rows={3}
-                className="mt-2 w-full resize-none rounded-lg border border-outline bg-canvas/50 p-3 text-sm text-white placeholder:text-muted/50 focus:border-white/30 focus:outline-none"
-              />
-              <p className="mt-1 text-right text-xs tabular-nums text-muted/60">{editBio.length}/160</p>
-            </div>
-
-            <div className="mb-6 flex items-center gap-3">
-              <label htmlFor="profile-public" className="text-xs uppercase tracking-[0.2em] text-muted">
-                Public Profile
-              </label>
-              <button
-                id="profile-public"
-                type="button"
-                role="switch"
-                aria-checked={editIsPublic}
-                onClick={() => setEditIsPublic((prev) => !prev)}
-                className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full border border-outline transition-colors duration-200 ${
-                  editIsPublic ? 'bg-white' : 'bg-canvas'
-                }`}
-              >
-                <span
-                  className={`inline-block h-4 w-4 rounded-full transition-transform duration-200 ${
-                    editIsPublic ? 'translate-x-5 bg-canvas' : 'translate-x-1 bg-muted'
-                  }`}
-                />
-              </button>
-              <span className="text-xs text-muted">{editIsPublic ? 'Visible to everyone' : 'Only visible to you'}</span>
-            </div>
-
-            <div className="flex items-center gap-3">
-              <button
-                type="button"
-                onClick={handleProfileSave}
-                disabled={savingProfile}
-                className="rounded-full bg-white px-6 py-2.5 text-xs font-semibold uppercase tracking-[0.2em] text-canvas transition-opacity hover:opacity-90 disabled:opacity-40"
-              >
-                {savingProfile ? 'Saving...' : 'Save Changes'}
-              </button>
-              {profileStatus && (
-                <p className="text-xs text-muted" aria-live="polite">{profileStatus}</p>
-              )}
-            </div>
-          </section>
-
           <Stats ratedAlbums={ratedAlbums} />
           <TopGenres ratedAlbums={ratedAlbums} />
 

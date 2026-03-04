@@ -1,6 +1,6 @@
 import { Elysia } from 'elysia'
 import { cors } from '@elysiajs/cors'
-import { and, desc, eq, inArray, lt, sql } from 'drizzle-orm'
+import { and, desc, eq, ilike, inArray, lt, or, sql } from 'drizzle-orm'
 
 import { auth } from './auth'
 import { db } from './db'
@@ -561,7 +561,7 @@ const app = new Elysia()
       .limit(1)
 
     const profile = profiles[0]
-    if (!profile || !profile.isPublic) {
+    if (!profile) {
       set.status = 404
       return { error: 'User not found.' }
     }
@@ -572,6 +572,51 @@ const app = new Elysia()
     if (!targetUser) {
       set.status = 404
       return { error: 'User not found.' }
+    }
+
+    // Check if the requesting user is the owner or following this profile
+    const authUser = await getAuthUser(request)
+    const isOwnProfile = authUser?.id === profile.userId
+
+    // If the profile is private, return limited info
+    if (!profile.isPublic && !isOwnProfile) {
+      // Check follow status
+      let isFollowing = false
+      if (authUser?.id) {
+        const followRow = await db
+          .select({ id: userFollow.id })
+          .from(userFollow)
+          .where(and(eq(userFollow.followerId, authUser.id), eq(userFollow.followingId, profile.userId)))
+          .limit(1)
+        isFollowing = Boolean(followRow[0])
+      }
+
+      // Count followers/following even for private profiles (public metadata)
+      const [followerRows, followingRows] = await Promise.all([
+        db.select({ id: userFollow.id }).from(userFollow).where(eq(userFollow.followingId, profile.userId)),
+        db.select({ id: userFollow.id }).from(userFollow).where(eq(userFollow.followerId, profile.userId)),
+      ])
+
+      set.headers ??= {}
+      set.headers['Cache-Control'] = 'public, max-age=30'
+      return {
+        data: {
+          userId: profile.userId,
+          name: targetUser.name,
+          username: profile.username,
+          bio: null,
+          isPrivate: true,
+          joinedAt: targetUser.createdAt.getTime(),
+          stats: null,
+          followerCount: followerRows.length,
+          followingCount: followingRows.length,
+          isFollowing,
+          isOwnProfile: false,
+          recentRatings: [],
+          recentReviews: [],
+          lists: [],
+        },
+      }
     }
 
     // Fetch stats in parallel
@@ -598,7 +643,6 @@ const app = new Elysia()
 
     // Check if the requesting user is following this profile
     let isFollowing = false
-    const authUser = await getAuthUser(request)
     if (authUser?.id && authUser.id !== profile.userId) {
       const followRow = await db
         .select({ id: userFollow.id })
@@ -666,6 +710,7 @@ const app = new Elysia()
         name: targetUser.name,
         username: profile.username,
         bio: profile.bio,
+        isPrivate: false,
         joinedAt: targetUser.createdAt.getTime(),
         stats: {
           totalRated: ratings.length,
@@ -850,17 +895,12 @@ const app = new Elysia()
       .from(userFollow)
       .where(eq(userFollow.followerId, authUser.id))
 
-    if (!follows.length) {
-      set.headers ??= {}
-      set.headers['Cache-Control'] = 'no-store'
-      return { data: [], nextCursor: null }
-    }
-
-    const followingIds = follows.map((f) => f.followingId)
+    // Include the user's own activity + followed users' activity
+    const feedUserIds = [authUser.id, ...follows.map((f) => f.followingId)]
 
     // Cursor-based pagination
     const cursor = query?.cursor ? new Date(String(query.cursor)) : null
-    const conditions = [inArray(activity.userId, followingIds)]
+    const conditions = [inArray(activity.userId, feedUserIds)]
     if (cursor && !isNaN(cursor.getTime())) {
       conditions.push(lt(activity.createdAt, cursor))
     }
@@ -1173,6 +1213,82 @@ const app = new Elysia()
         updatedAt: targetList.updatedAt.getTime(),
       },
     }
+  })
+
+  // ── User Search ──
+
+  .get('/api/users/search', async ({ request, query, set }) => {
+    const q = String(query?.q ?? '').trim()
+    if (!q || q.length < 2) {
+      set.headers ??= {}
+      set.headers['Cache-Control'] = 'no-store'
+      return { data: [], nextCursor: null }
+    }
+
+    const limitParam = Number(query?.limit)
+    const limit = Number.isFinite(limitParam) ? Math.min(Math.max(limitParam, 1), 30) : 20
+    const pattern = `%${q}%`
+
+    // Cursor-based pagination using offset for simplicity (user search is not time-ordered)
+    const offsetParam = Number(query?.offset)
+    const offset = Number.isFinite(offsetParam) && offsetParam >= 0 ? offsetParam : 0
+
+    // Search across username and display name (include both public and private profiles)
+    const results = await db
+      .select({
+        userId: userProfile.userId,
+        username: userProfile.username,
+        bio: userProfile.bio,
+        isPublic: userProfile.isPublic,
+        name: user.name,
+        image: user.image,
+      })
+      .from(userProfile)
+      .innerJoin(user, eq(userProfile.userId, user.id))
+      .where(
+        or(
+          ilike(userProfile.username, pattern),
+          ilike(user.name, pattern),
+        ),
+      )
+      .orderBy(userProfile.username)
+      .limit(limit + 1)
+      .offset(offset)
+
+    const hasMore = results.length > limit
+    const pageResults = hasMore ? results.slice(0, limit) : results
+    const nextOffset = hasMore ? offset + limit : null
+
+    // If the requester is logged in, include follow status
+    const authUser = await getAuthUser(request)
+    let followSet = new Set<string>()
+    if (authUser) {
+      const userIds = pageResults.map((r) => r.userId)
+      if (userIds.length) {
+        const follows = await db
+          .select({ followingId: userFollow.followingId })
+          .from(userFollow)
+          .where(and(eq(userFollow.followerId, authUser.id), inArray(userFollow.followingId, userIds)))
+        followSet = new Set(follows.map((f) => f.followingId))
+      }
+    }
+
+    const data = pageResults
+      .filter((r) => r.username) // Only return users who have set a username
+      .map((r) => ({
+        userId: r.userId,
+        username: r.username,
+        name: r.name,
+        image: r.isPublic ? r.image : null, // Don't expose avatar for private profiles
+        bio: r.isPublic ? r.bio : null, // Don't expose bio for private profiles
+        isPrivate: !r.isPublic,
+        isFollowing: authUser ? followSet.has(r.userId) : false,
+        isMe: authUser ? r.userId === authUser.id : false,
+      }))
+
+    set.headers ??= {}
+    set.headers['Cache-Control'] = 'no-store'
+    return { data, nextOffset }
   })
 
   // ── Existing public routes ──

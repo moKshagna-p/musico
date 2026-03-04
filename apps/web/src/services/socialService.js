@@ -79,8 +79,30 @@ export const checkUsernameAvailability = async (username) => {
 // ── Public profiles ──
 
 export const fetchPublicProfile = async (username) => {
-  const response = await requestPublicApi(`/api/users/${encodeURIComponent(username)}`)
+  // Use credentialed request so the server can detect the current user
+  // and return isFollowing / isOwnProfile accurately.
+  const response = await requestPrivateApi(`/api/users/${encodeURIComponent(username)}`)
   return response?.data ?? null
+}
+
+// ── User Search ──
+
+export const searchUsers = async (query, { limit = 20, offset = 0 } = {}) => {
+  const params = { q: query, limit }
+  if (offset) params.offset = offset
+
+  // Use private API so the server can include follow status for the current user
+  const response = await requestPrivateApi(`/api/users/search?${new URLSearchParams(
+    Object.entries(params).reduce((acc, [k, v]) => {
+      if (v !== undefined && v !== null) acc[k] = String(v)
+      return acc
+    }, {}),
+  ).toString()}`)
+
+  return {
+    users: Array.isArray(response?.data) ? response.data : [],
+    nextOffset: response?.nextOffset ?? null,
+  }
 }
 
 // ── Follow ──
