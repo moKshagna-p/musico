@@ -32,10 +32,14 @@ export const fetchMyRatings = async () => {
   return response?.data && typeof response.data === 'object' ? response.data : {}
 }
 
-export const saveMyRating = async (albumId, rating) => {
+export const saveMyRating = async (albumId, rating, meta = {}) => {
+  const body = { rating }
+  if (meta.albumName) body.albumName = meta.albumName
+  if (meta.albumCover) body.albumCover = meta.albumCover
+
   const response = await requestPrivateApi(`/api/me/ratings/${encodeURIComponent(albumId)}`, {
     method: 'PUT',
-    body: JSON.stringify({ rating }),
+    body: JSON.stringify(body),
   })
 
   return response?.data ?? { rating, timestamp: Date.now() }

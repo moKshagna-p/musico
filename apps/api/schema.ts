@@ -1,6 +1,6 @@
 import type { ReleaseSummary } from './types'
 
-import { boolean, index, integer, jsonb, pgTable, text, timestamp, uniqueIndex } from 'drizzle-orm/pg-core'
+import { boolean, index, integer, jsonb, pgEnum, pgTable, text, timestamp, uniqueIndex } from 'drizzle-orm/pg-core'
 
 export const user = pgTable(
   'user',
@@ -153,6 +153,93 @@ export const userListAlbum = pgTable(
   (table) => [
     index('user_list_album_list_id_idx').on(table.listId),
     uniqueIndex('user_list_album_unique').on(table.listId, table.albumId),
+  ],
+)
+
+// ── Social profile (separate table to avoid touching Better Auth's user table) ──
+
+export const userProfile = pgTable(
+  'user_profile',
+  {
+    userId: text('userId')
+      .primaryKey()
+      .references(() => user.id, { onDelete: 'cascade' }),
+    username: text('username'),
+    bio: text('bio').notNull().default(''),
+    isPublic: boolean('isPublic').notNull().default(true),
+    createdAt: timestamp('createdAt', { withTimezone: true, mode: 'date' }).notNull(),
+    updatedAt: timestamp('updatedAt', { withTimezone: true, mode: 'date' }).notNull(),
+  },
+  (table) => [uniqueIndex('user_profile_username_unique').on(table.username)],
+)
+
+// ── Follow relationships ──
+
+export const userFollow = pgTable(
+  'user_follow',
+  {
+    id: text('id').primaryKey(),
+    followerId: text('followerId')
+      .notNull()
+      .references(() => user.id, { onDelete: 'cascade' }),
+    followingId: text('followingId')
+      .notNull()
+      .references(() => user.id, { onDelete: 'cascade' }),
+    createdAt: timestamp('createdAt', { withTimezone: true, mode: 'date' }).notNull(),
+  },
+  (table) => [
+    uniqueIndex('user_follow_unique').on(table.followerId, table.followingId),
+    index('user_follow_follower_idx').on(table.followerId),
+    index('user_follow_following_idx').on(table.followingId),
+  ],
+)
+
+// ── Micro-reviews ──
+
+export const userReview = pgTable(
+  'user_review',
+  {
+    id: text('id').primaryKey(),
+    userId: text('userId')
+      .notNull()
+      .references(() => user.id, { onDelete: 'cascade' }),
+    albumId: text('albumId').notNull(),
+    content: text('content').notNull(),
+    albumName: text('albumName').notNull().default(''),
+    albumCover: text('albumCover').notNull().default(''),
+    albumArtists: jsonb('albumArtists').$type<string[]>().notNull().default([]),
+    createdAt: timestamp('createdAt', { withTimezone: true, mode: 'date' }).notNull(),
+    updatedAt: timestamp('updatedAt', { withTimezone: true, mode: 'date' }).notNull(),
+  },
+  (table) => [
+    uniqueIndex('user_review_user_album_unique').on(table.userId, table.albumId),
+    index('user_review_user_id_idx').on(table.userId),
+    index('user_review_album_id_idx').on(table.albumId),
+  ],
+)
+
+// ── Activity feed events ──
+
+export const activityTypeEnum = pgEnum('activity_type', ['rated', 'reviewed', 'listed', 'followed'])
+
+export const activity = pgTable(
+  'activity',
+  {
+    id: text('id').primaryKey(),
+    userId: text('userId')
+      .notNull()
+      .references(() => user.id, { onDelete: 'cascade' }),
+    type: activityTypeEnum('type').notNull(),
+    albumId: text('albumId'),
+    albumName: text('albumName'),
+    albumCover: text('albumCover'),
+    targetUserId: text('targetUserId').references(() => user.id, { onDelete: 'set null' }),
+    metadata: jsonb('metadata').$type<Record<string, unknown>>().notNull().default({}),
+    createdAt: timestamp('createdAt', { withTimezone: true, mode: 'date' }).notNull(),
+  },
+  (table) => [
+    index('activity_user_id_created_at_idx').on(table.userId, table.createdAt),
+    index('activity_created_at_idx').on(table.createdAt),
   ],
 )
 

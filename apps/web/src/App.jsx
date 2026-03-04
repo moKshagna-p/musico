@@ -8,9 +8,12 @@ import { useAuth } from './hooks/useAuth.js'
 import AlbumDetails from './pages/AlbumDetails.jsx'
 import Auth from './pages/Auth.jsx'
 import Discover from './pages/Discover.jsx'
+import Feed from './pages/Feed.jsx'
 import Home from './pages/Home.jsx'
 import NotFound from './pages/NotFound.jsx'
 import Profile from './pages/Profile.jsx'
+import PublicList from './pages/PublicList.jsx'
+import PublicProfile from './pages/PublicProfile.jsx'
 import SearchResults from './pages/SearchResults.jsx'
 
 const INACTIVITY_TIMEOUT_MS = 20 * 60 * 1000
@@ -105,6 +108,9 @@ const App = () => {
             <Route path="/discover" element={<Discover />} />
             <Route path="/search" element={<SearchResults />} />
             <Route path="/profile" element={<Profile />} />
+            <Route path="/feed" element={<Feed />} />
+            <Route path="/u/:username" element={<PublicProfile />} />
+            <Route path="/lists/:listId" element={<PublicList />} />
             <Route path="/auth" element={<Auth />} />
             <Route path="/album/:albumId" element={<AlbumDetails />} />
             <Route path="*" element={<NotFound />} />

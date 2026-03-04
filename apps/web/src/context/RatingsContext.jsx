@@ -44,7 +44,7 @@ export const RatingsProvider = ({ children }) => {
     }
   }, [isPending, user?.id])
 
-  const rateAlbum = useCallback((albumId, rating) => {
+  const rateAlbum = useCallback((albumId, rating, meta = {}) => {
     if (!user?.id) return
 
     const normalizedAlbumId = String(albumId ?? '').trim()
@@ -62,7 +62,7 @@ export const RatingsProvider = ({ children }) => {
       }
     })
 
-    void saveMyRating(normalizedAlbumId, normalizedRating)
+    void saveMyRating(normalizedAlbumId, normalizedRating, meta)
       .then((saved) => {
         setRatings((prev) => ({
           ...prev,

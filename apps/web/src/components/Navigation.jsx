@@ -76,6 +76,11 @@ const Navigation = () => {
           <NavLink to="/discover" className={({ isActive }) => (isActive ? 'text-white' : 'hover:text-white')}>
             Discover
           </NavLink>
+          {user && (
+            <NavLink to="/feed" className={({ isActive }) => (isActive ? 'text-white' : 'hover:text-white')}>
+              Feed
+            </NavLink>
+          )}
           {user ? (
             <NavLink to="/profile" className={({ isActive }) => (isActive ? 'text-white' : 'hover:text-white')}>
               Profile

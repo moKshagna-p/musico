@@ -4,12 +4,15 @@ import { useLocation, useNavigate, useParams } from 'react-router-dom'
 
 import PageTransition from '../components/PageTransition.jsx'
 import RatingStars from '../components/RatingStars.jsx'
+import ReviewInput from '../components/ReviewInput.jsx'
+import ReviewsList from '../components/ReviewsList.jsx'
 import StreamingLinks from '../components/StreamingLinks.jsx'
 import { useAuth } from '../hooks/useAuth.js'
 import { useLists } from '../hooks/useLists.js'
 import { useRatings } from '../hooks/useRatings.js'
 import { trackOpenedAlbumGenres } from '../services/recommendationProfileService.js'
 import { getReleaseDetails } from '../services/discogsService.js'
+import { saveMyReview } from '../services/socialService.js'
 import {
   formatDuration,
   formatLargeNumber,
@@ -32,6 +35,7 @@ const AlbumDetails = () => {
   const [error, setError] = useState(null)
   const [newListName, setNewListName] = useState('')
   const [listStatus, setListStatus] = useState('')
+  const [reviewKey, setReviewKey] = useState(0) // increment to refresh reviews list
 
   useEffect(() => {
     let isMounted = true
@@ -242,7 +246,10 @@ const AlbumDetails = () => {
                       setListStatus('Sign in to rate albums.')
                       return
                     }
-                    rateAlbum(album.id, value)
+                    rateAlbum(album.id, value, {
+                      albumName: album.name,
+                      albumCover: album.cover,
+                    })
                   }}
                   showValue
                 />
@@ -366,6 +373,39 @@ const AlbumDetails = () => {
                 <p className="px-4 py-6 text-sm text-muted">Track details are not available for this release.</p>
               )}
             </div>
+          </section>
+
+          {/* Reviews */}
+          <section className="space-y-6">
+            <p className="text-xs uppercase tracking-[0.42em] text-muted">Reviews</p>
+
+            {isSignedIn ? (
+              <ReviewInput
+                albumId={album.id}
+                onSave={async (content) => {
+                  await saveMyReview(album.id, {
+                    content,
+                    albumName: album.name,
+                    albumCover: album.cover,
+                    albumArtists: album.artists,
+                  })
+                  setReviewKey((k) => k + 1)
+                }}
+              />
+            ) : (
+              <div className="rounded-xl border border-outline bg-panel/30 px-4 py-4 text-sm text-muted">
+                <button
+                  type="button"
+                  onClick={() => navigate('/auth')}
+                  className="text-white hover:underline"
+                >
+                  Sign in
+                </button>{' '}
+                to write a review.
+              </div>
+            )}
+
+            <ReviewsList key={reviewKey} albumId={album.id} />
           </section>
         </section>
       </div>
