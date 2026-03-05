@@ -9,6 +9,7 @@ export const useAlbums = (initialQuery = '') => {
   const [loading, setLoading] = useState(Boolean(initialQuery?.trim()))
   const [error, setError] = useState(null)
   const [query, setQuery] = useState(initialQuery)
+  const [correctedQuery, setCorrectedQuery] = useState(null)
 
   const searchHandler = useMemo(
     () =>
@@ -18,17 +19,21 @@ export const useAlbums = (initialQuery = '') => {
         setAlbums([])
         setLoading(false)
         setError(null)
+        setCorrectedQuery(null)
         return
       }
 
       setLoading(true)
       setError(null)
+      setCorrectedQuery(null)
       try {
-        const results = await searchReleases(trimmed)
-        setAlbums(results)
+        const result = await searchReleases(trimmed)
+        setAlbums(result.data)
+        setCorrectedQuery(result.correctedQuery)
       } catch (err) {
         setError(err?.message ?? 'Search is unavailable at the moment.')
         setAlbums([])
+        setCorrectedQuery(null)
       } finally {
         setLoading(false)
       }
@@ -42,17 +47,21 @@ export const useAlbums = (initialQuery = '') => {
       setAlbums([])
       setLoading(false)
       setError(null)
+      setCorrectedQuery(null)
       return
     }
 
     setLoading(true)
     setError(null)
+    setCorrectedQuery(null)
     try {
-      const results = await searchReleases(trimmed)
-      setAlbums(results)
+      const result = await searchReleases(trimmed)
+      setAlbums(result.data)
+      setCorrectedQuery(result.correctedQuery)
     } catch (err) {
       setError(err?.message ?? 'Search is unavailable at the moment.')
       setAlbums([])
+      setCorrectedQuery(null)
     } finally {
       setLoading(false)
     }
@@ -85,5 +94,6 @@ export const useAlbums = (initialQuery = '') => {
     setQuery,
     loading,
     error,
+    correctedQuery,
   }
 }

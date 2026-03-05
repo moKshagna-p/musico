@@ -30,7 +30,7 @@ const parsePositiveInteger = (value: string | undefined, fallback: number) => {
 }
 
 const RELEASE_CACHE_WINDOW = 1000 * 60 * 60 // 1 hour
-const FEATURED_DB_CACHE_WINDOW = parsePositiveInteger(env.FEATURED_CACHE_TTL_MS, 1000 * 60 * 60 * 24)
+const FEATURED_DB_CACHE_WINDOW = parsePositiveInteger(env.FEATURED_CACHE_TTL_MS, 1000 * 60 * 60 * 24 * 7)
 const SEARCH_DB_CACHE_WINDOW = parsePositiveInteger(env.SEARCH_CACHE_TTL_MS, 1000 * 60 * 60 * 24 * 7)
 const FEATURED_RETRY_COOLDOWN_MS = parsePositiveInteger(env.FEATURED_RETRY_COOLDOWN_MS, 1000 * 60 * 10)
 const SEARCH_RETRY_COOLDOWN_MS = parsePositiveInteger(env.SEARCH_RETRY_COOLDOWN_MS, 1000 * 60 * 10)
@@ -533,6 +533,87 @@ const normalizeSearchValue = (value = '') =>
     .replace(/\s+/g, ' ')
     .trim()
 
+// ─── Fuzzy matching utilities ───────────────────────────────────────────────
+
+const levenshtein = (a: string, b: string): number => {
+  if (a === b) return 0
+  if (!a.length) return b.length
+  if (!b.length) return a.length
+
+  const matrix: number[][] = []
+  for (let i = 0; i <= a.length; i++) matrix[i] = [i]
+  for (let j = 0; j <= b.length; j++) matrix[0][j] = j
+
+  for (let i = 1; i <= a.length; i++) {
+    for (let j = 1; j <= b.length; j++) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1
+      matrix[i][j] = Math.min(
+        matrix[i - 1][j] + 1,      // deletion
+        matrix[i][j - 1] + 1,      // insertion
+        matrix[i - 1][j - 1] + cost // substitution
+      )
+    }
+  }
+  return matrix[a.length][b.length]
+}
+
+const fuzzyScore = (query: string, candidate: string): number => {
+  const q = normalizeSearchValue(query)
+  const c = normalizeSearchValue(candidate)
+  if (!q || !c) return 0
+  if (q === c) return 1
+
+  // Token-level overlap (handles word reordering / partial matches)
+  const qTokens = q.split(' ').filter(Boolean)
+  const cTokens = c.split(' ').filter(Boolean)
+  let tokenMatchScore = 0
+  for (const qt of qTokens) {
+    let bestTokenDist = qt.length
+    for (const ct of cTokens) {
+      bestTokenDist = Math.min(bestTokenDist, levenshtein(qt, ct))
+    }
+    // Normalize: 1 = perfect token match, 0 = completely different
+    tokenMatchScore += Math.max(0, 1 - bestTokenDist / Math.max(qt.length, 1))
+  }
+  tokenMatchScore /= qTokens.length
+
+  // Whole-string Levenshtein similarity
+  const dist = levenshtein(q, c)
+  const maxLen = Math.max(q.length, c.length)
+  const stringSimilarity = 1 - dist / maxLen
+
+  return Math.max(tokenMatchScore, stringSimilarity)
+}
+
+const FUZZY_SIMILARITY_THRESHOLD = 0.45
+
+const fetchFuzzySuggestions = async (sourceQuery: string): Promise<string | null> => {
+  // Use Discogs general search to find approximate artist/album name matches
+  const response = await requestDiscogs('/database/search', {
+    q: sourceQuery,
+    per_page: 25,
+    type: 'artist',
+  })
+
+  const results = Array.isArray(response?.results) ? response.results : []
+  if (!results.length) return null
+
+  let bestCandidate: string | null = null
+  let bestScore = 0
+
+  for (const entry of results) {
+    const title = typeof entry?.title === 'string' ? stripDiscogsDisambiguation(entry.title) : ''
+    if (!title) continue
+    const score = fuzzyScore(sourceQuery, title)
+    if (score > bestScore && score >= FUZZY_SIMILARITY_THRESHOLD) {
+      bestScore = score
+      bestCandidate = title
+    }
+  }
+
+  return bestCandidate
+}
+
 const extractMasterArtist = (entry: any) => {
   const fromTitle =
     typeof entry?.title === 'string' && entry.title.includes(' - ') ? entry.title.split(' - ')[0]?.trim() : ''
@@ -858,9 +939,14 @@ const refreshSearchQuery = async (queryHash: string, normalizedQuery: string, so
   })
 }
 
-export const searchReleases = async (query: string) => {
+export interface SearchResult {
+  data: ReleaseSummary[]
+  correctedQuery?: string
+}
+
+export const searchReleases = async (query: string): Promise<SearchResult> => {
   const trimmed = query?.trim()
-  if (!trimmed) return []
+  if (!trimmed) return { data: [] }
 
   const normalizedQuery = normalizeCacheQuery(trimmed)
   const queryHash = createQueryHash(normalizedQuery)
@@ -874,13 +960,41 @@ export const searchReleases = async (query: string) => {
     isNotExpired(cached?.expiresAt) &&
     (!shouldRefreshSummaryPayload(cachedPayload) || recentRefresh)
   ) {
-    return cachedPayload
+    return { data: cachedPayload }
   }
 
   try {
-    return await refreshSearchQuery(queryHash, normalizedQuery, trimmed)
+    const results = await refreshSearchQuery(queryHash, normalizedQuery, trimmed)
+
+    // If the primary search returned results, return them directly
+    if (results.length) return { data: results }
+
+    // ─── Fuzzy fallback: try to find an approximate match ────────────
+    const corrected = await fetchFuzzySuggestions(trimmed)
+    if (corrected && normalizeSearchValue(corrected) !== normalizeSearchValue(trimmed)) {
+      const correctedNorm = normalizeCacheQuery(corrected)
+      const correctedHash = createQueryHash(correctedNorm)
+
+      // Check if corrected query is already cached
+      const correctedCached = await getCachedSearch(correctedHash)
+      const correctedPayload = toReleaseSummaryArray(correctedCached?.payload)
+      if (
+        correctedPayload.length &&
+        isNotExpired(correctedCached?.expiresAt) &&
+        (!shouldRefreshSummaryPayload(correctedPayload) || recentRefresh)
+      ) {
+        return { data: correctedPayload, correctedQuery: corrected }
+      }
+
+      const correctedResults = await refreshSearchQuery(correctedHash, correctedNorm, corrected)
+      if (correctedResults.length) {
+        return { data: correctedResults, correctedQuery: corrected }
+      }
+    }
+
+    return { data: results }
   } catch {
-    if (cachedPayload.length) return cachedPayload
+    if (cachedPayload.length) return { data: cachedPayload }
     throw new Error('Search unavailable right now. Please try again shortly.')
   }
 }

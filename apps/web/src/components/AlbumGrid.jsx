@@ -1,7 +1,7 @@
 import AlbumCard from './AlbumCard.jsx'
 import LoadingSkeleton from './LoadingSkeleton.jsx'
 
-const AlbumGrid = ({ albums = [], loading, error, onSelect }) => {
+const AlbumGrid = ({ albums = [], loading, error, onSelect, correctedQuery }) => {
   if (error) {
     return (
       <div className="rounded-3xl border border-outline bg-panel px-6 py-8 text-center text-muted">
@@ -20,18 +20,26 @@ const AlbumGrid = ({ albums = [], loading, error, onSelect }) => {
   }
 
   return (
-    <div className="grid gap-6 tablet:grid-cols-2 laptop:grid-cols-3">
-      {loading ? (
-        <LoadingSkeleton count={6} />
-      ) : (
-        albums.map((album) => (
-          <AlbumCard
-            key={`${album.id ?? 'album'}-${album.name ?? 'untitled'}-${(album.artists ?? []).join('|')}-${album.releaseYear ?? 'year'}`}
-            album={album}
-            onSelect={onSelect}
-          />
-        ))
+    <div>
+      {correctedQuery && !loading && albums.length > 0 && (
+        <p className="mb-4 text-sm text-muted">
+          Showing results for{' '}
+          <span className="font-medium text-white">"{correctedQuery}"</span>
+        </p>
       )}
+      <div className="grid gap-6 tablet:grid-cols-2 laptop:grid-cols-3">
+        {loading ? (
+          <LoadingSkeleton count={6} />
+        ) : (
+          albums.map((album) => (
+            <AlbumCard
+              key={`${album.id ?? 'album'}-${album.name ?? 'untitled'}-${(album.artists ?? []).join('|')}-${album.releaseYear ?? 'year'}`}
+              album={album}
+              onSelect={onSelect}
+            />
+          ))
+        )}
+      </div>
     </div>
   )
 }

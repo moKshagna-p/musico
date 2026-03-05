@@ -17,7 +17,7 @@ const SearchResults = () => {
   const enableHistory = !isPending && Boolean(user?.id)
   const initialQuery = searchParams.get('q') ?? ''
 
-  const { albums, query, setQuery, loading, error } = useAlbums(initialQuery)
+  const { albums, query, setQuery, loading, error, correctedQuery } = useAlbums(initialQuery)
 
   useEffect(() => {
     if (initialQuery) {
@@ -73,6 +73,7 @@ const SearchResults = () => {
             albums={albums}
             loading={loading}
             error={error}
+            correctedQuery={correctedQuery}
             onSelect={(id) => navigate(`/album/${id}`, { state: { from: '/search', query } })}
           />
         )}

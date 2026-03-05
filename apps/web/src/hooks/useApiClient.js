@@ -66,15 +66,16 @@ export const useApiClient = () => {
 
   const searchReleases = async (query) => {
     const trimmed = query?.trim()
-    if (!trimmed) return []
+    if (!trimmed) return { data: [], correctedQuery: null }
     const cacheKey = trimmed.toLowerCase()
     const cached = searchCache.get(cacheKey)
-    if (cached && isFresh(cached.timestamp)) return cached.data
+    if (cached && isFresh(cached.timestamp)) return { data: cached.data, correctedQuery: cached.correctedQuery ?? null }
 
     const response = await requestBackend('/api/search', { q: trimmed })
     const data = Array.isArray(response?.data) ? response.data : []
-    searchCache.set(cacheKey, { data, timestamp: Date.now() })
-    return data
+    const correctedQuery = response?.correctedQuery ?? null
+    searchCache.set(cacheKey, { data, correctedQuery, timestamp: Date.now() })
+    return { data, correctedQuery }
   }
 
   const getReleaseDetails = async (releaseId) => {

@@ -1318,10 +1318,13 @@ const app = new Elysia()
       return { error: 'Missing search query.' }
     }
     try {
-      const data = await searchReleases(q)
+      const result = await searchReleases(q)
       set.headers ??= {}
       set.headers['Cache-Control'] = 'public, max-age=60'
-      return { data }
+      return {
+        data: result.data,
+        ...(result.correctedQuery ? { correctedQuery: result.correctedQuery } : {}),
+      }
     } catch (error) {
       console.error('[search] error', error)
       set.status = 502

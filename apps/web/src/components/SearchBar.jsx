@@ -73,10 +73,10 @@ const SearchBar = ({
 
     const timer = setTimeout(async () => {
       try {
-        const results = await searchReleases(trimmed)
+        const result = await searchReleases(trimmed)
         if (latestRequestIdRef.current !== requestId) return
 
-        const nextSuggestions = results
+        const nextSuggestions = (result.data ?? result)
           .slice(0, SUGGESTION_LIMIT)
           .map((item) => ({
             id: item.id,

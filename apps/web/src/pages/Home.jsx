@@ -54,8 +54,8 @@ const Home = () => {
         const allResults = []
 
         for (const genre of topGenres) {
-          const results = await searchReleases(genre)
-          allResults.push(...results.slice(0, 4))
+          const result = await searchReleases(genre)
+          allResults.push(...(result.data ?? []).slice(0, 4))
         }
 
         const uniqueResults = Array.from(
