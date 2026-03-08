@@ -1,8 +1,10 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+/* eslint-disable react-refresh/only-export-components */
+import { createContext, useCallback, useEffect, useMemo, useState } from 'react'
 
 import { useAuth } from '../hooks/useAuth.js'
 import { fetchMyRatings, saveMyRating } from '../services/profileDataService.js'
-import { RatingsContext } from './ratingsContext.js'
+
+export const RatingsContext = createContext(null)
 
 export const RatingsProvider = ({ children }) => {
   const { user, isPending } = useAuth()

@@ -10,6 +10,8 @@ import { useAuth } from '../hooks/useAuth.js'
 import useFeed from '../hooks/useFeed.js'
 import { searchUsers } from '../services/socialService.js'
 
+const Motion = motion
+
 // ── User Search Panel ──
 
 const UserSearchPanel = () => {
@@ -109,7 +111,7 @@ const UserSearchPanel = () => {
       {/* Search Results */}
       <AnimatePresence>
         {(hasSearched || loading) && (
-          <motion.div
+          <Motion.div
             initial={shouldReduceMotion ? false : { opacity: 0, y: -4 }}
             animate={{ opacity: 1, y: 0 }}
             exit={shouldReduceMotion ? { opacity: 0 } : { opacity: 0, y: -4 }}
@@ -138,18 +140,18 @@ const UserSearchPanel = () => {
             ) : (
               <div className="p-2">
                 {results.map((person, i) => (
-                  <motion.div
+                  <Motion.div
                     key={person.userId}
                     initial={shouldReduceMotion ? false : { opacity: 0, x: -8 }}
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ delay: i * 0.04, duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
                   >
                     <UserSearchResult person={person} />
-                  </motion.div>
+                  </Motion.div>
                 ))}
               </div>
             )}
-          </motion.div>
+          </Motion.div>
         )}
       </AnimatePresence>
     </div>
@@ -211,7 +213,7 @@ const EmptyFeed = ({ navigate }) => {
   const shouldReduceMotion = useReducedMotion()
 
   return (
-    <motion.div
+    <Motion.div
       initial={shouldReduceMotion ? false : { opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
@@ -266,7 +268,7 @@ const EmptyFeed = ({ navigate }) => {
           Discover Music
         </button>
       </div>
-    </motion.div>
+    </Motion.div>
   )
 }
 
@@ -365,7 +367,7 @@ const Feed = () => {
           {loading && !items.length ? (
             <FeedSkeleton />
           ) : error ? (
-            <motion.div
+            <Motion.div
               initial={shouldReduceMotion ? false : { opacity: 0 }}
               animate={{ opacity: 1 }}
               className="rounded-2xl border border-outline/40 bg-panel/30 p-8 text-center"
@@ -379,14 +381,14 @@ const Feed = () => {
               >
                 Try Again
               </button>
-            </motion.div>
+            </Motion.div>
           ) : items.length === 0 ? (
             <EmptyFeed navigate={navigate} />
           ) : (
             <div className="space-y-3">
               <AnimatePresence mode="popLayout">
                 {items.map((item, i) => (
-                  <motion.div
+                  <Motion.div
                     key={item.id}
                     initial={shouldReduceMotion ? false : { opacity: 0, y: 8 }}
                     animate={{ opacity: 1, y: 0 }}
@@ -399,12 +401,12 @@ const Feed = () => {
                     layout={!shouldReduceMotion}
                   >
                     <ActivityCard item={item} />
-                  </motion.div>
+                  </Motion.div>
                 ))}
               </AnimatePresence>
 
               {hasMore && (
-                <motion.button
+                <Motion.button
                   type="button"
                   onClick={loadMore}
                   disabled={loadingMore}
@@ -420,7 +422,7 @@ const Feed = () => {
                   ) : (
                     'Load More'
                   )}
-                </motion.button>
+                </Motion.button>
               )}
             </div>
           )}

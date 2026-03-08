@@ -44,6 +44,7 @@ const SEARCH_MIN_RESULTS_BEFORE_PAGING = parsePositiveInteger(env.SEARCH_MIN_RES
 const SEARCH_ARTIST_CANDIDATE_LIMIT = 5
 const DISCOGS_MIN_REQUEST_INTERVAL_MS = parsePositiveInteger(env.DISCOGS_MIN_REQUEST_INTERVAL_MS, 350)
 const DISCOGS_MAX_RETRIES = parsePositiveInteger(env.DISCOGS_MAX_RETRIES, 4)
+const RELEASE_CACHE_MAX_ENTRIES = parsePositiveInteger(env.RELEASE_CACHE_MAX_ENTRIES, 1500)
 
 const releaseCache = new Map<string, { data: ReleaseDetails; timestamp: number }>()
 const featuredRefreshInFlight = new Map<string, Promise<ReleaseSummary[]>>()
@@ -53,6 +54,16 @@ let discogsNextRequestAt = 0
 const HEADERS: Record<string, string> = {
   'User-Agent': DISCOGS_USER_AGENT,
   Accept: 'application/json',
+}
+
+const setBoundedCacheEntry = <T>(cache: Map<string, T>, key: string, value: T, maxEntries: number) => {
+  if (cache.has(key)) cache.delete(key)
+  cache.set(key, value)
+  while (cache.size > maxEntries) {
+    const oldestKey = cache.keys().next().value
+    if (!oldestKey) break
+    cache.delete(oldestKey)
+  }
 }
 
 const parseGenreSource = (value: unknown): string[] => {
@@ -1014,7 +1025,7 @@ export const getReleaseDetails = async (releaseId: string) => {
     if (!normalized) throw new Error('Unable to normalize release')
     // Keep the prefixed ID in the cached object for consistency
     normalized.id = releaseId
-    releaseCache.set(releaseId, { data: normalized, timestamp: Date.now() })
+    setBoundedCacheEntry(releaseCache, releaseId, { data: normalized, timestamp: Date.now() }, RELEASE_CACHE_MAX_ENTRIES)
     return normalized
   }
 

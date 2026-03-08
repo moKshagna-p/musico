@@ -1,20 +1,22 @@
-import { useEffect } from 'react'
+import { lazy, Suspense, useEffect } from 'react'
 import { AnimatePresence } from 'framer-motion'
 import { Route, Routes, useLocation, useNavigate } from 'react-router-dom'
 
 import Footer from './components/Footer.jsx'
 import Navigation from './components/Navigation.jsx'
+import RouteErrorBoundary from './components/RouteErrorBoundary.jsx'
 import { useAuth } from './hooks/useAuth.js'
-import AlbumDetails from './pages/AlbumDetails.jsx'
-import Auth from './pages/Auth.jsx'
-import Discover from './pages/Discover.jsx'
-import Feed from './pages/Feed.jsx'
-import Home from './pages/Home.jsx'
-import NotFound from './pages/NotFound.jsx'
-import Profile from './pages/Profile.jsx'
-import PublicList from './pages/PublicList.jsx'
-import PublicProfile from './pages/PublicProfile.jsx'
-import SearchResults from './pages/SearchResults.jsx'
+
+const Home = lazy(() => import('./pages/Home.jsx'))
+const Discover = lazy(() => import('./pages/Discover.jsx'))
+const SearchResults = lazy(() => import('./pages/SearchResults.jsx'))
+const Profile = lazy(() => import('./pages/Profile.jsx'))
+const Feed = lazy(() => import('./pages/Feed.jsx'))
+const PublicProfile = lazy(() => import('./pages/PublicProfile.jsx'))
+const PublicList = lazy(() => import('./pages/PublicList.jsx'))
+const Auth = lazy(() => import('./pages/Auth.jsx'))
+const AlbumDetails = lazy(() => import('./pages/AlbumDetails.jsx'))
+const NotFound = lazy(() => import('./pages/NotFound.jsx'))
 
 const INACTIVITY_TIMEOUT_MS = 20 * 60 * 1000
 const LAST_ACTIVITY_KEY = 'musico:last-activity-at'
@@ -102,20 +104,24 @@ const App = () => {
     <div className="flex min-h-screen flex-col bg-canvas text-white">
       <Navigation />
       <main className="flex-1">
-        <AnimatePresence mode="wait" initial={false}>
-          <Routes location={location} key={location.pathname}>
-            <Route path="/" element={<Home />} />
-            <Route path="/discover" element={<Discover />} />
-            <Route path="/search" element={<SearchResults />} />
-            <Route path="/profile" element={<Profile />} />
-            <Route path="/feed" element={<Feed />} />
-            <Route path="/u/:username" element={<PublicProfile />} />
-            <Route path="/lists/:listId" element={<PublicList />} />
-            <Route path="/auth" element={<Auth />} />
-            <Route path="/album/:albumId" element={<AlbumDetails />} />
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-        </AnimatePresence>
+        <RouteErrorBoundary>
+          <Suspense fallback={<div className="mx-auto max-w-6xl px-4 py-16 text-sm text-muted">Loading...</div>}>
+            <AnimatePresence mode="wait" initial={false}>
+              <Routes location={location} key={location.pathname}>
+                <Route path="/" element={<Home />} />
+                <Route path="/discover" element={<Discover />} />
+                <Route path="/search" element={<SearchResults />} />
+                <Route path="/profile" element={<Profile />} />
+                <Route path="/feed" element={<Feed />} />
+                <Route path="/u/:username" element={<PublicProfile />} />
+                <Route path="/lists/:listId" element={<PublicList />} />
+                <Route path="/auth" element={<Auth />} />
+                <Route path="/album/:albumId" element={<AlbumDetails />} />
+                <Route path="*" element={<NotFound />} />
+              </Routes>
+            </AnimatePresence>
+          </Suspense>
+        </RouteErrorBoundary>
       </main>
       <Footer />
     </div>

@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+/* eslint-disable react-refresh/only-export-components */
+import { createContext, useCallback, useEffect, useMemo, useState } from 'react'
 
 import { useAuth } from '../hooks/useAuth.js'
 import {
@@ -11,7 +12,7 @@ import {
   normalizeListName,
   toListAlbumSummary,
 } from '../services/listsService.js'
-import { ListsContext } from './listsContext.js'
+export const ListsContext = createContext(null)
 
 const normalizeRemoteList = (value) => {
   const id = String(value?.id ?? '').trim()

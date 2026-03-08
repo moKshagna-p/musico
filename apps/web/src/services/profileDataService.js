@@ -1,67 +1,50 @@
-const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:4000').replace(/\/$/, '')
-
-const requestPrivateApi = async (path, options = {}) => {
-  const response = await fetch(`${API_BASE_URL}${path}`, {
-    credentials: 'include',
-    headers: {
-      'Content-Type': 'application/json',
-      ...(options.headers ?? {}),
-    },
-    ...options,
-  })
-
-  if (!response.ok) {
-    let message = 'Unable to sync profile data right now.'
-    try {
-      const body = await response.json()
-      if (body?.error) message = body.error
-    } catch {
-      // Ignore response parse failures.
-    }
-
-    const error = new Error(message)
-    error.status = response.status
-    throw error
-  }
-
-  return response.json()
-}
+import { requestPrivateJson } from './apiClient.js'
 
 export const fetchMyRatings = async () => {
-  const response = await requestPrivateApi('/api/me/ratings')
+  const response = await requestPrivateJson('/api/me/ratings', {
+    fallbackMessage: 'Unable to sync profile data right now.',
+  })
+
   return response?.data && typeof response.data === 'object' ? response.data : {}
 }
 
 export const saveMyRating = async (albumId, rating, meta = {}) => {
-  const body = { rating }
-  if (meta.albumName) body.albumName = meta.albumName
-  if (meta.albumCover) body.albumCover = meta.albumCover
+  const payload = { rating }
+  if (meta.albumName) payload.albumName = meta.albumName
+  if (meta.albumCover) payload.albumCover = meta.albumCover
 
-  const response = await requestPrivateApi(`/api/me/ratings/${encodeURIComponent(albumId)}`, {
+  const response = await requestPrivateJson(`/api/me/ratings/${encodeURIComponent(albumId)}`, {
     method: 'PUT',
-    body: JSON.stringify(body),
+    body: JSON.stringify(payload),
+    fallbackMessage: 'Unable to save rating.',
   })
 
   return response?.data ?? { rating, timestamp: Date.now() }
 }
 
 export const fetchMyLists = async () => {
-  const response = await requestPrivateApi('/api/me/lists')
+  const response = await requestPrivateJson('/api/me/lists', {
+    fallbackMessage: 'Unable to load your lists.',
+  })
   return Array.isArray(response?.data) ? response.data : []
 }
 
 export const createMyList = async (name) => {
-  const response = await requestPrivateApi('/api/me/lists', {
+  const response = await requestPrivateJson('/api/me/lists', {
     method: 'POST',
     body: JSON.stringify({ name }),
+    fallbackMessage: 'Unable to create list.',
   })
+
   return response?.data ?? null
 }
 
 export const toggleAlbumInMyList = async (listId, album) => {
-  const response = await requestPrivateApi(`/api/me/lists/${encodeURIComponent(listId)}/toggle`, {
+  const response = await requestPrivateJson(`/api/me/lists/${encodeURIComponent(listId)}/toggle`, {
     method: 'POST',
     body: JSON.stringify(album),
+    fallbackMessage: 'Unable to update list.',
   })
+
   return response?.data ?? { added: false }
 }

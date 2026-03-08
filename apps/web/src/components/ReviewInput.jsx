@@ -1,6 +1,6 @@
 import { useCallback, useState } from 'react'
 
-const ReviewInput = ({ albumId, initialContent = '', onSave, disabled = false }) => {
+const ReviewInput = ({ initialContent = '', onSave, disabled = false }) => {
   const [content, setContent] = useState(initialContent)
   const [saving, setSaving] = useState(false)
   const [status, setStatus] = useState('')

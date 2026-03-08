@@ -8,13 +8,15 @@
     "packages/*"
   ],
   "scripts": {
-    "dev": "turbo run dev --parallel",
-    "build": "turbo run build",
-    "lint": "turbo run lint",
-    "preview": "turbo run preview --filter=@musico/web",
-    "dev:web": "turbo run dev --filter=@musico/web",
-    "dev:api": "turbo run dev --filter=@musico/api",
-    "start:api": "turbo run start --filter=@musico/api"
+    "check:bun": "node ./scripts/check-bun.mjs",
+    "dev": "npm run check:bun && turbo run dev --parallel",
+    "build": "npm run check:bun && turbo run build",
+    "lint": "npm run lint --workspace=@musico/web",
+    "test": "npm run test --workspace=@musico/web",
+    "preview": "npm run preview --workspace=@musico/web",
+    "dev:web": "npm run dev --workspace=@musico/web",
+    "dev:api": "npm run check:bun && turbo run dev --filter=@musico/api",
+    "start:api": "npm run check:bun && turbo run start --filter=@musico/api"
   },
   "devDependencies": {
     "turbo": "^2.5.6"

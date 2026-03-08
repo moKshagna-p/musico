@@ -1,6 +1,6 @@
 import { useContext } from 'react'
 
-import { ListsContext } from '../context/listsContext.js'
+import { ListsContext } from '../context/ListsContext.jsx'
 
 export const useLists = () => {
   const context = useContext(ListsContext)

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { FiLock, FiShare2 } from 'react-icons/fi'
 import { FaStar } from 'react-icons/fa'
 import { Link, useNavigate, useParams } from 'react-router-dom'

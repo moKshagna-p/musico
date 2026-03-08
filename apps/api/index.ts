@@ -24,6 +24,7 @@ const PORT = Number(env.PORT ?? 4000)
 
 const RATE_LIMIT_WINDOW = 1000 * 60 * 60 // 1 hour
 const RATE_LIMIT_MAX = 100
+const RATE_LIMIT_MAX_TRACKED_IPS = 10000
 const MAX_LISTS_PER_USER = 30
 const MAX_ALBUMS_PER_LIST = 200
 const MAX_REVIEW_LENGTH = 280
@@ -31,6 +32,21 @@ const MAX_BIO_LENGTH = 160
 const USERNAME_REGEX = /^[a-z0-9][a-z0-9-]{1,22}[a-z0-9]$/
 
 const rateLimiter = new Map<string, { count: number; resetAt: number }>()
+
+const log = (level: 'info' | 'warn' | 'error', message: string, data: Record<string, unknown> = {}) => {
+  const timestamp = new Date().toISOString()
+  const entry = { level, message, timestamp, ...data }
+  const serialized = JSON.stringify(entry)
+  if (level === 'error') {
+    console.error(serialized)
+    return
+  }
+  if (level === 'warn') {
+    console.warn(serialized)
+    return
+  }
+  console.log(serialized)
+}
 
 const getClientIp = (request: Request) => {
   const forwardedFor = request.headers.get('x-forwarded-for') ?? request.headers.get('cf-connecting-ip')
@@ -42,6 +58,15 @@ const getClientIp = (request: Request) => {
 
 const consumeRateLimit = (ip: string) => {
   const now = Date.now()
+  if (rateLimiter.size > RATE_LIMIT_MAX_TRACKED_IPS) {
+    for (const [trackedIp, tracked] of rateLimiter) {
+      if (tracked.resetAt <= now) {
+        rateLimiter.delete(trackedIp)
+      }
+      if (rateLimiter.size <= RATE_LIMIT_MAX_TRACKED_IPS) break
+    }
+  }
+
   const entry = rateLimiter.get(ip)
 
   if (!entry || now > entry.resetAt) {
@@ -116,7 +141,13 @@ const recordActivity = (params: {
       metadata: params.metadata ?? {},
       createdAt: now,
     })
-    .catch((err) => console.error('[activity] failed to record', err))
+    .catch((err) =>
+      log('error', 'activity.record_failed', {
+        userId: params.userId,
+        type: params.type,
+        message: String(err?.message ?? 'Unknown error'),
+      }),
+    )
 }
 
 // Helper to get or create a user profile row
@@ -140,6 +171,31 @@ const ensureUserProfile = async (userId: string) => {
 }
 
 const app = new Elysia()
+  .derive(({ request, set }) => {
+    const requestId = crypto.randomUUID()
+    set.headers ??= {}
+    set.headers['X-Request-Id'] = requestId
+    return { requestId, requestStartedAt: Date.now(), requestPath: new URL(request.url).pathname }
+  })
+  .onAfterHandle(({ request, set, requestId, requestStartedAt, requestPath }) => {
+    log('info', 'request.completed', {
+      requestId,
+      method: request.method,
+      path: requestPath,
+      status: Number(set.status ?? 200),
+      durationMs: Date.now() - requestStartedAt,
+    })
+  })
+  .onError(({ code, error, request, requestId, requestPath, set }) => {
+    log('error', 'request.failed', {
+      requestId,
+      code,
+      message: String(error?.message ?? 'Unknown error'),
+      method: request.method,
+      path: requestPath,
+      status: Number(set.status ?? 500),
+    })
+  })
   .use(
     cors({
       origin: allowedOrigin,
@@ -163,7 +219,7 @@ const app = new Elysia()
   })
   .get('/', () => ({
     status: 'ok',
-    message: 'MuseVault API proxy is running.',
+    message: 'Musico API proxy is running.',
   }))
 
   // ── Existing rating routes ──
@@ -1358,4 +1414,7 @@ const app = new Elysia()
   })
   .listen(PORT)
 
-console.log(`MuseVault API server running on http://localhost:${app.server?.port ?? PORT}`)
+log('info', 'server.started', {
+  port: app.server?.port ?? PORT,
+  url: `http://localhost:${app.server?.port ?? PORT}`,
+})

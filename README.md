@@ -16,7 +16,7 @@ Turbo monorepo for a React/Vite frontend and a Bun/Elysia API proxy.
 ## Setup
 
 1. Install dependencies:
-   - `npm install`
+   - `npm install` (or `bun install`)
 2. Copy `.env.example` to `.env` at the repo root and fill:
    - `VITE_API_BASE_URL` - backend origin (defaults to `http://localhost:4000`).
    - `PORT`, `ALLOWED_ORIGIN`, `DISCOGS_TOKEN` (+ optional `DISCOGS_KEY`/`DISCOGS_SECRET`).
@@ -28,12 +28,14 @@ Turbo monorepo for a React/Vite frontend and a Bun/Elysia API proxy.
 
 ## Scripts
 
-- `npm run dev` - run `apps/web` and `apps/api` in parallel via Turbo.
-- `npm run build` - build all apps that expose `build`.
-- `npm run lint` - lint all apps that expose `lint`.
-- `npm run preview` - preview the web build.
+- `npm run check:bun` - verify Bun is installed before backend/monorepo tasks.
+- `npm run dev` - run `apps/web` and `apps/api` in parallel via Turbo (requires Bun).
+- `npm run build` - build all apps that expose `build` (requires Bun).
+- `npm run lint` - lint the frontend app.
+- `npm run test` - run frontend unit tests.
+- `npm run preview` - preview the frontend build.
 - `npm run dev:web` - run frontend only.
-- `npm run dev:api` - run backend only.
+- `npm run dev:api` - run backend only (requires Bun).
 - `npm run start:api` - start backend once.
 
 ## Auth
