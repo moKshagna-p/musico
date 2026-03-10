@@ -1,4 +1,4 @@
-import { authClient, API_BASE_URL } from './authClient.js'
+import { API_BASE_URL } from './authClient.js'
 
 const toUrl = (path, params = {}) => {
   const url = new URL(`${API_BASE_URL}${path}`)
@@ -49,8 +49,9 @@ export const requestPrivateJson = async (path, options = {}) => {
 
   return requestJson(
     (url) =>
-      authClient.fetch(url, {
+      fetch(url, {
         method,
+        credentials: 'include',
         headers: {
           'Content-Type': 'application/json',
           ...headers,

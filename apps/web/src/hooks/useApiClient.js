@@ -1,4 +1,4 @@
-import { authClient, API_BASE_URL } from '../services/authClient.js'
+import { API_BASE_URL } from '../services/authClient.js'
 
 const CACHE_WINDOW = 1000 * 60 * 60 // 1 hour
 const FEATURED_CACHE_WINDOW = 1000 * 60 * 5 // 5 minutes
@@ -17,7 +17,9 @@ export const useApiClient = () => {
       }
     })
 
-    const response = await authClient.fetch(url.toString())
+    const response = await fetch(url.toString(), {
+      credentials: 'include',
+    })
     if (!response.ok) {
       let message = 'Music data service is unavailable.'
       try {
