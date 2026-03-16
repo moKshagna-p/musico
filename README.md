@@ -37,6 +37,10 @@ Turbo monorepo for a React/Vite frontend and a Bun/Elysia API proxy.
 - `npm run dev:web` - run frontend only.
 - `npm run dev:api` - run backend only (requires Bun).
 - `npm run start:api` - start backend once.
+- `npm run start:api:local` - start backend once using the root `.env`.
+- `npm run db:migrate:api` - apply backend migrations using process environment variables.
+- `npm run build:web` - build the frontend app only.
+- `npm run start:web` - serve the built frontend in a Railway-friendly way.
 
 ## Auth
 
@@ -62,3 +66,13 @@ Turbo monorepo for a React/Vite frontend and a Bun/Elysia API proxy.
 - Stores ratings and lists in Postgres per authenticated user (`/api/me/*`) so profile data is isolated by account.
 - Keeps release detail caching in memory for 1 hour.
 - Applies IP-based abuse protection (100 requests/hour) and returns `429` with `Retry-After` headers when exceeded.
+
+## Production deployment
+
+- The API exposes:
+  - `GET /health` for process health
+  - `GET /ready` for readiness including database connectivity
+- Production startup requires runtime env vars and does not read from the root `.env` file automatically.
+- Recommended production split:
+  - deploy `apps/api` as a backend service
+  - deploy `apps/web` as a separate frontend service

@@ -5,6 +5,7 @@ import { and, desc, eq, ilike, inArray, lt, or, sql } from 'drizzle-orm'
 import { auth } from './auth'
 import { db } from './db'
 import { getFeaturedReleases, getRecentPopularReleases, getReleaseDetails, searchReleases } from './discogs'
+import { env, validateProductionEnv } from './env'
 import {
   activity,
   user,
@@ -16,11 +17,9 @@ import {
   userReview,
 } from './schema'
 
-const env = ((globalThis as unknown as { Bun?: { env: Record<string, string | undefined> } }).Bun?.env ??
-  process.env ??
-  {}) as Record<string, string | undefined>
+validateProductionEnv()
 
-const PORT = Number(env.PORT ?? 4000)
+const PORT = env.PORT
 
 const RATE_LIMIT_WINDOW = 1000 * 60 * 60 // 1 hour
 const RATE_LIMIT_MAX = 100
@@ -83,10 +82,7 @@ const consumeRateLimit = (ip: string) => {
   return { allowed: true, remaining: RATE_LIMIT_MAX - entry.count, retryAfter: Math.ceil((entry.resetAt - now) / 1000) }
 }
 
-const allowedOrigin = (env.ALLOWED_ORIGIN ?? 'http://localhost:5173')
-  .split(',')
-  .map((origin) => origin.trim())
-  .filter(Boolean)
+const allowedOrigin = env.ALLOWED_ORIGINS
 
 const normalizeListName = (value: unknown) =>
   String(value ?? '')
@@ -221,6 +217,22 @@ const app = new Elysia()
     status: 'ok',
     message: 'Musico API proxy is running.',
   }))
+  .get('/health', () => ({
+    status: 'ok',
+    uptimeSeconds: Math.floor(process.uptime()),
+  }))
+  .get('/ready', async ({ set }) => {
+    try {
+      await db.execute(sql`select 1`)
+      return { status: 'ready' }
+    } catch (error) {
+      set.status = 503
+      return {
+        status: 'not_ready',
+        error: error instanceof Error ? error.message : 'Database unavailable.',
+      }
+    }
+  })
 
   // ── Existing rating routes ──
 
@@ -1416,5 +1428,23 @@ const app = new Elysia()
 
 log('info', 'server.started', {
   port: app.server?.port ?? PORT,
-  url: `http://localhost:${app.server?.port ?? PORT}`,
+  url: env.BETTER_AUTH_URL,
 })
+
+const shutdown = async (signal: string) => {
+  log('warn', 'server.shutdown_started', { signal })
+  try {
+    await app.stop()
+    log('info', 'server.shutdown_completed', { signal })
+    process.exit(0)
+  } catch (error) {
+    log('error', 'server.shutdown_failed', {
+      signal,
+      message: error instanceof Error ? error.message : 'Unknown shutdown error',
+    })
+    process.exit(1)
+  }
+}
+
+process.on('SIGINT', () => void shutdown('SIGINT'))
+process.on('SIGTERM', () => void shutdown('SIGTERM'))

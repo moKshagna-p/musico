@@ -5,11 +5,8 @@ import { eq } from 'drizzle-orm'
 import type { ReleaseDetails, ReleaseSummary } from './types'
 
 import { db } from './db'
+import { env } from './env'
 import { featuredCache as featuredCacheTable, searchCache as searchCacheTable } from './schema'
-
-const env = ((globalThis as unknown as { Bun?: { env: Record<string, string | undefined> } }).Bun?.env ??
-  process.env ??
-  {}) as Record<string, string | undefined>
 
 const DISCOGS_BASE = 'https://api.discogs.com'
 const sanitizeDiscogsCredential = (value?: string) => {
@@ -22,29 +19,24 @@ const sanitizeDiscogsCredential = (value?: string) => {
 const DISCOGS_TOKEN = sanitizeDiscogsCredential(env.DISCOGS_TOKEN)
 const DISCOGS_KEY = sanitizeDiscogsCredential(env.DISCOGS_KEY)
 const DISCOGS_SECRET = sanitizeDiscogsCredential(env.DISCOGS_SECRET)
-const DISCOGS_USER_AGENT = env.DISCOGS_USER_AGENT?.trim() || 'musico/1.0 (+http://localhost:4000)'
-
-const parsePositiveInteger = (value: string | undefined, fallback: number) => {
-  const parsed = Number.parseInt(value ?? '', 10)
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback
-}
+const DISCOGS_USER_AGENT = env.DISCOGS_USER_AGENT
 
 const RELEASE_CACHE_WINDOW = 1000 * 60 * 60 // 1 hour
-const FEATURED_DB_CACHE_WINDOW = parsePositiveInteger(env.FEATURED_CACHE_TTL_MS, 1000 * 60 * 60 * 24 * 7)
-const SEARCH_DB_CACHE_WINDOW = parsePositiveInteger(env.SEARCH_CACHE_TTL_MS, 1000 * 60 * 60 * 24 * 7)
-const FEATURED_RETRY_COOLDOWN_MS = parsePositiveInteger(env.FEATURED_RETRY_COOLDOWN_MS, 1000 * 60 * 10)
-const SEARCH_RETRY_COOLDOWN_MS = parsePositiveInteger(env.SEARCH_RETRY_COOLDOWN_MS, 1000 * 60 * 10)
+const FEATURED_DB_CACHE_WINDOW = env.FEATURED_CACHE_TTL_MS
+const SEARCH_DB_CACHE_WINDOW = env.SEARCH_CACHE_TTL_MS
+const FEATURED_RETRY_COOLDOWN_MS = env.FEATURED_RETRY_COOLDOWN_MS
+const SEARCH_RETRY_COOLDOWN_MS = env.SEARCH_RETRY_COOLDOWN_MS
 const FEATURED_REFRESH_SIZE = 50
-const FEATURED_DETAIL_HYDRATION_LIMIT = parsePositiveInteger(env.FEATURED_DETAIL_HYDRATION_LIMIT, 12)
+const FEATURED_DETAIL_HYDRATION_LIMIT = env.FEATURED_DETAIL_HYDRATION_LIMIT
 const SEARCH_CACHE_VERSION = 'v8'
 const SEARCH_RESULTS_PER_PAGE = 100
-const SEARCH_MAX_PAGES = parsePositiveInteger(env.SEARCH_MAX_PAGES, 4)
-const SEARCH_QUERY_PAGES = parsePositiveInteger(env.SEARCH_QUERY_PAGES, 3)
-const SEARCH_MIN_RESULTS_BEFORE_PAGING = parsePositiveInteger(env.SEARCH_MIN_RESULTS_BEFORE_PAGING, 60)
+const SEARCH_MAX_PAGES = env.SEARCH_MAX_PAGES
+const SEARCH_QUERY_PAGES = env.SEARCH_QUERY_PAGES
+const SEARCH_MIN_RESULTS_BEFORE_PAGING = env.SEARCH_MIN_RESULTS_BEFORE_PAGING
 const SEARCH_ARTIST_CANDIDATE_LIMIT = 5
-const DISCOGS_MIN_REQUEST_INTERVAL_MS = parsePositiveInteger(env.DISCOGS_MIN_REQUEST_INTERVAL_MS, 350)
-const DISCOGS_MAX_RETRIES = parsePositiveInteger(env.DISCOGS_MAX_RETRIES, 4)
-const RELEASE_CACHE_MAX_ENTRIES = parsePositiveInteger(env.RELEASE_CACHE_MAX_ENTRIES, 1500)
+const DISCOGS_MIN_REQUEST_INTERVAL_MS = env.DISCOGS_MIN_REQUEST_INTERVAL_MS
+const DISCOGS_MAX_RETRIES = env.DISCOGS_MAX_RETRIES
+const RELEASE_CACHE_MAX_ENTRIES = env.RELEASE_CACHE_MAX_ENTRIES
 
 const releaseCache = new Map<string, { data: ReleaseDetails; timestamp: number }>()
 const featuredRefreshInFlight = new Map<string, Promise<ReleaseSummary[]>>()

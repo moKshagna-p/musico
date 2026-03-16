@@ -5,9 +5,11 @@
   "type": "module",
   "scripts": {
     "dev": "bun --env-file=../../.env run --watch index.ts",
-    "start": "bun --env-file=../../.env run index.ts",
+    "start": "bun run index.ts",
+    "start:local": "bun --env-file=../../.env run index.ts",
     "db:generate": "bun --env-file=../../.env drizzle-kit generate --config=drizzle.config.ts",
-    "db:migrate": "bun --env-file=../../.env drizzle-kit migrate --config=drizzle.config.ts",
+    "db:migrate": "drizzle-kit migrate --config=drizzle.config.ts",
+    "db:migrate:local": "bun --env-file=../../.env drizzle-kit migrate --config=drizzle.config.ts",
     "db:studio": "bun --env-file=../../.env drizzle-kit studio --config=drizzle.config.ts"
   },
   "dependencies": {
