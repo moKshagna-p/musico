@@ -29,6 +29,13 @@
       "when": 1772870400000,
       "tag": "0003_social_layer",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1774517978371,
+      "tag": "0004_known_greymalkin",
+      "breakpoints": true
     }
   ]
 }

@@ -1,130 +1,97 @@
 import { useEffect, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 
 import AlbumGrid from '../components/AlbumGrid.jsx'
 import Hero from '../components/Hero.jsx'
 import PageTransition from '../components/PageTransition.jsx'
-import { useAuth } from '../hooks/useAuth.js'
-import { searchReleases, getFeaturedReleases } from '../services/discogsService.js'
-import { getTopGenresForRecommendations } from '../services/recommendationProfileService.js'
+import { getFeaturedReleases, getRecentPopularReleases } from '../services/discogsService.js'
 
 const Home = () => {
   const navigate = useNavigate()
-  const { user, isPending } = useAuth()
-  const recommendationScope = !isPending && user?.id ? user.id : ''
-  const [featuredAlbums, setFeaturedAlbums] = useState([])
-  const [recommendedAlbums, setRecommendedAlbums] = useState([])
-  const [showAllTopAlbums, setShowAllTopAlbums] = useState(false)
-  const [loading, setLoading] = useState(true)
-  const [recommendedLoading, setRecommendedLoading] = useState(false)
-  const [error, setError] = useState(null)
+  const [mostHappeningAlbums, setMostHappeningAlbums] = useState([])
+  const [recentAlbums, setRecentAlbums] = useState([])
+  const [showAllHappeningAlbums, setShowAllHappeningAlbums] = useState(false)
+  const [happeningLoading, setHappeningLoading] = useState(true)
+  const [recentLoading, setRecentLoading] = useState(true)
+  const [happeningError, setHappeningError] = useState(null)
+  const [recentError, setRecentError] = useState(null)
 
   useEffect(() => {
-    const loadFeatured = async () => {
-      setLoading(true)
-      setError(null)
-      try {
-        const releases = await getFeaturedReleases(24)
-        setFeaturedAlbums(releases)
-      } catch (err) {
-        setError(err?.message ?? 'Unable to load featured releases.')
-      } finally {
-        setLoading(false)
+    const loadHomeSections = async () => {
+      setHappeningLoading(true)
+      setRecentLoading(true)
+      setHappeningError(null)
+      setRecentError(null)
+
+      const [mostHappeningResult, recentReleasesResult] = await Promise.allSettled([
+          getFeaturedReleases(24),
+          getRecentPopularReleases(24),
+      ])
+
+      if (mostHappeningResult.status === 'fulfilled') {
+        setMostHappeningAlbums(mostHappeningResult.value)
+      } else {
+        setHappeningError(mostHappeningResult.reason?.message ?? 'Unable to load most happening albums.')
       }
+
+      if (recentReleasesResult.status === 'fulfilled') {
+        setRecentAlbums(recentReleasesResult.value)
+      } else {
+        setRecentError(recentReleasesResult.reason?.message ?? 'Unable to load recent releases.')
+      }
+
+      setHappeningLoading(false)
+      setRecentLoading(false)
     }
 
-    loadFeatured()
+    loadHomeSections()
   }, [])
-
-  useEffect(() => {
-    const loadRecommendations = async () => {
-      if (!recommendationScope) {
-        setRecommendedAlbums([])
-        return
-      }
-
-      const topGenres = getTopGenresForRecommendations(recommendationScope, 3)
-      if (!topGenres.length) {
-        setRecommendedAlbums([])
-        return
-      }
-
-      setRecommendedLoading(true)
-      try {
-        const allResults = []
-
-        for (const genre of topGenres) {
-          const result = await searchReleases(genre)
-          allResults.push(...(result.data ?? []).slice(0, 4))
-        }
-
-        const uniqueResults = Array.from(
-          new Map(allResults.map((item) => [item.id, item])).values(),
-        )
-
-        setRecommendedAlbums(uniqueResults.slice(0, 6))
-      } catch (err) {
-        console.warn('Unable to load recommendations', err)
-        setRecommendedAlbums([])
-      } finally {
-        setRecommendedLoading(false)
-      }
-    }
-    loadRecommendations()
-  }, [recommendationScope])
 
   const handleAlbumSelect = (id) => {
     navigate(`/album/${id}`, { state: { from: '/', query: '' } })
   }
 
-  const visibleTopAlbums = showAllTopAlbums ? featuredAlbums : featuredAlbums.slice(0, 6)
+  const visibleMostHappeningAlbums = showAllHappeningAlbums ? mostHappeningAlbums : mostHappeningAlbums.slice(0, 6)
 
   return (
     <PageTransition>
       <Hero />
 
       <div className="mt-12 space-y-10">
-        {recommendedAlbums.length > 0 && (
-          <section className="space-y-6">
-            <div className="flex flex-col gap-3 tablet:flex-row tablet:items-center tablet:justify-between">
-              <div>
-                <p className="text-xs uppercase tracking-[0.4em] text-muted">Based On Albums You Opened</p>
-                <h2 className="font-display text-2xl tablet:text-3xl">For You</h2>
-              </div>
-              <Link
-                to="/discover"
-                className="text-xs uppercase tracking-[0.35em] text-muted transition hover:text-white tablet:tracking-[0.5em]"
-              >
-                Discover more
-              </Link>
+        <section className="space-y-6">
+          <div className="flex flex-col gap-3 tablet:flex-row tablet:items-center tablet:justify-between">
+            <div>
+              <p className="text-xs uppercase tracking-[0.4em] text-muted">Weekly Chart Pulse</p>
+              <h2 className="font-display text-2xl tablet:text-3xl">Most Happening Right Now</h2>
             </div>
-            <AlbumGrid 
-              albums={recommendedAlbums} 
-              loading={recommendedLoading} 
-              onSelect={handleAlbumSelect} 
-            />
-          </section>
-        )}
+            <button
+              type="button"
+              onClick={() => setShowAllHappeningAlbums((prev) => !prev)}
+              className="w-fit text-xs uppercase tracking-[0.35em] text-muted transition hover:text-white tablet:tracking-[0.5em]"
+            >
+              {showAllHappeningAlbums ? 'Show less' : 'See all'}
+            </button>
+          </div>
+          <AlbumGrid
+            albums={visibleMostHappeningAlbums}
+            loading={happeningLoading}
+            error={happeningError}
+            onSelect={handleAlbumSelect}
+          />
+        </section>
 
         <section className="space-y-6">
           <div className="flex flex-col gap-3 tablet:flex-row tablet:items-center tablet:justify-between">
             <div>
-              <p className="text-xs uppercase tracking-[0.4em] text-muted">Global Listening Pulse</p>
-              <h2 className="font-display text-2xl tablet:text-3xl">Top Albums Right Now</h2>
+              <p className="text-xs uppercase tracking-[0.4em] text-muted">Weekly Fresh Pull</p>
+              <h2 className="font-display text-2xl tablet:text-3xl">Recent Releases</h2>
             </div>
-            <button
-              type="button"
-              onClick={() => setShowAllTopAlbums((prev) => !prev)}
-              className="w-fit text-xs uppercase tracking-[0.35em] text-muted transition hover:text-white tablet:tracking-[0.5em]"
-            >
-              {showAllTopAlbums ? 'Show less' : 'See all'}
-            </button>
           </div>
-          <AlbumGrid 
-            albums={visibleTopAlbums} 
-            loading={loading} 
-            error={error} 
-            onSelect={handleAlbumSelect} 
+          <AlbumGrid
+            albums={recentAlbums}
+            loading={recentLoading}
+            error={recentError}
+            onSelect={handleAlbumSelect}
           />
         </section>
       </div>

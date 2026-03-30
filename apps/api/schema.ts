@@ -1,6 +1,6 @@
 import type { ReleaseSummary } from './types'
 
-import { boolean, index, integer, jsonb, pgEnum, pgTable, text, timestamp, uniqueIndex } from 'drizzle-orm/pg-core'
+import { boolean, index, integer, jsonb, pgEnum, pgTable, primaryKey, real, text, timestamp, uniqueIndex } from 'drizzle-orm/pg-core'
 
 export const user = pgTable(
   'user',
@@ -82,6 +82,37 @@ export const featuredCache = pgTable(
     updatedAt: timestamp('updatedAt', { withTimezone: true, mode: 'date' }).notNull(),
   },
   (table) => [index('featured_cache_expires_at_idx').on(table.expiresAt)],
+)
+
+export const storedTrendingAlbum = pgTable(
+  'stored_trending_album',
+  {
+    mode: text('mode').notNull(),
+    albumId: text('albumId').notNull(),
+    rank: integer('rank').notNull(),
+    name: text('name').notNull(),
+    artists: jsonb('artists').$type<string[]>().notNull(),
+    releaseDate: text('releaseDate'),
+    releaseYear: integer('releaseYear'),
+    cover: text('cover').notNull().default(''),
+    totalTracks: integer('totalTracks').notNull().default(0),
+    albumType: text('albumType').notNull().default('Release'),
+    label: text('label'),
+    popularity: integer('popularity').notNull().default(0),
+    externalUrls: jsonb('externalUrls').$type<{ discogs?: string }>().notNull().default({}),
+    genres: jsonb('genres').$type<string[]>().notNull().default([]),
+    communityRating: real('communityRating').notNull().default(0),
+    reviewCount: integer('reviewCount').notNull().default(0),
+    firstSeenAt: timestamp('firstSeenAt', { withTimezone: true, mode: 'date' }).notNull(),
+    lastSeenAt: timestamp('lastSeenAt', { withTimezone: true, mode: 'date' }).notNull(),
+    createdAt: timestamp('createdAt', { withTimezone: true, mode: 'date' }).notNull(),
+    updatedAt: timestamp('updatedAt', { withTimezone: true, mode: 'date' }).notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.mode, table.albumId], name: 'stored_trending_album_pk' }),
+    index('stored_trending_album_mode_last_seen_idx').on(table.mode, table.lastSeenAt),
+    index('stored_trending_album_mode_rank_idx').on(table.mode, table.rank),
+  ],
 )
 
 export const searchCache = pgTable(

@@ -750,7 +750,7 @@ const upsertFeatured = async (mode: FeaturedMode, payload: ReleaseSummary[]) => 
     })
 }
 
-const fetchFeaturedFromDiscogs = async (targetSize = FEATURED_REFRESH_SIZE) => {
+export const fetchFeaturedSnapshotFromDiscogs = async (targetSize = FEATURED_REFRESH_SIZE) => {
   const response = await requestDiscogs('/database/search', {
     per_page: Math.max(targetSize * 2, 36),
     type: 'release',
@@ -805,7 +805,7 @@ const refreshFeaturedMode = async (mode: FeaturedMode) => {
     const payload =
       mode === 'recent-popular'
         ? await fetchRecentPopularFromDiscogs(FEATURED_REFRESH_SIZE)
-        : await fetchFeaturedFromDiscogs(FEATURED_REFRESH_SIZE)
+        : await fetchFeaturedSnapshotFromDiscogs(FEATURED_REFRESH_SIZE)
     await upsertFeatured(mode, payload)
     return payload
   })()

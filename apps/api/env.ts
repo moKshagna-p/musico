@@ -51,6 +51,7 @@ export const env = {
   DISCOGS_MIN_REQUEST_INTERVAL_MS: parsePositiveInteger(readEnv('DISCOGS_MIN_REQUEST_INTERVAL_MS'), 350),
   DISCOGS_MAX_RETRIES: parsePositiveInteger(readEnv('DISCOGS_MAX_RETRIES'), 4),
   RELEASE_CACHE_MAX_ENTRIES: parsePositiveInteger(readEnv('RELEASE_CACHE_MAX_ENTRIES'), 1500),
+  CRON_SECRET: sanitizeOptionalSecret(readEnv('CRON_SECRET')),
 } as const
 
 export const validateProductionEnv = () => {

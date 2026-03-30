@@ -4,7 +4,7 @@ import { and, desc, eq, ilike, inArray, lt, or, sql } from 'drizzle-orm'
 
 import { auth } from './auth'
 import { db } from './db'
-import { getFeaturedReleases, getRecentPopularReleases, getReleaseDetails, searchReleases } from './discogs'
+import { getRecentPopularReleases, getReleaseDetails, searchReleases } from './discogs'
 import { env, validateProductionEnv } from './env'
 import {
   activity,
@@ -16,6 +16,12 @@ import {
   userRating,
   userReview,
 } from './schema'
+import {
+  getFeaturedFallbackReleases,
+  getStoredTrendingAlbums,
+  isStoredTrendingTableMissingError,
+  refreshStoredHomeAlbums,
+} from './trending'
 
 validateProductionEnv()
 
@@ -112,6 +118,25 @@ const ensureAuthenticated = async (request: Request, set: { status?: number }) =
     return null
   }
   return user
+}
+
+const authorizeCron = (request: Request, set: { status?: number }) => {
+  if (!env.CRON_SECRET) {
+    set.status = 500
+    return { error: 'CRON_SECRET is not configured.' }
+  }
+
+  const authorization = request.headers.get('authorization') ?? ''
+  const bearerToken = authorization.startsWith('Bearer ') ? authorization.slice(7).trim() : ''
+  const headerToken = request.headers.get('x-cron-secret')?.trim() ?? ''
+  const providedSecret = bearerToken || headerToken
+
+  if (providedSecret !== env.CRON_SECRET) {
+    set.status = 401
+    return { error: 'Unauthorized cron request.' }
+  }
+
+  return null
 }
 
 // Helper to record an activity event (fire-and-forget, never blocks the response)
@@ -1361,15 +1386,76 @@ const app = new Elysia()
 
   // ── Existing public routes ──
 
+  .get('/api/cron/home-refresh', async ({ query, request, set }) => {
+    const authError = authorizeCron(request, set)
+    if (authError) return authError
+
+    try {
+      const happeningLimitParam = Number(query?.happeningLimit)
+      const recentLimitParam = Number(query?.recentLimit)
+      const happeningLimit = Number.isFinite(happeningLimitParam) ? Math.min(Math.max(happeningLimitParam, 1), 50) : 12
+      const recentLimit = Number.isFinite(recentLimitParam) ? Math.min(Math.max(recentLimitParam, 1), 50) : 24
+      const result = await refreshStoredHomeAlbums({ happeningLimit, recentLimit })
+      set.headers ??= {}
+      set.headers['Cache-Control'] = 'no-store'
+      return {
+        ok: true,
+        refreshedAt: new Date().toISOString(),
+        mostHappening: {
+          insertedOrUpdated: result.mostHappening.insertedOrUpdated,
+          snapshotSize: result.mostHappening.data.length,
+          refreshedAt: result.mostHappening.refreshedAt.toISOString(),
+        },
+        recentReleases: {
+          insertedOrUpdated: result.recentReleases.insertedOrUpdated,
+          snapshotSize: result.recentReleases.data.length,
+          refreshedAt: result.recentReleases.refreshedAt.toISOString(),
+        },
+      }
+    } catch (error) {
+      if (isStoredTrendingTableMissingError(error)) {
+        set.status = 503
+        return { error: 'stored_trending_album table is missing. Run the latest database migration first.' }
+      }
+      console.error('[cron.home-refresh] error', error)
+      set.status = 502
+      return { error: 'Unable to refresh stored homepage releases right now.' }
+    }
+  })
+
   .get('/api/featured', async ({ query, set }) => {
     try {
       const limitParam = Number(query?.limit)
       const limit = Number.isFinite(limitParam) ? Math.min(Math.max(limitParam, 1), 50) : 24
       const mode = String(query?.mode ?? '').toLowerCase()
-      const data =
-        mode === 'recent-popular'
-          ? await getRecentPopularReleases(limit)
-          : await getFeaturedReleases(limit)
+      let data
+
+      if (mode === 'recent-popular') {
+        try {
+          data = await getStoredTrendingAlbums(limit, 'recent-popular')
+          if (!data.length) {
+            console.warn('[featured] recent release snapshot empty, falling back to Discogs cache')
+            data = await getRecentPopularReleases(limit)
+          }
+        } catch (error) {
+          if (!isStoredTrendingTableMissingError(error)) throw error
+          console.warn('[featured] stored_trending_album missing for recent releases, falling back to Discogs cache')
+          data = await getRecentPopularReleases(limit)
+        }
+      } else {
+        try {
+          data = await getStoredTrendingAlbums(limit)
+          if (!data.length) {
+            console.warn('[featured] most happening snapshot empty, falling back to Discogs cache')
+            data = await getFeaturedFallbackReleases(limit)
+          }
+        } catch (error) {
+          if (!isStoredTrendingTableMissingError(error)) throw error
+          console.warn('[featured] stored_trending_album missing for most happening, falling back to Discogs cache')
+          data = await getFeaturedFallbackReleases(limit)
+        }
+      }
+
       set.headers ??= {}
       set.headers['Cache-Control'] = 'public, max-age=60'
       return { data }
