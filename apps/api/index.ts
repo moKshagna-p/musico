@@ -160,6 +160,42 @@ const authorizeCron = (request: Request, set: { status?: number }) => {
   return null
 }
 
+const attachMusicoCommunityStats = async <T extends { id: string; communityRating?: number; reviewCount?: number }>(
+  releases: T[],
+) => {
+  const releaseIds = [...new Set(releases.map((release) => String(release.id ?? '').trim()).filter(Boolean))]
+  if (!releaseIds.length) return releases
+
+  const ratingRows = await db
+    .select({
+      albumId: userRating.albumId,
+      averageRating: sql<number>`coalesce(avg(${userRating.rating}), 0)`,
+      ratingCount: sql<number>`count(*)`,
+    })
+    .from(userRating)
+    .where(inArray(userRating.albumId, releaseIds))
+    .groupBy(userRating.albumId)
+
+  const statsByAlbumId = new Map(
+    ratingRows.map((row) => [
+      row.albumId,
+      {
+        communityRating: Number(Number(row.averageRating ?? 0).toFixed(1)),
+        reviewCount: Number(row.ratingCount ?? 0),
+      },
+    ]),
+  )
+
+  return releases.map((release) => {
+    const stats = statsByAlbumId.get(String(release.id))
+    return {
+      ...release,
+      communityRating: stats?.communityRating ?? 0,
+      reviewCount: stats?.reviewCount ?? 0,
+    }
+  })
+}
+
 // Helper to record an activity event (fire-and-forget, never blocks the response)
 const recordActivity = (params: {
   userId: string
@@ -1079,6 +1115,7 @@ const app = new Elysia()
           id: item.userId,
           name: actor?.name ?? 'Unknown',
           username: actorProfile?.username ?? null,
+          image: actor?.image ?? null,
         },
         albumId: item.albumId,
         albumName: item.albumName,
@@ -1088,6 +1125,7 @@ const app = new Elysia()
               id: target.id,
               name: target.name,
               username: targetProfile?.username ?? null,
+              image: target.image ?? null,
             }
           : null,
         metadata: item.metadata,
@@ -1530,7 +1568,7 @@ const app = new Elysia()
 
       set.headers ??= {}
       set.headers['Cache-Control'] = 'public, max-age=60'
-      return { data }
+      return { data: await attachMusicoCommunityStats(data) }
     } catch (error) {
       console.error('[featured] error', error)
       set.status = 502
@@ -1545,10 +1583,11 @@ const app = new Elysia()
     }
     try {
       const result = await searchReleases(q)
+      const data = await attachMusicoCommunityStats(result.data)
       set.headers ??= {}
       set.headers['Cache-Control'] = 'public, max-age=60'
       return {
-        data: result.data,
+        data,
         ...(result.correctedQuery ? { correctedQuery: result.correctedQuery } : {}),
       }
     } catch (error) {
@@ -1587,9 +1626,10 @@ const app = new Elysia()
     }
     try {
       const data = await getReleaseDetails(params.id)
+      const [hydrated] = await attachMusicoCommunityStats([data])
       set.headers ??= {}
       set.headers['Cache-Control'] = 'public, max-age=60'
-      return data
+      return hydrated
     } catch (error) {
       console.error('[release] error', error)
       set.status = 502

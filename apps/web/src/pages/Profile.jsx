@@ -30,7 +30,12 @@ const FollowListModal = ({ title, users, loading, onClose }) => (
           <p className="text-sm text-muted">Loading…</p>
         ) : users.length ? (
           users.map((person) => (
-            <div key={person.userId} className="flex items-center gap-3 rounded-xl border border-outline/60 bg-canvas/30 px-4 py-3">
+            <Link
+              key={person.userId}
+              to={person.username ? `/profile/${person.username}` : '#'}
+              onClick={person.username ? onClose : undefined}
+              className="flex items-center gap-3 rounded-xl border border-outline/60 bg-canvas/30 px-4 py-3 transition hover:border-outline hover:bg-canvas/40"
+            >
               {person.image ? (
                 <img src={person.image} alt="" className="h-11 w-11 rounded-full object-cover ring-1 ring-white/10" />
               ) : (
@@ -42,7 +47,7 @@ const FollowListModal = ({ title, users, loading, onClose }) => (
                 <p className="truncate text-sm font-semibold text-white">{person.name}</p>
                 {person.username && <p className="truncate text-xs text-muted">@{person.username}</p>}
               </div>
-            </div>
+            </Link>
           ))
         ) : (
           <p className="text-sm text-muted">No users here yet.</p>

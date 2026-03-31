@@ -77,6 +77,15 @@ const ActivityCard = ({ item }) => {
             className="h-14 w-14 rounded-xl object-cover ring-1 ring-white/10"
           />
         </Link>
+      ) : actor?.image ? (
+        <img
+          src={actor.image}
+          alt=""
+          width={56}
+          height={56}
+          loading="lazy"
+          className="h-14 w-14 shrink-0 rounded-xl object-cover ring-1 ring-white/10"
+        />
       ) : (
         <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-white/[0.06] text-lg font-bold text-white/40 ring-1 ring-white/10" aria-hidden="true">
           {actor?.name?.charAt(0)?.toUpperCase() ?? '?'}

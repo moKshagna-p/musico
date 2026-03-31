@@ -33,6 +33,13 @@ export const checkUsernameAvailability = async (username) => {
   return response?.data ?? { available: false, valid: false }
 }
 
+export const fetchUserProfile = async (username) => {
+  const response = await requestPrivateJson(`/api/users/${encodeURIComponent(username)}`, {
+    fallbackMessage: 'Unable to load user profile.',
+  })
+  return response?.data ?? null
+}
+
 // ── User Search ──
 
 export const searchUsers = async (query, { limit = 20, offset = 0 } = {}) => {

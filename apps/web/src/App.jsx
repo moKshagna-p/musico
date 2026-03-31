@@ -11,6 +11,7 @@ const Home = lazy(() => import('./pages/Home.jsx'))
 const Discover = lazy(() => import('./pages/Discover.jsx'))
 const SearchResults = lazy(() => import('./pages/SearchResults.jsx'))
 const Profile = lazy(() => import('./pages/Profile.jsx'))
+const UserProfile = lazy(() => import('./pages/UserProfile.jsx'))
 const Feed = lazy(() => import('./pages/Feed.jsx'))
 const PublicList = lazy(() => import('./pages/PublicList.jsx'))
 const Auth = lazy(() => import('./pages/Auth.jsx'))
@@ -111,6 +112,7 @@ const App = () => {
                 <Route path="/discover" element={<Discover />} />
                 <Route path="/search" element={<SearchResults />} />
                 <Route path="/profile" element={<Profile />} />
+                <Route path="/profile/:username" element={<UserProfile />} />
                 <Route path="/feed" element={<Feed />} />
                 <Route path="/lists/:listId" element={<PublicList />} />
                 <Route path="/auth" element={<Auth />} />
