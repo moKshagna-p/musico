@@ -36,6 +36,13 @@
       "when": 1774517978371,
       "tag": "0004_known_greymalkin",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1774880000000,
+      "tag": "0005_search_signal",
+      "breakpoints": true
     }
   ]
 }

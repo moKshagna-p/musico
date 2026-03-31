@@ -4,7 +4,13 @@ import type { ReleaseSummary } from './types'
 
 import { fetchBillboard200Albums } from './charts'
 import { db } from './db'
-import { getFeaturedReleases, getRecentPopularReleases, searchReleases } from './discogs'
+import {
+  fetchRecentReleaseCandidatesFromDiscogs,
+  getFeaturedReleases,
+  getRecentPopularReleases,
+  searchReleases,
+} from './discogs'
+import { getTopSearchQueries } from './searchSignals'
 import { storedTrendingAlbum } from './schema'
 
 type StoredMode = 'featured' | 'recent-popular'
@@ -92,6 +98,18 @@ const pickBestDiscogsMatch = (
   return best.release
 }
 
+const parseReleaseTimestamp = (release: ReleaseSummary) => {
+  const releaseDate = String(release.releaseDate ?? '').trim()
+  if (releaseDate) {
+    const parsed = new Date(releaseDate)
+    if (!Number.isNaN(parsed.getTime())) return parsed.getTime()
+  }
+  if (Number(release.releaseYear ?? 0) > 0) {
+    return new Date(`${release.releaseYear}-01-01`).getTime()
+  }
+  return 0
+}
+
 const getMostHappeningAlbums = async (limit = 12) => {
   const chartAlbums = await fetchBillboard200Albums(limit)
   const matches: ReleaseSummary[] = []
@@ -110,9 +128,75 @@ const getMostHappeningAlbums = async (limit = 12) => {
   return Array.from(new Map(matches.map((release) => [release.id, release])).values()).slice(0, limit)
 }
 
+const getStoredAlbumIds = async (mode: StoredMode) => {
+  const rows = await db
+    .select({ albumId: storedTrendingAlbum.albumId })
+    .from(storedTrendingAlbum)
+    .where(eq(storedTrendingAlbum.mode, mode))
+
+  return new Set(rows.map((row) => row.albumId))
+}
+
+const selectSearchDrivenRecentReleases = async (limit: number) => {
+  const [topQueries, existingAlbumIds] = await Promise.all([
+    getTopSearchQueries(Math.max(limit, 12)),
+    getStoredAlbumIds('recent-popular'),
+  ])
+
+  const now = Date.now()
+  const recentCutoff = new Date(new Date().getFullYear() - 1, 0, 1).getTime()
+  const queryResults = await Promise.all(
+    topQueries.map(async ({ displayQuery, searchCount }) => {
+      try {
+        const result = await searchReleases(displayQuery)
+        const recentMatches = (result.data ?? [])
+          .filter((release) => parseReleaseTimestamp(release) >= recentCutoff)
+          .sort((a, b) => {
+            const dateDiff = parseReleaseTimestamp(b) - parseReleaseTimestamp(a)
+            if (dateDiff !== 0) return dateDiff
+            return Number(b.popularity ?? 0) - Number(a.popularity ?? 0)
+          })
+          .slice(0, 2)
+          .map((release, index) => ({
+            release,
+            score:
+              searchCount * 1000 +
+              Math.max(0, 365 * 24 * 60 * 60 * 1000 - Math.abs(now - parseReleaseTimestamp(release))) / 1000000 -
+              index * 25,
+          }))
+
+        return recentMatches
+      } catch {
+        return []
+      }
+    }),
+  )
+
+  const ranked = queryResults
+    .flat()
+    .sort((a, b) => b.score - a.score)
+    .map((entry) => entry.release)
+
+  const uniqueRanked = Array.from(new Map(ranked.map((release) => [release.id, release])).values())
+  const unseen = uniqueRanked.filter((release) => !existingAlbumIds.has(release.id))
+  const seen = uniqueRanked.filter((release) => existingAlbumIds.has(release.id))
+
+  return [...unseen, ...seen].slice(0, limit)
+}
+
+const selectRecentReleaseSnapshot = async (limit: number) => {
+  const searchDriven = await selectSearchDrivenRecentReleases(limit)
+  if (searchDriven.length >= limit) return searchDriven
+
+  const existingIds = new Set(searchDriven.map((release) => release.id))
+  const fallbackCandidates = await fetchRecentReleaseCandidatesFromDiscogs(Math.max(limit * 4, 48))
+  const fallback = fallbackCandidates.filter((release) => !existingIds.has(release.id))
+  return [...searchDriven, ...fallback].slice(0, limit)
+}
+
 const getSourceSnapshotByMode = async (mode: StoredMode, limit: number) => {
   if (mode === 'recent-popular') {
-    return getRecentPopularReleases(limit, true)
+    return selectRecentReleaseSnapshot(limit)
   }
 
   return getMostHappeningAlbums(limit)
@@ -240,3 +324,4 @@ export const refreshStoredHomeAlbums = async (params?: { happeningLimit?: number
 }
 
 export const getFeaturedFallbackReleases = async (limit = 24) => getFeaturedReleases(limit)
+export const getRecentPopularFallbackReleases = async (limit = 24) => getRecentPopularReleases(limit)

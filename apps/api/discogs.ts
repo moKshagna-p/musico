@@ -365,7 +365,7 @@ const releaseScore = (release: ReleaseSummary) => {
   if ((release.reviewCount ?? 0) > 0) score += 2
   if (release.communityRating && release.communityRating > 0) score += Math.floor(release.communityRating)
   
-  const albumType = (release.albumType ?? '').toLowerCase()
+  const albumType = String(release.albumType ?? '').toLowerCase()
   if (albumType === 'album' || albumType === 'lp') score += 10
   if (albumType.includes('single') || albumType.includes('ep')) score -= 5
   if (hasVariantMarker(release.name)) score -= 10
@@ -795,6 +795,87 @@ const fetchRecentPopularFromDiscogs = async (targetSize = FEATURED_REFRESH_SIZE)
 
   const ranked = [...recentFirst, ...olderFallback]
   return hydrateReleasesWithDetails(ranked.slice(0, targetSize))
+}
+
+const getIsoWeekNumber = (date: Date) => {
+  const utcDate = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()))
+  const dayNumber = utcDate.getUTCDay() || 7
+  utcDate.setUTCDate(utcDate.getUTCDate() + 4 - dayNumber)
+  const yearStart = new Date(Date.UTC(utcDate.getUTCFullYear(), 0, 1))
+  return Math.ceil((((utcDate.getTime() - yearStart.getTime()) / 86400000) + 1) / 7)
+}
+
+const parseReleaseDateValue = (release: ReleaseSummary) => {
+  const rawDate = String(release.releaseDate ?? '').trim()
+  if (rawDate) {
+    const parsed = new Date(rawDate)
+    if (!Number.isNaN(parsed.getTime())) return parsed.getTime()
+
+    const yearMonthMatch = rawDate.match(/^(\d{4})-(\d{2})$/)
+    if (yearMonthMatch) {
+      const parsedMonth = new Date(`${yearMonthMatch[1]}-${yearMonthMatch[2]}-01`)
+      if (!Number.isNaN(parsedMonth.getTime())) return parsedMonth.getTime()
+    }
+
+    const yearMatch = rawDate.match(/^(\d{4})$/)
+    if (yearMatch) {
+      return new Date(`${yearMatch[1]}-01-01`).getTime()
+    }
+  }
+
+  if (Number(release.releaseYear ?? 0) > 0) {
+    return new Date(`${release.releaseYear}-01-01`).getTime()
+  }
+
+  return 0
+}
+
+export const fetchRecentReleaseCandidatesFromDiscogs = async (targetSize = FEATURED_REFRESH_SIZE * 3) => {
+  const currentDate = new Date()
+  const currentYear = currentDate.getFullYear()
+  const isoWeek = getIsoWeekNumber(currentDate)
+  const rotatingPage = Math.max(1, (isoWeek % 4) + 1)
+  const perPage = Math.min(100, Math.max(targetSize * 2, 50))
+  const requestPlan = [
+    { year: currentYear, pages: [1, rotatingPage, rotatingPage + 1] },
+    { year: currentYear - 1, pages: [1, rotatingPage] },
+  ]
+
+  const responses = await Promise.all(
+    requestPlan.flatMap(({ year, pages }) =>
+      Array.from(new Set(pages)).map((page) =>
+        requestDiscogs('/database/search', {
+          per_page: perPage,
+          page,
+          type: 'release',
+          format: 'album',
+          year,
+          sort: 'year',
+          sort_order: 'desc',
+        }),
+      ),
+    ),
+  )
+
+  const normalized = responses.flatMap((response) => mapDiscogsSearchResults(response?.results ?? []))
+  const curated = dedupeReleasedAlbums(normalized)
+  const now = currentDate.getTime()
+  const recentWindowStart = new Date(currentYear - 1, 0, 1).getTime()
+
+  const ranked = curated
+    .filter((release) => parseReleaseDateValue(release) >= recentWindowStart || Number(release.releaseYear ?? 0) >= currentYear - 1)
+    .sort((a, b) => {
+      const dateDiff = parseReleaseDateValue(b) - parseReleaseDateValue(a)
+      if (dateDiff !== 0) return dateDiff
+
+      const agePenaltyA = Math.abs(now - parseReleaseDateValue(a))
+      const agePenaltyB = Math.abs(now - parseReleaseDateValue(b))
+      if (agePenaltyA !== agePenaltyB) return agePenaltyA - agePenaltyB
+
+      return Number(b.popularity ?? 0) - Number(a.popularity ?? 0)
+    })
+
+  return hydrateReleasesWithDetails(ranked.slice(0, Math.max(targetSize, FEATURED_REFRESH_SIZE)))
 }
 
 const refreshFeaturedMode = async (mode: FeaturedMode) => {

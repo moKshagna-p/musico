@@ -76,7 +76,7 @@ const Discover = () => {
         />
 
         <div>
-          <p className="mb-4 text-xs uppercase tracking-[0.4em] text-muted">Featured Releases</p>
+          <p className="mb-4 text-xs uppercase tracking-[0.4em] text-muted">Recent Releases</p>
           <AlbumGrid albums={albums} loading={loading} error={error} onSelect={handleAlbumSelect} />
         </div>
       </div>

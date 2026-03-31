@@ -115,6 +115,22 @@ export const storedTrendingAlbum = pgTable(
   ],
 )
 
+export const userSearchTrend = pgTable(
+  'user_search_trend',
+  {
+    normalizedQuery: text('normalizedQuery').primaryKey(),
+    displayQuery: text('displayQuery').notNull(),
+    searchCount: integer('searchCount').notNull().default(1),
+    createdAt: timestamp('createdAt', { withTimezone: true, mode: 'date' }).notNull(),
+    updatedAt: timestamp('updatedAt', { withTimezone: true, mode: 'date' }).notNull(),
+    lastSearchedAt: timestamp('lastSearchedAt', { withTimezone: true, mode: 'date' }).notNull(),
+  },
+  (table) => [
+    index('user_search_trend_last_searched_idx').on(table.lastSearchedAt),
+    index('user_search_trend_search_count_idx').on(table.searchCount),
+  ],
+)
+
 export const searchCache = pgTable(
   'search_cache',
   {

@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { FiArrowLeft } from 'react-icons/fi'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 
@@ -8,6 +8,7 @@ import SearchBar from '../components/SearchBar.jsx'
 import { useAlbums } from '../hooks/useAlbums.js'
 import { useAuth } from '../hooks/useAuth.js'
 import { addToSearchHistory } from '../services/searchHistoryService.js'
+import { recordSearchSignal } from '../services/searchSignalService.js'
 
 const SearchResults = () => {
   const navigate = useNavigate()
@@ -16,14 +17,26 @@ const SearchResults = () => {
   const historyScope = user?.id ?? 'guest'
   const enableHistory = !isPending && Boolean(user?.id)
   const initialQuery = searchParams.get('q') ?? ''
+  const lastLoggedQueryRef = useRef('')
 
   const { albums, query, setQuery, loading, error, correctedQuery } = useAlbums(initialQuery)
+
+  const logSearch = (value) => {
+    const trimmed = value?.trim() ?? ''
+    if (!trimmed) return
+
+    const normalized = trimmed.toLowerCase()
+    if (lastLoggedQueryRef.current === normalized) return
+    lastLoggedQueryRef.current = normalized
+    void recordSearchSignal(trimmed)
+  }
 
   useEffect(() => {
     if (initialQuery) {
       setQuery(initialQuery)
       if (enableHistory) {
         addToSearchHistory(initialQuery, historyScope)
+        logSearch(initialQuery)
       }
     }
   }, [enableHistory, historyScope, initialQuery, setQuery])
@@ -33,6 +46,7 @@ const SearchResults = () => {
     if (value?.trim()) {
       if (enableHistory) {
         addToSearchHistory(value, historyScope)
+        logSearch(value)
       }
       const params = new URLSearchParams()
       params.set('q', value)

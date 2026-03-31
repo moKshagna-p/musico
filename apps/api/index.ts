@@ -6,6 +6,7 @@ import { auth } from './auth'
 import { db } from './db'
 import { getRecentPopularReleases, getReleaseDetails, searchReleases } from './discogs'
 import { env, validateProductionEnv } from './env'
+import { recordSearchQuery } from './searchSignals'
 import {
   activity,
   user,
@@ -18,8 +19,10 @@ import {
 } from './schema'
 import {
   getFeaturedFallbackReleases,
+  getRecentPopularFallbackReleases,
   getStoredTrendingAlbums,
   isStoredTrendingTableMissingError,
+  refreshStoredTrendingAlbums,
   refreshStoredHomeAlbums,
 } from './trending'
 
@@ -1423,6 +1426,34 @@ const app = new Elysia()
     }
   })
 
+  .get('/api/cron/recent-releases-refresh', async ({ query, request, set }) => {
+    const authError = authorizeCron(request, set)
+    if (authError) return authError
+
+    try {
+      const limitParam = Number(query?.limit)
+      const limit = Number.isFinite(limitParam) ? Math.min(Math.max(limitParam, 1), 50) : 24
+      const result = await refreshStoredTrendingAlbums('recent-popular', limit)
+      set.headers ??= {}
+      set.headers['Cache-Control'] = 'no-store'
+      return {
+        ok: true,
+        mode: 'recent-popular',
+        insertedOrUpdated: result.insertedOrUpdated,
+        snapshotSize: result.data.length,
+        refreshedAt: result.refreshedAt.toISOString(),
+      }
+    } catch (error) {
+      if (isStoredTrendingTableMissingError(error)) {
+        set.status = 503
+        return { error: 'stored_trending_album table is missing. Run the latest database migration first.' }
+      }
+      console.error('[cron.recent-releases-refresh] error', error)
+      set.status = 502
+      return { error: 'Unable to refresh stored recent releases right now.' }
+    }
+  })
+
   .get('/api/featured', async ({ query, set }) => {
     try {
       const limitParam = Number(query?.limit)
@@ -1435,12 +1466,12 @@ const app = new Elysia()
           data = await getStoredTrendingAlbums(limit, 'recent-popular')
           if (!data.length) {
             console.warn('[featured] recent release snapshot empty, falling back to Discogs cache')
-            data = await getRecentPopularReleases(limit)
+            data = await getRecentPopularFallbackReleases(limit)
           }
         } catch (error) {
           if (!isStoredTrendingTableMissingError(error)) throw error
           console.warn('[featured] stored_trending_album missing for recent releases, falling back to Discogs cache')
-          data = await getRecentPopularReleases(limit)
+          data = await getRecentPopularFallbackReleases(limit)
         }
       } else {
         try {
@@ -1483,6 +1514,29 @@ const app = new Elysia()
       console.error('[search] error', error)
       set.status = 502
       return { error: 'Search unavailable right now. Please try again shortly.' }
+    }
+  })
+  .post('/api/search-events', async ({ body, set }) => {
+    const typedBody = body as { query?: unknown }
+    const query = String(typedBody?.query ?? '').trim()
+    if (!query) {
+      set.status = 400
+      return { error: 'Missing search query.' }
+    }
+
+    try {
+      await recordSearchQuery(query)
+      set.headers ??= {}
+      set.headers['Cache-Control'] = 'no-store'
+      return { ok: true }
+    } catch (error) {
+      if (isStoredTrendingTableMissingError(error)) {
+        set.status = 503
+        return { error: 'Database migration is missing.' }
+      }
+      console.error('[search-events] error', error)
+      set.status = 500
+      return { error: 'Unable to record search query right now.' }
     }
   })
   .get('/api/releases/:id', async ({ params, set }) => {
