@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
-import { FiEdit2, FiExternalLink, FiLogOut, FiX } from 'react-icons/fi'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { FiEdit2, FiLogOut, FiUpload, FiX } from 'react-icons/fi'
 import { Link, useNavigate } from 'react-router-dom'
 
 import PageTransition from '../components/PageTransition.jsx'
@@ -10,7 +10,47 @@ import { useAuth } from '../hooks/useAuth.js'
 import { useLists } from '../hooks/useLists.js'
 import { useRatings } from '../hooks/useRatings.js'
 import { getReleaseDetails } from '../services/discogsService.js'
-import { fetchMyProfile, updateMyProfile } from '../services/socialService.js'
+import { fetchMyFollowers, fetchMyFollowing, fetchMyProfile, updateMyProfile } from '../services/socialService.js'
+
+const FollowListModal = ({ title, users, loading, onClose }) => (
+  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm">
+    <div className="relative mx-4 w-full max-w-lg rounded-2xl border border-outline bg-panel p-6">
+      <button
+        type="button"
+        onClick={onClose}
+        className="absolute right-4 top-4 p-1 text-muted transition-colors hover:text-white"
+        aria-label="Close"
+      >
+        <FiX className="h-5 w-5" />
+      </button>
+
+      <h2 className="font-display text-2xl font-bold">{title}</h2>
+      <div className="mt-5 max-h-[60vh] space-y-3 overflow-y-auto pr-1">
+        {loading ? (
+          <p className="text-sm text-muted">Loading…</p>
+        ) : users.length ? (
+          users.map((person) => (
+            <div key={person.userId} className="flex items-center gap-3 rounded-xl border border-outline/60 bg-canvas/30 px-4 py-3">
+              {person.image ? (
+                <img src={person.image} alt="" className="h-11 w-11 rounded-full object-cover ring-1 ring-white/10" />
+              ) : (
+                <div className="flex h-11 w-11 items-center justify-center rounded-full bg-outline/60 text-sm font-semibold text-muted">
+                  {person.name?.charAt(0)?.toUpperCase() ?? '?'}
+                </div>
+              )}
+              <div className="min-w-0">
+                <p className="truncate text-sm font-semibold text-white">{person.name}</p>
+                {person.username && <p className="truncate text-xs text-muted">@{person.username}</p>}
+              </div>
+            </div>
+          ))
+        ) : (
+          <p className="text-sm text-muted">No users here yet.</p>
+        )}
+      </div>
+    </div>
+  </div>
+)
 
 const Profile = () => {
   const navigate = useNavigate()
@@ -25,9 +65,16 @@ const Profile = () => {
   const [showUsernameSetup, setShowUsernameSetup] = useState(false)
   const [showEditModal, setShowEditModal] = useState(false)
   const [editBio, setEditBio] = useState('')
-  const [editIsPublic, setEditIsPublic] = useState(true)
+  const [editImage, setEditImage] = useState('')
   const [savingProfile, setSavingProfile] = useState(false)
   const [profileStatus, setProfileStatus] = useState('')
+  const [showFollowersModal, setShowFollowersModal] = useState(false)
+  const [showFollowingModal, setShowFollowingModal] = useState(false)
+  const [followers, setFollowers] = useState([])
+  const [following, setFollowing] = useState([])
+  const [followersLoading, setFollowersLoading] = useState(false)
+  const [followingLoading, setFollowingLoading] = useState(false)
+  const fileInputRef = useRef(null)
 
   useEffect(() => {
     if (!isPending && !user) {
@@ -47,7 +94,7 @@ const Profile = () => {
         if (!cancelled && data) {
           setSocialProfile(data)
           setEditBio(data.bio ?? '')
-          setEditIsPublic(data.isPublic ?? true)
+          setEditImage(data.image ?? '')
           if (!data.username) {
             setShowUsernameSetup(true)
           }
@@ -67,7 +114,7 @@ const Profile = () => {
 
   const openEditModal = useCallback(() => {
     setEditBio(socialProfile?.bio ?? '')
-    setEditIsPublic(socialProfile?.isPublic ?? true)
+    setEditImage(socialProfile?.image ?? '')
     setProfileStatus('')
     setShowEditModal(true)
   }, [socialProfile])
@@ -79,7 +126,7 @@ const Profile = () => {
     try {
       const updated = await updateMyProfile({
         bio: editBio.trim(),
-        isPublic: editIsPublic,
+        image: editImage.trim(),
       })
       setSocialProfile((prev) => ({ ...prev, ...updated }))
       setProfileStatus('Saved.')
@@ -89,7 +136,27 @@ const Profile = () => {
     } finally {
       setSavingProfile(false)
     }
-  }, [editBio, editIsPublic, savingProfile])
+  }, [editBio, editImage, savingProfile])
+
+  const openFollowers = useCallback(async () => {
+    setShowFollowersModal(true)
+    setFollowersLoading(true)
+    try {
+      setFollowers(await fetchMyFollowers())
+    } finally {
+      setFollowersLoading(false)
+    }
+  }, [])
+
+  const openFollowing = useCallback(async () => {
+    setShowFollowingModal(true)
+    setFollowingLoading(true)
+    try {
+      setFollowing(await fetchMyFollowing())
+    } finally {
+      setFollowingLoading(false)
+    }
+  }, [])
 
   const handleUsernameComplete = useCallback(async () => {
     setShowUsernameSetup(false)
@@ -98,11 +165,42 @@ const Profile = () => {
       if (data) {
         setSocialProfile(data)
         setEditBio(data.bio ?? '')
-        setEditIsPublic(data.isPublic ?? true)
+        setEditImage(data.image ?? '')
       }
     } catch {
       // ignore
     }
+  }, [])
+
+  const handleImageFileChange = useCallback((event) => {
+    const file = event.target.files?.[0]
+    if (!file) return
+
+    if (!file.type.startsWith('image/')) {
+      setProfileStatus('Please choose an image file.')
+      event.target.value = ''
+      return
+    }
+
+    const maxFileSizeBytes = 1024 * 1024 * 2
+    if (file.size > maxFileSizeBytes) {
+      setProfileStatus('Image must be smaller than 2MB.')
+      event.target.value = ''
+      return
+    }
+
+    const reader = new FileReader()
+    reader.onload = () => {
+      if (typeof reader.result === 'string') {
+        setEditImage(reader.result)
+        setProfileStatus('')
+      }
+    }
+    reader.onerror = () => {
+      setProfileStatus('Unable to read that image.')
+    }
+    reader.readAsDataURL(file)
+    event.target.value = ''
   }, [])
 
   const ratedItems = useMemo(
@@ -169,6 +267,24 @@ const Profile = () => {
         />
       )}
 
+      {showFollowersModal && (
+        <FollowListModal
+          title="Followers"
+          users={followers}
+          loading={followersLoading}
+          onClose={() => setShowFollowersModal(false)}
+        />
+      )}
+
+      {showFollowingModal && (
+        <FollowListModal
+          title="Following"
+          users={following}
+          loading={followingLoading}
+          onClose={() => setShowFollowingModal(false)}
+        />
+      )}
+
       {/* Edit Profile Modal */}
       {showEditModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm">
@@ -183,7 +299,7 @@ const Profile = () => {
             </button>
 
             <h2 className="font-display text-2xl font-bold">Edit Profile</h2>
-            <p className="mt-1 text-sm text-muted">Update your bio and privacy settings.</p>
+            <p className="mt-1 text-sm text-muted">Update your bio and profile picture.</p>
 
             <div className="mt-6 space-y-5">
               {socialProfile?.username && (
@@ -208,26 +324,43 @@ const Profile = () => {
                 <p className="mt-1 text-right text-xs tabular-nums text-muted/60">{editBio.length}/160</p>
               </div>
 
-              <div className="flex items-center justify-between rounded-lg border border-outline/60 bg-canvas/30 px-4 py-3">
-                <div>
-                  <p className="text-sm text-white">Public Profile</p>
-                  <p className="text-xs text-muted">{editIsPublic ? 'Anyone can see your profile' : 'Only you can see your profile'}</p>
+              <div>
+                <label className="block text-xs uppercase tracking-[0.2em] text-muted">Profile Picture</label>
+                <div className="mt-2 flex items-center gap-4 rounded-lg border border-outline/60 bg-canvas/30 p-4">
+                  {editImage ? (
+                    <img src={editImage} alt="" className="h-16 w-16 rounded-full object-cover ring-1 ring-white/10" />
+                  ) : (
+                    <div className="flex h-16 w-16 items-center justify-center rounded-full bg-outline/60 text-lg font-semibold text-muted">
+                      {(user.name ?? user.email)?.charAt(0)?.toUpperCase() ?? '?'}
+                    </div>
+                  )}
+                  <div className="flex flex-wrap gap-3">
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      className="inline-flex items-center gap-2 rounded-full border border-outline px-4 py-2 text-xs uppercase tracking-[0.2em] text-muted transition-colors hover:text-white"
+                    >
+                      <FiUpload aria-hidden="true" />
+                      Upload From Device
+                    </button>
+                    {editImage && (
+                      <button
+                        type="button"
+                        onClick={() => setEditImage('')}
+                        className="rounded-full border border-outline px-4 py-2 text-xs uppercase tracking-[0.2em] text-muted transition-colors hover:text-white"
+                      >
+                        Remove
+                      </button>
+                    )}
+                  </div>
                 </div>
-                <button
-                  type="button"
-                  role="switch"
-                  aria-checked={editIsPublic}
-                  onClick={() => setEditIsPublic((prev) => !prev)}
-                  className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full transition-colors duration-200 ${
-                    editIsPublic ? 'bg-white' : 'bg-outline'
-                  }`}
-                >
-                  <span
-                    className={`inline-block h-4 w-4 rounded-full transition-transform duration-200 ${
-                      editIsPublic ? 'translate-x-5 bg-canvas' : 'translate-x-1 bg-muted'
-                    }`}
-                  />
-                </button>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={handleImageFileChange}
+                  className="hidden"
+                />
               </div>
 
               {profileStatus && (
@@ -261,9 +394,17 @@ const Profile = () => {
       <div className="mx-auto w-full max-w-6xl py-4 tablet:py-8">
         <header className="py-8 text-center tablet:py-14">
           {/* Avatar circle */}
-          <div className="mx-auto mb-5 flex h-20 w-20 items-center justify-center rounded-full bg-outline/60 text-3xl font-bold text-muted">
-            {(user.name ?? user.email)?.charAt(0)?.toUpperCase() ?? '?'}
-          </div>
+          {socialProfile?.image ? (
+            <img
+              src={socialProfile.image}
+              alt=""
+              className="mx-auto mb-5 h-20 w-20 rounded-full object-cover ring-1 ring-white/10"
+            />
+          ) : (
+            <div className="mx-auto mb-5 flex h-20 w-20 items-center justify-center rounded-full bg-outline/60 text-3xl font-bold text-muted">
+              {(user.name ?? user.email)?.charAt(0)?.toUpperCase() ?? '?'}
+            </div>
+          )}
 
           <h1 className="mx-auto max-w-4xl break-words font-display text-4xl font-bold leading-tight tablet:text-7xl">
             {user.name || user.email}
@@ -281,14 +422,14 @@ const Profile = () => {
           {/* Follower / Following counts */}
           {socialProfile && (
             <div className="mt-5 flex items-center justify-center gap-8 text-sm">
-              <div>
+              <button type="button" onClick={openFollowers} className="transition hover:text-white">
                 <span className="font-semibold text-white">{socialProfile.followerCount ?? 0}</span>
                 <span className="ml-1 text-muted">followers</span>
-              </div>
-              <div>
+              </button>
+              <button type="button" onClick={openFollowing} className="transition hover:text-white">
                 <span className="font-semibold text-white">{socialProfile.followingCount ?? 0}</span>
                 <span className="ml-1 text-muted">following</span>
-              </div>
+              </button>
             </div>
           )}
 
@@ -303,16 +444,6 @@ const Profile = () => {
               Edit Profile
             </button>
 
-            {socialProfile?.username && (
-              <Link
-                to={`/u/${socialProfile.username}`}
-                className="inline-flex items-center gap-2 rounded-full border border-outline px-4 py-2 text-xs uppercase tracking-[0.24em] text-muted transition-colors duration-200 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas tablet:tracking-[0.3em]"
-              >
-                <FiExternalLink aria-hidden="true" />
-                Public Profile
-              </Link>
-            )}
-
             {!socialProfile?.username && !profileLoading && (
               <button
                 type="button"
@@ -322,7 +453,6 @@ const Profile = () => {
                 Set Username
               </button>
             )}
-
             <button
               type="button"
               onClick={handleSignOut}

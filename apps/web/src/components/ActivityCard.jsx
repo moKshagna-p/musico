@@ -6,13 +6,7 @@ const ActivityCard = ({ item }) => {
 
   const timeAgo = formatTimeAgo(createdAt)
 
-  const userLink = actor?.username ? (
-    <Link to={`/u/${actor.username}`} className="font-semibold text-white hover:underline">
-      {actor.name}
-    </Link>
-  ) : (
-    <span className="font-semibold text-white">{actor?.name ?? 'Unknown'}</span>
-  )
+  const userLink = <span className="font-semibold text-white">{actor?.name ?? 'Unknown'}</span>
 
   const albumLink = albumId ? (
     <Link to={`/album/${albumId}`} className="font-semibold text-white hover:underline">
@@ -20,14 +14,7 @@ const ActivityCard = ({ item }) => {
     </Link>
   ) : null
 
-  const targetLink =
-    targetUser?.username ? (
-      <Link to={`/u/${targetUser.username}`} className="font-semibold text-white hover:underline">
-        {targetUser.name}
-      </Link>
-    ) : targetUser ? (
-      <span className="font-semibold text-white">{targetUser.name}</span>
-    ) : null
+  const targetLink = targetUser ? <span className="font-semibold text-white">{targetUser.name}</span> : null
 
   const renderContent = () => {
     switch (type) {

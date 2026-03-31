@@ -109,6 +109,24 @@ const parseReleaseYear = (value: unknown) => {
   return Number.isFinite(parsed) && parsed > 0 ? Math.round(parsed) : null
 }
 
+const parseProfileImage = (value: unknown) => {
+  const trimmed = String(value ?? '').trim()
+  if (!trimmed) return null
+
+  if (trimmed.startsWith('data:image/')) {
+    const maxBytes = 1024 * 1024 * 2
+    return trimmed.length <= maxBytes * 1.4 ? trimmed : null
+  }
+
+  try {
+    const url = new URL(trimmed)
+    if (url.protocol !== 'http:' && url.protocol !== 'https:') return null
+    return url.toString()
+  } catch {
+    return null
+  }
+}
+
 const getAuthUser = async (request: Request) => {
   const session = await auth.api.getSession({ headers: request.headers })
   return session?.user ?? null
@@ -554,6 +572,7 @@ const app = new Elysia()
         username: profile.username,
         bio: profile.bio,
         isPublic: profile.isPublic,
+        image: authUser.image ?? null,
         followerCount: followerRows.length,
         followingCount: followingRows.length,
       },
@@ -563,8 +582,9 @@ const app = new Elysia()
     const authUser = await ensureAuthenticated(request, set)
     if (!authUser) return { error: 'Unauthorized.' }
 
-    const typed = body as { username?: unknown; bio?: unknown; isPublic?: unknown }
+    const typed = body as { username?: unknown; bio?: unknown; isPublic?: unknown; image?: unknown }
     const updates: Record<string, unknown> = {}
+    const userUpdates: Record<string, unknown> = {}
     const now = new Date()
 
     // Validate and set username
@@ -601,7 +621,17 @@ const app = new Elysia()
       updates.isPublic = Boolean(typed.isPublic)
     }
 
-    if (!Object.keys(updates).length) {
+    if (typed.image !== undefined) {
+      const parsedImage = parseProfileImage(typed.image)
+      const rawImage = String(typed.image ?? '').trim()
+      if (rawImage && !parsedImage) {
+        set.status = 400
+        return { error: 'Profile image must be a valid http or https URL.' }
+      }
+      userUpdates.image = parsedImage
+    }
+
+    if (!Object.keys(updates).length && !Object.keys(userUpdates).length) {
       set.status = 400
       return { error: 'No valid fields to update.' }
     }
@@ -612,15 +642,24 @@ const app = new Elysia()
       .set({ ...updates, updatedAt: now })
       .where(eq(userProfile.userId, authUser.id))
 
-    const updated = await db.select().from(userProfile).where(eq(userProfile.userId, authUser.id)).limit(1)
+    if (Object.keys(userUpdates).length) {
+      await db
+        .update(user)
+        .set({ ...userUpdates, updatedAt: now })
+        .where(eq(user.id, authUser.id))
+    }
+
+    const [updatedProfile] = await db.select().from(userProfile).where(eq(userProfile.userId, authUser.id)).limit(1)
+    const [updatedUser] = await db.select().from(user).where(eq(user.id, authUser.id)).limit(1)
 
     set.headers ??= {}
     set.headers['Cache-Control'] = 'no-store'
     return {
       data: {
-        username: updated[0]?.username ?? null,
-        bio: updated[0]?.bio ?? '',
-        isPublic: updated[0]?.isPublic ?? true,
+        username: updatedProfile?.username ?? null,
+        bio: updatedProfile?.bio ?? '',
+        isPublic: updatedProfile?.isPublic ?? true,
+        image: updatedUser?.image ?? null,
       },
     }
   })
@@ -925,6 +964,7 @@ const app = new Elysia()
           userId: u.id,
           name: u.name,
           username: p?.username ?? null,
+          image: u.image ?? null,
           followedAt: f.createdAt.getTime(),
         }
       })
@@ -966,6 +1006,7 @@ const app = new Elysia()
           userId: u.id,
           name: u.name,
           username: p?.username ?? null,
+          image: u.image ?? null,
           followedAt: f.createdAt.getTime(),
         }
       })

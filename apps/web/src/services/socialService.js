@@ -9,11 +9,11 @@ export const fetchMyProfile = async () => {
   return response?.data ?? null
 }
 
-export const updateMyProfile = async ({ username, bio, isPublic }) => {
+export const updateMyProfile = async ({ username, bio, image }) => {
   const payload = {}
   if (username !== undefined) payload.username = username
   if (bio !== undefined) payload.bio = bio
-  if (isPublic !== undefined) payload.isPublic = isPublic
+  if (image !== undefined) payload.image = image
 
   const response = await requestPrivateJson('/api/me/profile', {
     method: 'PUT',
@@ -31,15 +31,6 @@ export const checkUsernameAvailability = async (username) => {
   })
 
   return response?.data ?? { available: false, valid: false }
-}
-
-// ── Public profiles ──
-
-export const fetchPublicProfile = async (username) => {
-  const response = await requestPrivateJson(`/api/users/${encodeURIComponent(username)}`, {
-    fallbackMessage: 'Unable to load user profile.',
-  })
-  return response?.data ?? null
 }
 
 // ── User Search ──

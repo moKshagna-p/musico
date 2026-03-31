@@ -80,13 +80,7 @@ const PublicList = () => {
 
           <div className="mt-4 flex items-center justify-center gap-2 text-sm text-muted">
             <span>by</span>
-            {list.owner?.username ? (
-              <Link to={`/u/${list.owner.username}`} className="font-semibold text-white hover:underline">
-                {list.owner.name}
-              </Link>
-            ) : (
-              <span className="font-semibold text-white">{list.owner?.name ?? 'Unknown'}</span>
-            )}
+            <span className="font-semibold text-white">{list.owner?.name ?? 'Unknown'}</span>
             <span className="text-muted/60">|</span>
             <span>{list.albumCount} albums</span>
           </div>

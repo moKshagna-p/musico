@@ -82,7 +82,7 @@ const UsernameSetup = ({ onComplete, onSkip }) => {
       <div className="mx-4 w-full max-w-md rounded-2xl border border-outline bg-panel p-8">
         <h2 className="font-display text-2xl font-bold">Choose your username</h2>
         <p className="mt-2 text-sm text-muted">
-          This will be your public profile URL. You can change it later.
+          This helps other users find and follow you. You can change it later.
         </p>
 
         <form onSubmit={handleSubmit} className="mt-6 space-y-4">
@@ -118,7 +118,7 @@ const UsernameSetup = ({ onComplete, onSkip }) => {
             )}
             {username.trim() && status === 'available' && (
               <p className="mt-1 text-xs text-muted">
-                musico.com/u/{username.trim().toLowerCase()}
+                Findable as @{username.trim().toLowerCase()}
               </p>
             )}
           </div>

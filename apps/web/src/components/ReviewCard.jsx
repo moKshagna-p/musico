@@ -1,4 +1,3 @@
-import { Link } from 'react-router-dom'
 import { FaStar } from 'react-icons/fa'
 
 const ReviewCard = ({ review }) => {
@@ -16,16 +15,7 @@ const ReviewCard = ({ review }) => {
             {displayName.charAt(0).toUpperCase()}
           </div>
           <div>
-            {username ? (
-              <Link
-                to={`/u/${username}`}
-                className="text-sm font-semibold text-white hover:underline"
-              >
-                {displayName}
-              </Link>
-            ) : (
-              <span className="text-sm font-semibold text-white">{displayName}</span>
-            )}
+            <span className="text-sm font-semibold text-white">{displayName}</span>
             {username && (
               <span className="ml-1.5 text-xs text-muted">@{username}</span>
             )}
