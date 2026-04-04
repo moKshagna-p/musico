@@ -57,6 +57,18 @@ const FollowListModal = ({ title, users, loading, onClose }) => (
   </div>
 )
 
+const formatReviewedAt = (timestamp) => {
+  if (!timestamp) return ''
+
+  const date = new Date(timestamp)
+  if (Number.isNaN(date.getTime())) return ''
+
+  return new Intl.DateTimeFormat('en', {
+    month: 'short',
+    day: 'numeric',
+  }).format(date)
+}
+
 const Profile = () => {
   const navigate = useNavigate()
   const { user, isPending, signOutCurrentUser } = useAuth()
@@ -475,18 +487,35 @@ const Profile = () => {
 
           <section>
             <h2 className="mb-8 text-center font-display text-3xl font-bold tablet:text-4xl">Recently Rated</h2>
-            <div className="grid grid-cols-1 gap-4 tablet:grid-cols-2 laptop:grid-cols-3">
+            <div className="flex snap-x snap-mandatory gap-4 overflow-x-auto pb-3 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
               {recentlyRated.map((album) => (
-                <Link to={`/album/${album.albumId}`} key={album.albumId}>
-                  <div className="group relative overflow-hidden rounded-lg">
-                    <img src={album.cover} alt={album.name} className="aspect-square w-full object-cover transition-transform duration-300 group-hover:scale-[1.03]" />
-                    <div className="absolute inset-0 bg-black/50 opacity-0 transition-opacity duration-300 group-hover:opacity-100">
-                      <div className="flex h-full items-center justify-center text-center">
-                        <div>
-                          <h2 className="font-bold text-white">{album.name}</h2>
-                          <p className="text-white">{album.artist ?? album.artists?.[0] ?? 'Unknown artist'}</p>
-                        </div>
+                <Link
+                  to={`/album/${album.albumId}`}
+                  key={album.albumId}
+                  className="group min-w-[220px] max-w-[220px] flex-none snap-start"
+                >
+                  <div className="overflow-hidden rounded-2xl border border-outline/70 bg-panel/70 transition-colors duration-200 group-hover:border-white/20">
+                    <div className="relative">
+                      <img
+                        src={album.cover}
+                        alt={album.name}
+                        className="block aspect-square w-full object-cover transition-transform duration-300 group-hover:scale-[1.02]"
+                      />
+                      <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-black/80 via-black/15 to-transparent" />
+                      <div className="absolute bottom-3 left-3 rounded-full bg-black/70 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.24em] text-white/80">
+                        {album.rating.toFixed(1)} / 5
                       </div>
+                    </div>
+                    <div className="space-y-2 px-4 py-4">
+                      <div>
+                        <h3 className="line-clamp-1 text-base font-semibold text-white">{album.name}</h3>
+                        <p className="line-clamp-1 text-sm text-muted">
+                          {album.artist ?? album.artists?.[0] ?? 'Unknown artist'}
+                        </p>
+                      </div>
+                      <p className="text-right text-[11px] uppercase tracking-[0.2em] text-muted/80">
+                        {formatReviewedAt(album.timestamp)}
+                      </p>
                     </div>
                   </div>
                 </Link>
