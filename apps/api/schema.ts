@@ -84,6 +84,19 @@ export const featuredCache = pgTable(
   (table) => [index('featured_cache_expires_at_idx').on(table.expiresAt)],
 )
 
+export const releaseCache = pgTable(
+  'release_cache',
+  {
+    releaseId: text('releaseId').primaryKey(),
+    payload: jsonb('payload').$type<Record<string, unknown>>().notNull(),
+    expiresAt: timestamp('expiresAt', { withTimezone: true, mode: 'date' }).notNull(),
+    refreshedAt: timestamp('refreshedAt', { withTimezone: true, mode: 'date' }).notNull(),
+    createdAt: timestamp('createdAt', { withTimezone: true, mode: 'date' }).notNull(),
+    updatedAt: timestamp('updatedAt', { withTimezone: true, mode: 'date' }).notNull(),
+  },
+  (table) => [index('release_cache_expires_at_idx').on(table.expiresAt)],
+)
+
 export const storedTrendingAlbum = pgTable(
   'stored_trending_album',
   {
