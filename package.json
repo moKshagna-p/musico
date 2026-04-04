@@ -2,7 +2,7 @@
   "name": "musico",
   "private": true,
   "version": "0.0.0",
-  "packageManager": "bun@1.2.18",
+  "packageManager": "bun@1.3.10",
   "workspaces": [
     "apps/*",
     "packages/*"
@@ -11,8 +11,8 @@
     "check:bun": "node ./scripts/check-bun.mjs",
     "dev": "npm run check:bun && turbo run dev --parallel",
     "build": "npm run check:bun && turbo run build",
-    "lint": "npm run lint --workspace=@musico/web",
-    "test": "npm run test --workspace=@musico/web",
+    "lint": "turbo run lint",
+    "test": "turbo run test",
     "preview": "npm run preview --workspace=@musico/web",
     "dev:web": "npm run dev --workspace=@musico/web",
     "dev:api": "npm run check:bun && turbo run dev --filter=@musico/api",
