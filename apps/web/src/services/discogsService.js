@@ -2,12 +2,30 @@ import { requestPublicJson } from './apiClient.js'
 
 const CACHE_WINDOW = 1000 * 60 * 60 // 1 hour
 const FEATURED_CACHE_WINDOW = 1000 * 60 * 5 // 5 minutes
+const DETAILS_CACHE_WINDOW = 1000 * 60 * 60 * 24 // 24 hours
 const SEARCH_CACHE_VERSION = 'v4'
 
 const featuredCache = { timestamp: 0, data: [] }
 const recentPopularCache = { timestamp: 0, data: [] }
-const searchCache = new Map()
-const releaseCache = new Map()
+
+const storage = {
+  get: (key) => {
+    try {
+      const item = localStorage.getItem(key)
+      if (!item) return null
+      return JSON.parse(item)
+    } catch {
+      return null
+    }
+  },
+  set: (key, value) => {
+    try {
+      localStorage.setItem(key, JSON.stringify(value))
+    } catch {
+      // Ignore quota errors
+    }
+  },
+}
 
 const isFresh = (timestamp, ttl = CACHE_WINDOW) => Date.now() - timestamp < ttl
 
@@ -50,9 +68,11 @@ export const searchReleases = async (query) => {
   const trimmed = query?.trim()
   if (!trimmed) return { data: [], correctedQuery: null }
 
-  const cacheKey = `${SEARCH_CACHE_VERSION}:${trimmed.toLowerCase()}`
-  const cached = searchCache.get(cacheKey)
-  if (cached && isFresh(cached.timestamp)) return { data: cached.data, correctedQuery: cached.correctedQuery ?? null }
+  const cacheKey = `musico:search:${SEARCH_CACHE_VERSION}:${trimmed.toLowerCase()}`
+  const cached = storage.get(cacheKey)
+  if (cached && isFresh(cached.timestamp, CACHE_WINDOW)) {
+    return { data: cached.data, correctedQuery: cached.correctedQuery ?? null }
+  }
 
   const response = await requestPublicJson('/api/search', {
     params: { q: trimmed },
@@ -61,21 +81,24 @@ export const searchReleases = async (query) => {
 
   const data = Array.isArray(response?.data) ? response.data : []
   const correctedQuery = response?.correctedQuery ?? null
-  searchCache.set(cacheKey, { data, correctedQuery, timestamp: Date.now() })
+  storage.set(cacheKey, { data, correctedQuery, timestamp: Date.now() })
   return { data, correctedQuery }
 }
 
 export const getReleaseDetails = async (releaseId) => {
   if (!releaseId) throw new Error('Release id missing')
 
-  const cached = releaseCache.get(releaseId)
-  if (cached && isFresh(cached.timestamp)) return cached.data
+  const cacheKey = `musico:release:${releaseId}`
+  const cached = storage.get(cacheKey)
+  if (cached && isFresh(cached.timestamp, DETAILS_CACHE_WINDOW)) {
+    return cached.data
+  }
 
   const data = await requestPublicJson(`/api/releases/${releaseId}`, {
     fallbackMessage: 'Music data service is unavailable.',
   })
 
-  releaseCache.set(releaseId, { data, timestamp: Date.now() })
+  storage.set(cacheKey, { data, timestamp: Date.now() })
   return data
 }
 

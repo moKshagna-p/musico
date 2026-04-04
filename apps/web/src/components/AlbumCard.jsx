@@ -1,4 +1,4 @@
-import { memo } from 'react'
+import { memo, useRef } from 'react'
 import { motion } from 'framer-motion'
 import { FiArrowUpRight } from 'react-icons/fi'
 
@@ -10,12 +10,26 @@ import RatingStars from './RatingStars.jsx'
 const AlbumCard = ({ album, onSelect }) => {
   const MotionArticle = motion.article
   const { getCommunityStats } = useRatings()
+  const prefetchTimerRef = useRef(null)
   const community = getCommunityStats(album)
   const genres = Array.isArray(album.genres) ? album.genres.filter(Boolean) : []
   const genreLabel = genres.slice(0, 2).join(' • ')
 
   const handleNavigate = () => {
     onSelect?.(album.id)
+  }
+
+  const handleMouseEnter = () => {
+    prefetchTimerRef.current = setTimeout(() => {
+      prefetchReleaseDetails(album.id)
+    }, 100)
+  }
+
+  const handleMouseLeave = () => {
+    if (prefetchTimerRef.current) {
+      clearTimeout(prefetchTimerRef.current)
+      prefetchTimerRef.current = null
+    }
   }
 
   return (
@@ -25,7 +39,8 @@ const AlbumCard = ({ album, onSelect }) => {
       animate={{ opacity: 1, y: 0 }}
       whileHover={{ y: -6 }}
       onClick={handleNavigate}
-      onMouseEnter={() => prefetchReleaseDetails(album.id)}
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
       className="group relative flex cursor-pointer flex-col gap-4 rounded-3xl border border-outline bg-panel p-4 text-white transition hover:border-white/40"
     >
       <div className="relative aspect-square overflow-hidden rounded-2xl bg-black/40">

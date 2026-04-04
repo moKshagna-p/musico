@@ -97,7 +97,7 @@ const SearchBar = ({
           setIsSuggesting(false)
         }
       }
-    }, 120)
+    }, 300)
 
     return () => clearTimeout(timer)
   }, [enablePredictive, value])

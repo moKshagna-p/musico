@@ -1628,7 +1628,7 @@ const app = new Elysia()
       const data = await getReleaseDetails(params.id)
       const [hydrated] = await attachMusicoCommunityStats([data])
       set.headers ??= {}
-      set.headers['Cache-Control'] = 'public, max-age=60'
+      set.headers['Cache-Control'] = 'public, max-age=3600'
       return hydrated
     } catch (error) {
       console.error('[release] error', error)
