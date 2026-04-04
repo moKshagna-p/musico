@@ -492,14 +492,14 @@ const Profile = () => {
                 <Link
                   to={`/album/${album.albumId}`}
                   key={album.albumId}
-                  className="group min-w-[220px] max-w-[220px] flex-none snap-start"
+                  className="group min-w-[220px] max-w-[220px] flex-none snap-start transition-transform duration-300 hover:-translate-y-1.5"
                 >
                   <div className="overflow-hidden rounded-2xl border border-outline/70 bg-panel/70 transition-colors duration-200 group-hover:border-white/20">
                     <div className="relative">
                       <img
                         src={album.cover}
                         alt={album.name}
-                        className="block aspect-square w-full object-cover transition-transform duration-300 group-hover:scale-[1.02]"
+                        className="block aspect-square w-full object-cover"
                       />
                       <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-black/80 via-black/15 to-transparent" />
                       <div className="absolute bottom-3 left-3 rounded-full bg-black/70 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.24em] text-white/80">
