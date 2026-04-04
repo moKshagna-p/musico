@@ -16,7 +16,7 @@ const TopGenres = ({ ratedAlbums }) => {
 
   return (
     <section className="my-16">
-      <h2 className="mb-8 text-center font-display text-3xl font-bold tablet:text-4xl">Top Genres</h2>
+      <h2 className="mb-8 text-center font-display text-3xl font-bold tablet:text-4xl">Recent Top Genres</h2>
       <div className="text-center">
         {topGenres.map(([genre]) => (
           <p key={genre} className="text-base text-muted tablet:text-lg">

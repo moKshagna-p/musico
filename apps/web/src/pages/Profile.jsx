@@ -239,8 +239,13 @@ const Profile = () => {
         setRatedAlbums([])
         return
       }
+      
+      const topItems = [...ratedItems]
+        .sort((a, b) => b.timestamp - a.timestamp)
+        .slice(0, 12)
+
       const albums = await Promise.allSettled(
-        ratedItems.map(async (item) => {
+        topItems.map(async (item) => {
           const details = await getReleaseDetails(item.albumId)
           return { ...item, ...details }
         }),
@@ -264,6 +269,11 @@ const Profile = () => {
     await signOutCurrentUser()
     navigate('/auth')
   }
+
+  const totalRated = ratedItems.length
+  const averageRating = totalRated > 0
+    ? ratedItems.reduce((acc, item) => acc + item.rating, 0) / totalRated
+    : 0
 
   if (isPending || !user || loadingRatings) {
     return (
@@ -482,7 +492,7 @@ const Profile = () => {
         </header>
 
         <main className="mt-10 tablet:mt-16">
-          <Stats ratedAlbums={ratedAlbums} />
+          <Stats ratedAlbums={ratedAlbums} totalRated={totalRated} averageRating={averageRating} />
           <TopGenres ratedAlbums={ratedAlbums} />
 
           <section>
