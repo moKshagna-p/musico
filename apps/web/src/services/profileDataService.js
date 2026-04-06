@@ -1,11 +1,13 @@
-import { requestPrivateJson } from './apiClient.js'
+import api from './apiClient.js'
+
+/**
+ * Professional Profile Data Service using Axios apiClient
+ */
 
 export const fetchMyRatings = async () => {
-  const response = await requestPrivateJson('/api/me/ratings', {
-    fallbackMessage: 'Unable to sync profile data right now.',
-  })
-
-  return response?.data && typeof response.data === 'object' ? response.data : {}
+  const response = await api.get('/api/me/ratings')
+  // Axios interceptor returns response.data directly
+  return response.data && typeof response.data === 'object' ? response.data : {}
 }
 
 export const saveMyRating = async (albumId, rating, meta = {}) => {
@@ -13,38 +15,21 @@ export const saveMyRating = async (albumId, rating, meta = {}) => {
   if (meta.albumName) payload.albumName = meta.albumName
   if (meta.albumCover) payload.albumCover = meta.albumCover
 
-  const response = await requestPrivateJson(`/api/me/ratings/${encodeURIComponent(albumId)}`, {
-    method: 'PUT',
-    body: JSON.stringify(payload),
-    fallbackMessage: 'Unable to save rating.',
-  })
-
-  return response?.data ?? { rating, timestamp: Date.now() }
+  const response = await api.put(`/api/me/ratings/${encodeURIComponent(albumId)}`, payload)
+  return response.data ?? { rating, timestamp: Date.now() }
 }
 
 export const fetchMyLists = async () => {
-  const response = await requestPrivateJson('/api/me/lists', {
-    fallbackMessage: 'Unable to load your lists.',
-  })
-  return Array.isArray(response?.data) ? response.data : []
+  const response = await api.get('/api/me/lists')
+  return Array.isArray(response.data) ? response.data : []
 }
 
 export const createMyList = async (name) => {
-  const response = await requestPrivateJson('/api/me/lists', {
-    method: 'POST',
-    body: JSON.stringify({ name }),
-    fallbackMessage: 'Unable to create list.',
-  })
-
-  return response?.data ?? null
+  const response = await api.post('/api/me/lists', { name })
+  return response.data ?? null
 }
 
 export const toggleAlbumInMyList = async (listId, album) => {
-  const response = await requestPrivateJson(`/api/me/lists/${encodeURIComponent(listId)}/toggle`, {
-    method: 'POST',
-    body: JSON.stringify(album),
-    fallbackMessage: 'Unable to update list.',
-  })
-
-  return response?.data ?? { added: false }
+  const response = await api.post(`/api/me/lists/${encodeURIComponent(listId)}/toggle`, album)
+  return response.data ?? { added: false }
 }

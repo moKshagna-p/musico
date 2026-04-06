@@ -23,6 +23,7 @@
     "start:web": "npm run preview --workspace=@musico/web -- --host 0.0.0.0 --port ${PORT:-4173}"
   },
   "devDependencies": {
+    "puppeteer": "^24.40.0",
     "turbo": "^2.5.6"
   }
 }

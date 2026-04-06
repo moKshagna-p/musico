@@ -1,4 +1,5 @@
-import { requestPublicJson } from './apiClient.js'
+import { validatedRequest, AlbumSchema } from './apiClient.js'
+import { z } from 'zod'
 
 const CACHE_WINDOW = 1000 * 60 * 60 // 1 hour
 const FEATURED_CACHE_WINDOW = 1000 * 60 * 5 // 5 minutes
@@ -29,17 +30,25 @@ const storage = {
 
 const isFresh = (timestamp, ttl = CACHE_WINDOW) => Date.now() - timestamp < ttl
 
+const AlbumArraySchema = z.array(AlbumSchema)
+
 export const getFeaturedReleases = async (limit = 24) => {
   if (featuredCache.data.length && isFresh(featuredCache.timestamp, FEATURED_CACHE_WINDOW)) {
     return featuredCache.data.slice(0, limit)
   }
 
-  const response = await requestPublicJson('/api/featured', {
-    params: { limit },
-    fallbackMessage: 'Music data service is unavailable.',
-  })
-
+  const response = await validatedRequest({ url: '/api/featured', params: { limit } })
+  // Backend returns { data: [...] } which Axios interceptor resolves to response
+  // Wait, if it's already intercepted, response is the data payload! Wait, no, the backend returns { data: array }.
+  // So response is { data: array }.
   const data = Array.isArray(response?.data) ? response.data : []
+  
+  // Validate silently
+  const result = AlbumArraySchema.safeParse(data)
+  if (!result.success) {
+    console.warn('[Validation Warning] Featured releases malformed:', result.error.format())
+  }
+
   featuredCache.timestamp = Date.now()
   featuredCache.data = data
   return data.slice(0, limit)
@@ -50,15 +59,21 @@ export const getRecentPopularReleases = async (limit = 24) => {
     return recentPopularCache.data.slice(0, limit)
   }
 
-  const response = await requestPublicJson('/api/featured', {
+  const response = await validatedRequest({
+    url: '/api/featured',
     params: {
       limit,
       mode: 'recent-popular',
     },
-    fallbackMessage: 'Music data service is unavailable.',
   })
 
   const data = Array.isArray(response?.data) ? response.data : []
+  
+  const result = AlbumArraySchema.safeParse(data)
+  if (!result.success) {
+    console.warn('[Validation Warning] Recent popular releases malformed:', result.error.format())
+  }
+
   recentPopularCache.timestamp = Date.now()
   recentPopularCache.data = data
   return data.slice(0, limit)
@@ -74,13 +89,15 @@ export const searchReleases = async (query) => {
     return { data: cached.data, correctedQuery: cached.correctedQuery ?? null }
   }
 
-  const response = await requestPublicJson('/api/search', {
-    params: { q: trimmed },
-    fallbackMessage: 'Music data service is unavailable.',
-  })
-
+  const response = await validatedRequest({ url: '/api/search', params: { q: trimmed } })
   const data = Array.isArray(response?.data) ? response.data : []
   const correctedQuery = response?.correctedQuery ?? null
+  
+  const result = AlbumArraySchema.safeParse(data)
+  if (!result.success) {
+    console.warn('[Validation Warning] Search results malformed:', result.error.format())
+  }
+
   storage.set(cacheKey, { data, correctedQuery, timestamp: Date.now() })
   return { data, correctedQuery }
 }
@@ -94,10 +111,7 @@ export const getReleaseDetails = async (releaseId) => {
     return cached.data
   }
 
-  const data = await requestPublicJson(`/api/releases/${releaseId}`, {
-    fallbackMessage: 'Music data service is unavailable.',
-  })
-
+  const data = await validatedRequest({ url: `/api/releases/${releaseId}` }, AlbumSchema)
   storage.set(cacheKey, { data, timestamp: Date.now() })
   return data
 }

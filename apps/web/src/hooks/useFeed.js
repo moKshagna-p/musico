@@ -1,92 +1,46 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useInfiniteQuery } from '@tanstack/react-query'
+import api from '../services/apiClient.js'
 
-import { fetchMyFeed } from '../services/socialService.js'
-
+/**
+ * Professional Feed Hook using TanStack Query
+ * Handles: Caching, SWR, Infinite Scroll, and Loading/Error states automatically.
+ */
 const useFeed = () => {
-  const [items, setItems] = useState([])
-  const [nextCursor, setNextCursor] = useState(null)
-  const [loading, setLoading] = useState(true)
-  const [loadingMore, setLoadingMore] = useState(false)
-  const [error, setError] = useState(null)
-  const pollRef = useRef(null)
+  const {
+    data,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+    isLoading,
+    isError,
+    error,
+    refetch,
+  } = useInfiniteQuery({
+    queryKey: ['feed'],
+    queryFn: async ({ pageParam = null }) => {
+      const response = await api.get('/api/me/feed', {
+        params: {
+          cursor: pageParam,
+          limit: 20,
+        },
+      })
+      return response // Axios interceptor already returns response.data
+    },
+    getNextPageParam: (lastPage) => lastPage.nextCursor || undefined,
+    initialPageParam: null,
+  })
 
-  // Initial load
-  useEffect(() => {
-    let cancelled = false
-
-    const load = async () => {
-      setLoading(true)
-      setError(null)
-      try {
-        const result = await fetchMyFeed({ limit: 20 })
-        if (!cancelled) {
-          setItems(result.items)
-          setNextCursor(result.nextCursor)
-        }
-      } catch (err) {
-        if (!cancelled) setError(err?.message ?? 'Failed to load feed.')
-      } finally {
-        if (!cancelled) setLoading(false)
-      }
-    }
-
-    void load()
-    return () => {
-      cancelled = true
-    }
-  }, [])
-
-  // Polling for new items every 60s
-  useEffect(() => {
-    pollRef.current = setInterval(async () => {
-      try {
-        const result = await fetchMyFeed({ limit: 20 })
-        setItems(result.items)
-        setNextCursor(result.nextCursor)
-      } catch {
-        // Silently fail polling
-      }
-    }, 60_000)
-
-    return () => clearInterval(pollRef.current)
-  }, [])
-
-  const loadMore = useCallback(async () => {
-    if (!nextCursor || loadingMore) return
-    setLoadingMore(true)
-    try {
-      const result = await fetchMyFeed({ cursor: nextCursor, limit: 20 })
-      setItems((prev) => [...prev, ...result.items])
-      setNextCursor(result.nextCursor)
-    } catch {
-      // ignore
-    } finally {
-      setLoadingMore(false)
-    }
-  }, [nextCursor, loadingMore])
-
-  const refresh = useCallback(async () => {
-    setLoading(true)
-    setError(null)
-    try {
-      const result = await fetchMyFeed({ limit: 20 })
-      setItems(result.items)
-      setNextCursor(result.nextCursor)
-    } catch (err) {
-      setError(err?.message ?? 'Failed to refresh feed.')
-    } finally {
-      setLoading(false)
-    }
-  }, [])
+  // Flatten the pages into a single items array
+  const items = data?.pages.flatMap((page) => page.data) ?? []
 
   return {
     items,
-    loading,
-    loadingMore,
-    error,
-    hasMore: Boolean(nextCursor),
-    loadMore,
-    refresh,
+    loading: isLoading,
+    loadingMore: isFetchingNextPage,
+    error: isError ? error.message : null,
+    hasMore: !!hasNextPage,
+    loadMore: fetchNextPage,
+    refresh: refetch,
   }
 }
 

@@ -1,64 +1,71 @@
+import axios from 'axios'
+import { z } from 'zod'
 import { API_BASE_URL } from './authClient.js'
 
-const toUrl = (path, params = {}) => {
-  const url = new URL(`${API_BASE_URL}${path}`)
-  Object.entries(params).forEach(([key, value]) => {
-    if (value !== undefined && value !== null && value !== '') {
-      url.searchParams.set(key, String(value))
+// ── Axios Instance ──
+const api = axios.create({
+  baseURL: API_BASE_URL,
+  withCredentials: true,
+  headers: {
+    'Content-Type': 'application/json',
+  },
+})
+
+// ── Interceptors (Professional Error Handling) ──
+api.interceptors.response.use(
+  (response) => response.data,
+  (error) => {
+    const message = error.response?.data?.error || 'Something went wrong.'
+    const status = error.response?.status
+    
+    // Globally handle 401s if needed (e.g., redirect to login)
+    if (status === 401) {
+      // window.location.href = '/auth'
     }
-  })
-  return url
-}
 
-const parseApiError = async (response, fallbackMessage) => {
-  let message = fallbackMessage
-  try {
-    const body = await response.json()
-    if (body?.error) message = body.error
-  } catch {
-    // Ignore parse failures for non-JSON responses.
+    const enhancedError = new Error(message)
+    enhancedError.status = status
+    return Promise.reject(enhancedError)
   }
+)
 
-  const error = new Error(message)
-  error.status = response.status
-  return error
-}
-
-const requestJson = async (fetcher, path, { params = {}, fallbackMessage = 'Something went wrong.' } = {}) => {
-  const url = toUrl(path, params)
-  const response = await fetcher(url.toString())
-
-  if (!response.ok) {
-    throw await parseApiError(response, fallbackMessage)
+/**
+ * Professional Fetcher with Zod Validation
+ * @param {string} url 
+ * @param {object} options 
+ * @param {z.ZodSchema} schema 
+ */
+export const validatedRequest = async (config, schema) => {
+  const data = await api(config)
+  
+  if (schema) {
+    const result = schema.safeParse(data)
+    if (!result.success) {
+      console.error('[API Validation Error]:', result.error.format())
+      // In production, we might just return data anyway to be safe, 
+      // but log the error to Sentry/Analytics.
+    }
   }
-
-  return response.json()
+  
+  return data
 }
 
-export const requestPublicJson = (path, options = {}) =>
-  requestJson((url) => fetch(url), path, options)
+// ── Schemas (Standardizing our data models) ──
 
-export const requestPrivateJson = async (path, options = {}) => {
-  const {
-    method = 'GET',
-    params = {},
-    body,
-    headers = {},
-    fallbackMessage = 'Something went wrong.',
-  } = options
+export const AlbumSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  artists: z.array(z.string()),
+  cover: z.string().optional().nullable(),
+  releaseYear: z.number().optional().nullable(),
+  genres: z.array(z.string()).optional(),
+  communityRating: z.number().optional(),
+  reviewCount: z.number().optional(),
+})
 
-  return requestJson(
-    (url) =>
-      fetch(url, {
-        method,
-        credentials: 'include',
-        headers: {
-          'Content-Type': 'application/json',
-          ...headers,
-        },
-        body,
-      }),
-    path,
-    { params, fallbackMessage },
-  )
-}
+export const ApiResponseSchema = z.object({
+  data: z.any(),
+  error: z.string().optional(),
+})
+
+export default api

@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto'
 
 import { eq } from 'drizzle-orm'
+import { LRUCache } from 'lru-cache'
 
 import type { ReleaseDetails, ReleaseSummary } from './types'
 
@@ -38,7 +39,15 @@ const DISCOGS_MIN_REQUEST_INTERVAL_MS = env.DISCOGS_MIN_REQUEST_INTERVAL_MS
 const DISCOGS_MAX_RETRIES = env.DISCOGS_MAX_RETRIES
 const RELEASE_CACHE_MAX_ENTRIES = env.RELEASE_CACHE_MAX_ENTRIES
 
-const releaseCache = new Map<string, { data: ReleaseDetails; timestamp: number }>()
+// ── In-memory LRU cache to protect RAM and speed up repeat requests ──
+const releaseMemoryCache = new LRUCache<string, ReleaseDetails>({
+  max: 1000, // Limit to 1000 items (approx 2-3MB total RAM)
+  ttl: 1000 * 60 * 15, // 15 minute in-memory TTL
+})
+
+// ── Request deduplication Map ──
+const releaseRequestsInFlight = new Map<string, Promise<ReleaseDetails>>()
+
 const featuredRefreshInFlight = new Map<string, Promise<ReleaseSummary[]>>()
 const searchRefreshInFlight = new Map<string, Promise<ReleaseSummary[]>>()
 let discogsNextRequestAt = 0
@@ -1083,75 +1092,76 @@ export const searchReleases = async (query: string): Promise<SearchResult> => {
   }
 }
 
-export const getReleaseDetails = async (releaseId: string) => {
+export const getReleaseDetails = async (releaseId: string): Promise<ReleaseDetails> => {
   if (!releaseId) throw new Error('Release id missing')
-  const cached = releaseCache.get(releaseId)
-  if (cached && isFresh(cached.timestamp)) return cached.data
 
-  // Extract the real Discogs ID and type from the prefixed ID
-  const isMaster = releaseId.startsWith('m:')
-  const isRelease = releaseId.startsWith('r:')
-  const cleanId = isMaster || isRelease ? releaseId.slice(2) : releaseId
+  // 1. Check in-memory LRU first (fastest)
+  const memoryCached = releaseMemoryCache.get(releaseId)
+  if (memoryCached) return memoryCached
 
-  const normalizeAndCache = (payload: any, fallbackTrackCount = 0) => {
-    const normalized = normalizeRelease(payload, fallbackTrackCount)
-    if (!normalized) throw new Error('Unable to normalize release')
-    // Keep the prefixed ID in the cached object for consistency
-    normalized.id = releaseId
-    setBoundedCacheEntry(releaseCache, releaseId, { data: normalized, timestamp: Date.now() }, RELEASE_CACHE_MAX_ENTRIES)
-    return normalized
-  }
+  // 2. Check for deduplication (if already fetching this album, join that request)
+  const inFlight = releaseRequestsInFlight.get(releaseId)
+  if (inFlight) return inFlight
 
-  try {
-    // If we KNOW it's a master, go straight to masters endpoint
-    if (isMaster) {
-      const master = await requestDiscogs(`/masters/${cleanId}`)
-      const mainReleaseId = String(master?.main_release ?? '').trim()
+  // 3. Create a fetch promise to share with other callers
+  const fetchPromise = (async () => {
+    // Extract the real Discogs ID and type from the prefixed ID
+    const isMaster = releaseId.startsWith('m:')
+    const isRelease = releaseId.startsWith('r:')
+    const cleanId = isMaster || isRelease ? releaseId.slice(2) : releaseId
+
+    const normalizeAndCache = (payload: any, fallbackTrackCount = 0) => {
+      const normalized = normalizeRelease(payload, fallbackTrackCount)
+      if (!normalized) throw new Error('Unable to normalize release')
+      normalized.id = releaseId
       
-      if (mainReleaseId) {
-        try {
-          const mainRelease = await requestDiscogs(`/releases/${mainReleaseId}`)
-          return normalizeAndCache(mainRelease, mainRelease.tracklist?.length)
-        } catch {
-          // fallback to master payload if main release fetch fails
-        }
-      }
-
-      return normalizeAndCache({
-        ...master,
-        id: master.id,
-        title: master.title,
-        tracklist: master.tracklist ?? [],
-      })
+      // Store in memory LRU
+      releaseMemoryCache.set(releaseId, normalized)
+      return normalized
     }
-
-    // Otherwise (isRelease or unprefixed), try releases endpoint first
-    const response = await requestDiscogs(`/releases/${cleanId}`)
-    return normalizeAndCache(response, response.tracklist?.length)
-  } catch (error) {
-    // Fallback logic for unprefixed IDs or failed release fetches
-    if (isRelease) throw error // If we specifically asked for a release and it failed, stop.
-
-    const message = error instanceof Error ? error.message : ''
-    const isNotFound = message.includes('Discogs request failed: 404')
-    if (!isNotFound && !isMaster) throw error
 
     try {
-      const master = await requestDiscogs(`/masters/${cleanId}`)
-      const mainReleaseId = String(master?.main_release ?? '').trim()
-      if (mainReleaseId) {
-        const mainRelease = await requestDiscogs(`/releases/${mainReleaseId}`)
-        return normalizeAndCache(mainRelease, mainRelease.tracklist?.length)
+      if (isMaster) {
+        const master = await requestDiscogs(`/masters/${cleanId}`)
+        const mainReleaseId = String(master?.main_release ?? '').trim()
+        if (mainReleaseId) {
+          try {
+            const mainRelease = await requestDiscogs(`/releases/${mainReleaseId}`)
+            return normalizeAndCache(mainRelease, mainRelease.tracklist?.length)
+          } catch { /* fallback to master */ }
+        }
+        return normalizeAndCache({ ...master, id: master.id, title: master.title, tracklist: master.tracklist ?? [] })
       }
-      
-      return normalizeAndCache({
-        ...master,
-        id: master.id,
-        title: master.title,
-        tracklist: master.tracklist ?? [],
-      })
-    } catch {
-      throw error
+
+      const response = await requestDiscogs(`/releases/${cleanId}`)
+      return normalizeAndCache(response, response.tracklist?.length)
+    } catch (error) {
+      if (isRelease) throw error
+      const message = error instanceof Error ? error.message : ''
+      if (!message.includes('404') && !isMaster) throw error
+
+      try {
+        const master = await requestDiscogs(`/masters/${cleanId}`)
+        const mainReleaseId = String(master?.main_release ?? '').trim()
+        if (mainReleaseId) {
+          const mainRelease = await requestDiscogs(`/releases/${mainReleaseId}`)
+          return normalizeAndCache(mainRelease, mainRelease.tracklist?.length)
+        }
+        return normalizeAndCache({ ...master, id: master.id, title: master.title, tracklist: master.tracklist ?? [] })
+      } catch {
+        throw error
+      }
     }
+  })()
+
+  // Register for deduplication
+  releaseRequestsInFlight.set(releaseId, fetchPromise)
+
+  try {
+    const result = await fetchPromise
+    return result
+  } finally {
+    // Cleanup flight map so future requests can happen if cache expires
+    releaseRequestsInFlight.delete(releaseId)
   }
 }
