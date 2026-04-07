@@ -5,6 +5,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import PageTransition from '../components/PageTransition.jsx'
 import Stats from '../components/Stats.jsx'
 import TopGenres from '../components/TopGenres.jsx'
+import ListCard from '../components/ListCard.jsx'
 import UsernameSetup from '../components/UsernameSetup.jsx'
 import { useAuth } from '../hooks/useAuth.js'
 import { useLists } from '../hooks/useLists.js'
@@ -533,24 +534,22 @@ const Profile = () => {
             </div>
           </section>
 
-          <section className="mt-16">
-            <h2 className="mb-8 text-center font-display text-3xl font-bold tablet:text-4xl">Lists</h2>
-            <div className="grid grid-cols-1 gap-6 tablet:grid-cols-2">
-              {lists.map((list) => (
-                <div key={list.id} className="rounded-lg border border-outline p-4">
-                  <h3 className="text-lg font-bold">{list.name}</h3>
-                  <div className="mt-4 grid grid-cols-3 gap-2">
-                    {list.albums.slice(0, 6).map((album) => (
-                      <img
-                        key={album.id}
-                        src={album.cover}
-                        alt={album.name}
-                        className="aspect-square w-full rounded-md object-cover"
-                      />
-                    ))}
-                  </div>
+          <section className="mt-20">
+            <div className="mb-10 text-center">
+              <h2 className="font-display text-3xl font-bold tablet:text-5xl">Your Collections</h2>
+              <p className="mt-2 text-xs uppercase tracking-[0.3em] text-muted">Personal curated lists</p>
+            </div>
+            
+            <div className="grid grid-cols-1 gap-8 tablet:grid-cols-2 lg:grid-cols-2">
+              {lists.length ? (
+                lists.map((list) => (
+                  <ListCard key={list.id} list={list} />
+                ))
+              ) : (
+                <div className="col-span-full rounded-[2.5rem] border border-dashed border-outline/60 bg-panel/20 p-12 text-center text-muted/60 uppercase tracking-widest text-[10px] font-bold">
+                  No lists created yet.
                 </div>
-              ))}
+              )}
             </div>
           </section>
         </main>
