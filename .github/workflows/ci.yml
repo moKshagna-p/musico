@@ -4,42 +4,48 @@ on:
   push:
     branches: [main]
   pull_request:
+    branches: [main]
   workflow_dispatch:
 
 permissions:
   contents: read
 
+# Ensure only one CI run happens per branch at a time
 concurrency:
-  group: ci-${{ github.workflow }}-${{ github.ref }}
+  group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  checks:
+  check:
+    name: Build & Test
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    
     steps:
-      - name: Checkout
+      - name: 1. Checkout repository
         uses: actions/checkout@v4
 
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: 1.3.10
-          cache: true
-
-      - name: Setup Node
+      - name: 2. Setup Node.js (LTS)
         uses: actions/setup-node@v4
         with:
           node-version: 22
 
-      - name: Install dependencies
+      - name: 3. Setup Bun (Stable)
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.10
+
+      - name: 4. Install dependencies
         run: bun install --frozen-lockfile
 
-      - name: Lint
+      - name: 5. Verify Workspace Integrity
+        run: bun run check:bun
+
+      - name: 6. Lint
         run: bun run lint
 
-      - name: Build
+      - name: 7. Build Project
         run: bun run build
 
-      - name: Test
+      - name: 8. Run Unit Tests
         run: bun run test
