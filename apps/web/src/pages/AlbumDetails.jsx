@@ -66,9 +66,16 @@ const AlbumDetails = () => {
   )
 
   useEffect(() => {
-    setListStatus('')
-    setNewListName('')
-  }, [album?.id])
+    // Reset local component state when navigating to a new album
+    if (albumId) {
+      // Wrap in setTimeout to avoid synchronous setState inside effect warning
+      const timer = setTimeout(() => {
+        setListStatus('')
+        setNewListName('')
+      }, 0)
+      return () => clearTimeout(timer)
+    }
+  }, [albumId])
 
   useEffect(() => {
     if (!album || !isSignedIn) return

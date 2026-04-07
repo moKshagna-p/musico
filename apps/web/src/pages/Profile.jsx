@@ -497,7 +497,10 @@ const Profile = () => {
           <TopGenres ratedAlbums={ratedAlbums} />
 
           <section>
-            <h2 className="mb-8 text-center font-display text-3xl font-bold tablet:text-4xl">Recently Rated</h2>
+            <div className="mb-10 text-center">
+              <p className="text-xs font-bold uppercase tracking-[0.45em] text-muted">Listening History</p>
+              <h2 className="mt-2 font-display text-3xl font-bold tablet:text-4xl">Recently Rated</h2>
+            </div>
             <div className="flex snap-x snap-mandatory gap-4 overflow-x-auto pb-3 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
               {recentlyRated.map((album) => (
                 <Link
@@ -535,9 +538,9 @@ const Profile = () => {
           </section>
 
           <section className="mt-20">
-            <div className="mb-10 text-center">
-              <h2 className="font-display text-3xl font-bold tablet:text-5xl">Your Collections</h2>
-              <p className="mt-2 text-xs uppercase tracking-[0.3em] text-muted">Personal curated lists</p>
+            <div className="mb-12 text-center">
+              <p className="text-xs font-bold uppercase tracking-[0.45em] text-muted">Personal Library</p>
+              <h2 className="mt-2 font-display text-3xl font-bold tablet:text-5xl">Your Collections</h2>
             </div>
             
             <div className="grid grid-cols-1 gap-8 tablet:grid-cols-2 lg:grid-cols-2">

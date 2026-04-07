@@ -3,13 +3,14 @@ import { Link } from 'react-router-dom'
 import { FiChevronRight } from 'react-icons/fi'
 
 const ListCard = ({ list }) => {
+  const MotionDiv = motion.div
   const albums = list.albums || []
   const displayAlbums = albums.slice(0, 4)
   const count = list.albumCount ?? albums.length
 
   return (
     <Link to={`/lists/${list.id}`} className="group block">
-      <motion.div
+      <MotionDiv
         whileHover={{ y: -8 }}
         transition={{ type: 'spring', stiffness: 300, damping: 20 }}
         className="relative overflow-hidden rounded-[2.5rem] border border-outline/60 bg-panel/40 p-6 backdrop-blur-md transition-colors hover:border-white/30"
@@ -19,10 +20,10 @@ const ListCard = ({ list }) => {
 
         <div className="flex items-center justify-between gap-4">
           <div className="min-w-0 flex-1">
-            <h3 className="truncate font-display text-2xl font-bold tracking-tight text-white group-hover:text-white">
+            <h3 className="truncate font-display text-xl font-medium tracking-wide text-white/90 group-hover:text-white tablet:text-2xl">
               {list.name}
             </h3>
-            <p className="mt-1 text-xs uppercase tracking-[0.3em] text-muted">
+            <p className="mt-1.5 text-[10px] font-bold uppercase tracking-[0.45em] text-muted">
               {count} {count === 1 ? 'Album' : 'Albums'}
             </p>
           </div>
@@ -39,7 +40,7 @@ const ListCard = ({ list }) => {
                 const rotate = rotations[index % rotations.length]
                 
                 return (
-                  <motion.div
+                  <MotionDiv
                     key={album.id || index}
                     initial={{ opacity: 0, x: 20 }}
                     animate={{ opacity: 1, x: 0 }}
@@ -54,25 +55,25 @@ const ListCard = ({ list }) => {
                       loading="lazy"
                     />
                     <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent" />
-                  </motion.div>
+                  </MotionDiv>
                 )
               })}
             </div>
           ) : (
             <div className="flex h-full w-full items-center justify-center rounded-2xl border-2 border-dashed border-outline/40">
-              <p className="text-[10px] uppercase tracking-widest text-muted/60 font-semibold">Empty Collection</p>
+              <p className="text-[10px] font-bold uppercase tracking-[0.45em] text-muted/60">Empty</p>
             </div>
           )}
           
           {count > 4 && (
-            <div className="ml-4 mb-2 shrink-0">
-              <span className="rounded-full bg-white/10 px-3 py-1 text-[10px] font-bold uppercase tracking-widest text-muted backdrop-blur-md">
+            <div className="mb-2 ml-4 shrink-0">
+              <span className="rounded-full bg-white/10 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.3em] text-muted backdrop-blur-md">
                 +{count - 4} more
               </span>
             </div>
           )}
         </div>
-      </motion.div>
+      </MotionDiv>
     </Link>
   )
 }

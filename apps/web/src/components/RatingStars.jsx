@@ -3,6 +3,9 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { FaStar } from 'react-icons/fa'
 
 const RatingStars = ({ value = 0, onRate, readOnly = false, showValue = false }) => {
+  const MotionButton = motion.button
+  const MotionSpan = motion.span
+  const MotionDiv = motion.div
   const [hoverValue, setHoverValue] = useState(null)
   const [lastRated, setLastRated] = useState(null)
   const [showConfirmation, setShowConfirmation] = useState(false)
@@ -33,7 +36,7 @@ const RatingStars = ({ value = 0, onRate, readOnly = false, showValue = false })
           const isRecentlySelected = lastRated === star && showConfirmation
 
           return (
-            <motion.button
+            <MotionButton
               key={star}
               type="button"
               aria-label={`Rate ${star} star${star === 1 ? '' : 's'}`}
@@ -55,7 +58,7 @@ const RatingStars = ({ value = 0, onRate, readOnly = false, showValue = false })
               {/* Ripple Effect (Matching Site Vibe) */}
               <AnimatePresence>
                 {isRecentlySelected && (
-                  <motion.span
+                  <MotionSpan
                     initial={{ scale: 0.5, opacity: 0.8 }}
                     animate={{ scale: 2.5, opacity: 0 }}
                     exit={{ opacity: 0 }}
@@ -71,14 +74,14 @@ const RatingStars = ({ value = 0, onRate, readOnly = false, showValue = false })
                   active ? 'scale-110 text-white' : 'text-muted/45'
                 } ${isRecentlySelected ? 'drop-shadow-[0_0_8px_rgba(255,255,255,0.8)]' : ''}`} 
               />
-            </motion.button>
+            </MotionButton>
           )
         })}
       </div>
 
       <AnimatePresence>
         {showConfirmation && (
-          <motion.div
+          <MotionDiv
             initial={{ opacity: 0, y: 0 }}
             animate={{ opacity: 1, y: -20 }}
             exit={{ opacity: 0, y: -40 }}
@@ -87,7 +90,7 @@ const RatingStars = ({ value = 0, onRate, readOnly = false, showValue = false })
             <span className="text-[10px] font-bold uppercase tracking-[0.3em] text-white">
               Recorded
             </span>
-          </motion.div>
+          </MotionDiv>
         )}
       </AnimatePresence>
 
