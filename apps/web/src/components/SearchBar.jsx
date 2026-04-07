@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
-import { FiSearch, FiX } from 'react-icons/fi'
+import { FiSearch, FiX, FiCommand, FiClock, FiCornerDownLeft } from 'react-icons/fi'
+import { motion, AnimatePresence } from 'framer-motion'
+import { useNavigate } from 'react-router-dom'
 
-import { searchReleases } from '../services/discogsService.js'
+import { useSearch } from '../hooks/useSearch.js'
 import {
   addToSearchHistory,
   clearSearchHistory,
@@ -9,275 +11,232 @@ import {
   removeFromSearchHistory,
 } from '../services/searchHistoryService.js'
 
-const MIN_SUGGEST_QUERY_LENGTH = 3
-const SUGGESTION_LIMIT = 5
+const HighlightMatch = ({ text, match }) => {
+  if (!match || !text) return <>{text}</>
+  const parts = text.split(new RegExp(`(${match.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&')})`, 'gi'))
+  return (
+    <>
+      {parts.map((part, i) => 
+        part.toLowerCase() === match.toLowerCase() ? (
+          <span key={i} className="font-black text-white">{part}</span>
+        ) : (
+          <span key={i}>{part}</span>
+        )
+      )}
+    </>
+  )
+}
 
 const SearchBar = ({
   query = '',
   onSearch,
-  onValueChange,
   placeholder,
   autoFocus,
-  enablePredictive = false,
   historyScope = 'guest',
-  enableHistory = true,
 }) => {
+  const navigate = useNavigate()
   const [value, setValue] = useState(query)
-  const [recentSearches, setRecentSearches] = useState([])
-  const [suggestions, setSuggestions] = useState([])
-  const [isSuggesting, setIsSuggesting] = useState(false)
-  const [showSuggestions, setShowSuggestions] = useState(false)
+  const [isFocused, setIsFocused] = useState(false)
   const [activeSuggestionIndex, setActiveSuggestionIndex] = useState(-1)
-  const latestRequestIdRef = useRef(0)
-  const suggestionsCacheRef = useRef(new Map())
+  const inputRef = useRef(null)
+  
+  // 1. Professional Fetching with local debouncing & cancellation
+  const { suggestions, isLoading, isFetching } = useSearch(value, { enabled: isFocused })
+  
+  const [recentSearches, setRecentSearches] = useState([])
+
+  // 2. Keyboard shortcut (Cmd + K)
+  useEffect(() => {
+    const handleGlobalKeyDown = (e) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault()
+        inputRef.current?.focus()
+      }
+    }
+    window.addEventListener('keydown', handleGlobalKeyDown)
+    return () => window.removeEventListener('keydown', handleGlobalKeyDown)
+  }, [])
 
   useEffect(() => {
     setValue(query)
   }, [query])
 
   useEffect(() => {
-    if (!enableHistory) {
-      setRecentSearches([])
-      return
-    }
     setRecentSearches(getSearchHistory(historyScope))
-  }, [enableHistory, historyScope])
+  }, [historyScope, isFocused])
 
-  useEffect(() => {
-    if (!enablePredictive) {
-      setSuggestions([])
-      setIsSuggesting(false)
-      return
-    }
+  const submitSearch = (term) => {
+    const trimmed = term?.trim() ?? ''
+    if (!trimmed) return
 
-    const trimmed = value.trim()
-    if (trimmed.length < MIN_SUGGEST_QUERY_LENGTH) {
-      setSuggestions([])
-      setIsSuggesting(false)
-      setActiveSuggestionIndex(-1)
-      return
-    }
-
-    const cacheKey = trimmed.toLowerCase()
-    const cachedSuggestions = suggestionsCacheRef.current.get(cacheKey)
-    if (cachedSuggestions) {
-      setSuggestions(cachedSuggestions)
-      setIsSuggesting(false)
-      setActiveSuggestionIndex(-1)
-      return
-    }
-
-    const requestId = latestRequestIdRef.current + 1
-    latestRequestIdRef.current = requestId
-    setIsSuggesting(true)
-
-    const timer = setTimeout(async () => {
-      try {
-        const result = await searchReleases(trimmed)
-        if (latestRequestIdRef.current !== requestId) return
-
-        const nextSuggestions = (result.data ?? result)
-          .slice(0, SUGGESTION_LIMIT)
-          .map((item) => ({
-            id: item.id,
-            title: item.name,
-            artist: item.artists?.[0] ?? 'Unknown artist',
-          }))
-
-        suggestionsCacheRef.current.set(cacheKey, nextSuggestions)
-        setSuggestions(nextSuggestions)
-        setActiveSuggestionIndex(-1)
-      } catch {
-        if (latestRequestIdRef.current === requestId) {
-          setSuggestions([])
-          setActiveSuggestionIndex(-1)
-        }
-      } finally {
-        if (latestRequestIdRef.current === requestId) {
-          setIsSuggesting(false)
-        }
-      }
-    }, 300)
-
-    return () => clearTimeout(timer)
-  }, [enablePredictive, value])
-
-  const submitSearch = (rawValue) => {
-    const trimmed = rawValue?.trim() ?? ''
-    if (!trimmed) {
-      onSearch?.('')
-      return
-    }
-
-    if (enableHistory) {
-      addToSearchHistory(trimmed, historyScope)
-      setRecentSearches(getSearchHistory(historyScope))
-    }
+    addToSearchHistory(trimmed, historyScope)
     onSearch?.(trimmed)
-    setShowSuggestions(false)
-    setActiveSuggestionIndex(-1)
+    setIsFocused(false)
+    inputRef.current?.blur()
   }
 
-  const submitSuggestion = (item) => {
-    if (!item) return
-    const term = `${item.artist} ${item.title}`.trim()
-    setValue(term)
-    submitSearch(term)
-  }
-
-  const handleSubmit = (event) => {
-    event.preventDefault()
-    submitSearch(value)
-  }
-
-  const handleKeyDown = (event) => {
-    if (!shouldShowSuggestions || !suggestions.length) return
-
-    if (event.key === 'ArrowDown') {
-      event.preventDefault()
-      setActiveSuggestionIndex((prev) => (prev < 0 ? 0 : (prev + 1) % suggestions.length))
-      return
-    }
-
-    if (event.key === 'ArrowUp') {
-      event.preventDefault()
-      setActiveSuggestionIndex((prev) => (prev < 0 ? suggestions.length - 1 : prev <= 0 ? suggestions.length - 1 : prev - 1))
-      return
-    }
-
-    if (event.key === 'Enter' && activeSuggestionIndex >= 0) {
-      event.preventDefault()
-      submitSuggestion(suggestions[activeSuggestionIndex])
-      return
-    }
-
-    if (event.key === 'Escape') {
-      setShowSuggestions(false)
-      setActiveSuggestionIndex(-1)
+  const handleKeyDown = (e) => {
+    const totalCount = suggestions.length
+    
+    if (e.key === 'ArrowDown') {
+      e.preventDefault()
+      setActiveSuggestionIndex(prev => (prev < totalCount - 1 ? prev + 1 : 0))
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault()
+      setActiveSuggestionIndex(prev => (prev > 0 ? prev - 1 : totalCount - 1))
+    } else if (e.key === 'Enter') {
+      if (activeSuggestionIndex >= 0 && suggestions[activeSuggestionIndex]) {
+        e.preventDefault()
+        const item = suggestions[activeSuggestionIndex]
+        navigate(`/album/${item.id}`)
+        setIsFocused(false)
+      } else {
+        submitSearch(value)
+      }
+    } else if (e.key === 'Escape') {
+      setIsFocused(false)
+      inputRef.current?.blur()
     }
   }
 
-  const handleRecentSearchClick = (term) => {
-    setValue(term)
-    submitSearch(term)
-  }
-
-  const handleDeleteRecentSearch = (term) => {
-    if (!enableHistory) return
-    removeFromSearchHistory(term, historyScope)
-    setRecentSearches(getSearchHistory(historyScope))
-  }
-
-  const handleClearHistory = () => {
-    if (!enableHistory) return
-    clearSearchHistory(historyScope)
-    setRecentSearches([])
-  }
-
-  const shouldShowSuggestions = enablePredictive && showSuggestions && value.trim().length >= MIN_SUGGEST_QUERY_LENGTH
+  const showDropdown = isFocused && (value.length >= 3 || recentSearches.length > 0)
 
   return (
-    <div className="rounded-3xl border border-outline bg-panel p-4 tablet:p-6">
-      <div className="relative">
-        <form onSubmit={handleSubmit} className="flex items-center gap-3 border-b border-outline pb-4 tablet:gap-4">
-          <FiSearch className="text-xl text-muted" />
-          <input
-            value={value}
-            onChange={(event) => {
-              const nextValue = event.target.value
-              setValue(nextValue)
-              onValueChange?.(nextValue)
-            }}
-            onFocus={() => setShowSuggestions(true)}
-            onBlur={() => setTimeout(() => setShowSuggestions(false), 120)}
-            onKeyDown={handleKeyDown}
-            placeholder={placeholder ?? 'Search albums or artists'}
-            autoFocus={autoFocus}
-            className="flex-1 bg-transparent text-base text-white placeholder:text-muted focus:outline-none tablet:text-lg"
-          />
-          <button type="submit" className="text-[0.64rem] uppercase tracking-[0.22em] text-muted hover:text-white tablet:text-xs tablet:tracking-[0.4em]">
-            Search
-          </button>
-        </form>
+    <div className="relative z-50">
+      <div 
+        className={`relative flex items-center gap-3 rounded-2xl border transition-all duration-300 ${
+          isFocused 
+            ? 'border-white/40 bg-panel shadow-[0_0_0_4px_rgba(255,255,255,0.05)]' 
+            : 'border-outline bg-panel/60 hover:border-outline-hover'
+        } p-4`}
+      >
+        <FiSearch className={`text-xl transition-colors ${isFocused ? 'text-white' : 'text-muted'}`} />
+        
+        <input
+          ref={inputRef}
+          value={value}
+          onChange={(e) => {
+            setValue(e.target.value)
+            setActiveSuggestionIndex(-1)
+          }}
+          onFocus={() => setIsFocused(true)}
+          onBlur={() => setTimeout(() => setIsFocused(false), 200)}
+          onKeyDown={handleKeyDown}
+          placeholder={placeholder ?? 'Search music, artists, vibes...'}
+          autoFocus={autoFocus}
+          className="flex-1 bg-transparent text-base text-white placeholder:text-muted/60 focus:outline-none"
+        />
 
-        {shouldShowSuggestions && (
-          <div className="absolute left-0 right-0 top-[calc(100%+0.65rem)] z-20 rounded-2xl border border-outline bg-canvas/95 p-2 shadow-[0_18px_60px_rgba(0,0,0,0.45)] backdrop-blur">
-            {isSuggesting ? (
-              <p className="px-3 py-2 text-xs uppercase tracking-[0.32em] text-muted">Finding matches...</p>
-            ) : suggestions.length > 0 ? (
-              suggestions.map((item) => (
-                <button
-                  key={item.id}
-                  type="button"
-                  onMouseEnter={() => setActiveSuggestionIndex(suggestions.findIndex((entry) => entry.id === item.id))}
-                  onClick={() => submitSuggestion(item)}
-                  className={`flex w-full items-center justify-between rounded-xl px-3 py-2 text-left transition ${
-                    suggestions[activeSuggestionIndex]?.id === item.id ? 'bg-white/10' : 'hover:bg-white/5'
-                  }`}
-                >
-                  <span className="truncate text-sm text-white">{item.title}</span>
-                  <span className="max-w-28 truncate pl-3 text-xs uppercase tracking-[0.2em] text-muted tablet:max-w-none">{item.artist}</span>
-                </button>
-              ))
-            ) : (
-              <p className="px-3 py-2 text-xs uppercase tracking-[0.32em] text-muted">No quick matches yet.</p>
-            )}
-          </div>
-        )}
-      </div>
-
-      {enableHistory && (
-        <div className="mt-5 rounded-2xl border border-outline/80 bg-canvas/25 p-4">
-        <div className="mb-3 flex items-center justify-between">
-          <p className="text-xs uppercase tracking-[0.34em] text-muted">
-            Recent Searches
-            {recentSearches.length > 0 ? ` (${recentSearches.length})` : ''}
-          </p>
-          {recentSearches.length > 0 && (
-            <button
-              type="button"
-              onClick={handleClearHistory}
-              className="text-[0.65rem] uppercase tracking-[0.26em] text-muted transition hover:text-white"
+        <div className="flex items-center gap-2">
+          {value && (
+            <button 
+              onClick={() => setValue('')}
+              className="p-1 text-muted hover:text-white"
             >
-              Clear all
+              <FiX />
             </button>
           )}
+          <div className="hidden items-center gap-1 rounded-md border border-outline bg-canvas/50 px-1.5 py-0.5 text-[10px] font-bold text-muted tablet:flex">
+            <FiCommand /> K
+          </div>
         </div>
+      </div>
 
-        {recentSearches.length > 0 ? (
-          <div className="flex flex-wrap gap-2 text-xs text-muted">
-            {recentSearches.map((term) => (
-              <div
-                key={term}
-                className="group inline-flex items-center rounded-full border border-outline bg-panel px-3 py-1.5 text-[0.7rem]"
-              >
-                <button
-                  type="button"
-                  onClick={() => handleRecentSearchClick(term)}
-                  className="max-w-28 truncate text-left text-muted transition group-hover:text-white tablet:max-w-44"
-                  title={term}
-                >
-                  {term}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleDeleteRecentSearch(term)}
-                  className="ml-2 rounded-full p-0.5 text-muted transition hover:bg-white/10 hover:text-white"
-                  aria-label={`Delete ${term} from recent searches`}
-                >
-                  <FiX className="text-[0.65rem]" />
-                </button>
+      <AnimatePresence>
+        {showDropdown && (
+          <motion.div
+            initial={{ opacity: 0, y: 10, scale: 0.98 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 10, scale: 0.98 }}
+            className="absolute left-0 right-0 top-[calc(100%+0.5rem)] overflow-hidden rounded-2xl border border-outline bg-panel/95 shadow-2xl backdrop-blur-xl"
+          >
+            {/* Quick Results */}
+            {value.length >= 3 && (
+              <div className="p-2">
+                <div className="flex items-center justify-between px-3 py-2">
+                  <p className="text-[10px] font-bold uppercase tracking-[0.3em] text-muted">Suggestions</p>
+                  {(isLoading || isFetching) && (
+                    <div className="h-3 w-3 animate-spin rounded-full border-2 border-white/20 border-t-white" />
+                  )}
+                </div>
+                
+                {suggestions.length > 0 ? (
+                  <div className="space-y-1">
+                    {suggestions.map((item, i) => (
+                      <button
+                        key={item.id}
+                        onClick={() => navigate(`/album/${item.id}`)}
+                        onMouseEnter={() => setActiveSuggestionIndex(i)}
+                        className={`flex w-full items-center gap-4 rounded-xl p-2 text-left transition-colors ${
+                          activeSuggestionIndex === i ? 'bg-white/10' : 'hover:bg-white/5'
+                        }`}
+                      >
+                        <img 
+                          src={item.cover} 
+                          alt="" 
+                          className="h-10 w-10 rounded-lg object-cover bg-black/40"
+                        />
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-sm font-semibold text-white/90">
+                            <HighlightMatch text={item.name} match={value} />
+                          </p>
+                          <p className="truncate text-xs text-muted">
+                            <HighlightMatch text={item.artists?.join(', ')} match={value} /> • {item.releaseYear}
+                          </p>
+                        </div>
+                        {activeSuggestionIndex === i && (
+                          <FiCornerDownLeft className="text-muted opacity-50" />
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                ) : !isLoading && (
+                  <p className="px-3 py-4 text-center text-sm text-muted">No matches found.</p>
+                )}
               </div>
-            ))}
-          </div>
-        ) : (
-          <div className="rounded-xl border border-dashed border-outline px-4 py-5 text-center">
-            <p className="text-sm text-muted">No recent searches yet.</p>
-            <p className="mt-1 text-xs text-muted/80">Search an artist or album to start building history.</p>
-          </div>
+            )}
+
+            {/* Recent Searches */}
+            {recentSearches.length > 0 && value.length < 3 && (
+              <div className="p-2">
+                <div className="flex items-center justify-between px-3 py-2">
+                  <p className="text-[10px] font-bold uppercase tracking-[0.3em] text-muted text-center">Recent Searches</p>
+                  <button 
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      clearSearchHistory(historyScope)
+                      setRecentSearches([])
+                    }}
+                    className="text-[10px] font-bold uppercase tracking-widest text-muted hover:text-white"
+                  >
+                    Clear
+                  </button>
+                </div>
+                <div className="mt-1 space-y-1">
+                  {recentSearches.map((term) => (
+                    <div key={term} className="group flex items-center justify-between rounded-xl px-3 py-2 hover:bg-white/5 transition-colors cursor-pointer" onClick={() => setValue(term)}>
+                      <div className="flex items-center gap-3 min-w-0">
+                        <FiClock className="shrink-0 text-muted" />
+                        <span className="truncate text-sm text-white/80">{term}</span>
+                      </div>
+                      <button 
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          removeFromSearchHistory(term, historyScope)
+                          setRecentSearches(getSearchHistory(historyScope))
+                        }}
+                        className="opacity-0 group-hover:opacity-100 p-1 text-muted hover:text-red-400 transition-all"
+                      >
+                        <FiX />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </motion.div>
         )}
-        </div>
-      )}
+      </AnimatePresence>
     </div>
   )
 }

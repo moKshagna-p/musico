@@ -1,11 +1,11 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { FiArrowLeft } from 'react-icons/fi'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 
 import AlbumGrid from '../components/AlbumGrid.jsx'
 import PageTransition from '../components/PageTransition.jsx'
 import SearchBar from '../components/SearchBar.jsx'
-import { useAlbums } from '../hooks/useAlbums.js'
+import { useSearch } from '../hooks/useSearch.js'
 import { useAuth } from '../hooks/useAuth.js'
 import { addToSearchHistory } from '../services/searchHistoryService.js'
 import { recordSearchSignal } from '../services/searchSignalService.js'
@@ -13,13 +13,22 @@ import { recordSearchSignal } from '../services/searchSignalService.js'
 const SearchResults = () => {
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
-  const { user, isPending } = useAuth()
-  const historyScope = user?.id ?? 'guest'
-  const enableHistory = !isPending && Boolean(user?.id)
+  const { user } = useAuth()
+  
   const initialQuery = searchParams.get('q') ?? ''
+  const [query, setQuery] = useState(initialQuery)
   const lastLoggedQueryRef = useRef('')
 
-  const { albums, query, setQuery, loading, error, correctedQuery } = useAlbums(initialQuery)
+  // Professional Fetching with TanStack Query
+  const { 
+    suggestions: albums, 
+    isLoading: loading, 
+    error, 
+    correctedQuery 
+  } = useSearch(query, { 
+    limit: 24, // Full page results
+    enabled: !!query 
+  })
 
   const logSearch = (value) => {
     const trimmed = value?.trim() ?? ''
@@ -31,25 +40,15 @@ const SearchResults = () => {
     void recordSearchSignal(trimmed)
   }
 
-  useEffect(() => {
-    if (initialQuery) {
-      setQuery(initialQuery)
-      if (enableHistory) {
-        addToSearchHistory(initialQuery, historyScope)
-        logSearch(initialQuery)
-      }
-    }
-  }, [enableHistory, historyScope, initialQuery, setQuery])
-
-  const updateQuery = (value) => {
-    setQuery(value)
-    if (value?.trim()) {
-      if (enableHistory) {
-        addToSearchHistory(value, historyScope)
-        logSearch(value)
-      }
+  // Handle Search Submission
+  const handleSearch = (newQuery) => {
+    setQuery(newQuery)
+    if (newQuery?.trim()) {
+      addToSearchHistory(newQuery, user?.id ?? 'guest')
+      logSearch(newQuery)
+      
       const params = new URLSearchParams()
-      params.set('q', value)
+      params.set('q', newQuery)
       setSearchParams(params, { replace: true })
     } else {
       navigate('/discover')
@@ -68,28 +67,29 @@ const SearchResults = () => {
 
       <div className="space-y-8">
         <div>
-          <p className="text-xs uppercase tracking-[0.4em] text-muted">Search Results</p>
-          <h1 className="break-words font-display text-3xl tablet:text-4xl">
-            {query ? `"${query}"` : 'Start searching'}
+          <p className="text-xs uppercase tracking-[0.45em] text-muted font-bold">Search Results</p>
+          <h1 className="mt-2 break-words font-display text-3xl tablet:text-5xl font-bold tracking-tight">
+            {query ? `“${query}”` : 'Start searching'}
           </h1>
         </div>
 
         <SearchBar
           query={query}
-          onSearch={updateQuery}
-          autoFocus
-          historyScope={historyScope}
-          enableHistory={enableHistory}
+          onSearch={handleSearch}
+          autoFocus={!initialQuery}
+          historyScope={user?.id ?? 'guest'}
         />
 
         {query && (
-          <AlbumGrid
-            albums={albums}
-            loading={loading}
-            error={error}
-            correctedQuery={correctedQuery}
-            onSelect={(id) => navigate(`/album/${id}`, { state: { from: '/search', query } })}
-          />
+          <div className="mt-12">
+            <AlbumGrid
+              albums={albums}
+              loading={loading}
+              error={error?.message}
+              correctedQuery={correctedQuery}
+              onSelect={(id) => navigate(`/album/${id}`, { state: { from: '/search', query } })}
+            />
+          </div>
         )}
       </div>
     </PageTransition>

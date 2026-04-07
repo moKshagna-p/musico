@@ -36,6 +36,7 @@ api.interceptors.response.use(
  * @param {z.ZodSchema} schema 
  */
 export const validatedRequest = async (config, schema) => {
+  // Config can now include a 'signal' property from AbortController
   const data = await api(config)
   
   if (schema) {

@@ -79,7 +79,7 @@ export const getRecentPopularReleases = async (limit = 24) => {
   return data.slice(0, limit)
 }
 
-export const searchReleases = async (query) => {
+export const searchReleases = async (query, options = {}) => {
   const trimmed = query?.trim()
   if (!trimmed) return { data: [], correctedQuery: null }
 
@@ -89,7 +89,11 @@ export const searchReleases = async (query) => {
     return { data: cached.data, correctedQuery: cached.correctedQuery ?? null }
   }
 
-  const response = await validatedRequest({ url: '/api/search', params: { q: trimmed } })
+  const response = await validatedRequest({ 
+    url: '/api/search', 
+    params: { q: trimmed },
+    signal: options.signal 
+  })
   const data = Array.isArray(response?.data) ? response.data : []
   const correctedQuery = response?.correctedQuery ?? null
   
