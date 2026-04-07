@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { FiSearch, FiX, FiCommand, FiClock, FiCornerDownLeft } from 'react-icons/fi'
-import { motion, AnimatePresence } from 'framer-motion'
+import { AnimatePresence, motion } from 'framer-motion'
 import { useNavigate } from 'react-router-dom'
 
 import { useSearch } from '../hooks/useSearch.js'
@@ -35,6 +35,7 @@ const SearchBar = ({
   historyScope = 'guest',
 }) => {
   const navigate = useNavigate()
+  const MotionDiv = motion.div
   const [value, setValue] = useState(query)
   const [isFocused, setIsFocused] = useState(false)
   const [activeSuggestionIndex, setActiveSuggestionIndex] = useState(-1)
@@ -144,7 +145,7 @@ const SearchBar = ({
 
       <AnimatePresence>
         {showDropdown && (
-          <motion.div
+          <MotionDiv
             initial={{ opacity: 0, y: 10, scale: 0.98 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 10, scale: 0.98 }}
@@ -234,7 +235,7 @@ const SearchBar = ({
                 </div>
               </div>
             )}
-          </motion.div>
+          </MotionDiv>
         )}
       </AnimatePresence>
     </div>

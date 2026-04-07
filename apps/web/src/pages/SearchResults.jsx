@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useRef, useState } from 'react'
 import { FiArrowLeft } from 'react-icons/fi'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 
