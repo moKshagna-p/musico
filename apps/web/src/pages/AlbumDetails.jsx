@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { FiArrowLeft, FiCheck, FiClock, FiPlus } from 'react-icons/fi'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
+import { useQuery } from '@tanstack/react-query'
 
 import PageTransition from '../components/PageTransition.jsx'
 import RatingStars from '../components/RatingStars.jsx'
@@ -30,32 +31,20 @@ const AlbumDetails = () => {
   const { rateAlbum, getUserRating, getCommunityStats } = useRatings()
   const isSignedIn = Boolean(user?.id)
 
-  const [album, setAlbum] = useState(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState(null)
   const [newListName, setNewListName] = useState('')
   const [listStatus, setListStatus] = useState('')
   const [reviewKey, setReviewKey] = useState(0) // increment to refresh reviews list
 
-  useEffect(() => {
-    let isMounted = true
-    const fetchAlbum = async () => {
-      setLoading(true)
-      setError(null)
-      try {
-        const result = await getReleaseDetails(albumId)
-        if (isMounted) setAlbum(result)
-      } catch (err) {
-        if (isMounted) setError(err?.message ?? 'Unable to load album details.')
-      } finally {
-        if (isMounted) setLoading(false)
-      }
-    }
-    fetchAlbum()
-    return () => {
-      isMounted = false
-    }
-  }, [albumId])
+  // Professional Data Fetching with TanStack Query
+  const { 
+    data: album, 
+    isLoading: loading, 
+    error: queryError 
+  } = useQuery({
+    queryKey: ['release', albumId],
+    queryFn: () => getReleaseDetails(albumId),
+    enabled: !!albumId,
+  })
 
   const streamingLinks = useMemo(() => generateStreamingLinks(album), [album])
   const albumGenres = useMemo(() => inferAlbumGenres(album), [album])
@@ -176,11 +165,11 @@ const AlbumDetails = () => {
     )
   }
 
-  if (error) {
+  if (queryError) {
     return (
       <PageTransition>
         <div className="rounded-3xl border border-white/5 bg-red-500/10 px-6 py-8 text-center text-red-200">
-          <p className="font-semibold">{error}</p>
+          <p className="font-semibold">{queryError.message ?? 'Unable to load album details.'}</p>
           <button
             type="button"
             onClick={goBack}
@@ -286,7 +275,8 @@ const AlbumDetails = () => {
                   className="min-w-0 flex-1 bg-transparent text-sm text-white placeholder:text-white/45 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
                 />
                 <button
-                  type="submit"
+                  type="button"
+                  onClick={handleCreateList}
                   disabled={!isSignedIn}
                   className="inline-flex h-9 w-9 touch-manipulation items-center justify-center rounded-full border border-white/35 bg-white/90 text-canvas transition-colors duration-200 hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas disabled:cursor-not-allowed disabled:opacity-45"
                 >

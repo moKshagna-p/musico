@@ -1,5 +1,6 @@
 /* eslint-disable react-refresh/only-export-components */
 import { createContext, useCallback, useEffect, useMemo, useState } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 
 import { useAuth } from '../hooks/useAuth.js'
 import { fetchMyRatings, saveMyRating } from '../services/profileDataService.js'
@@ -8,6 +9,7 @@ export const RatingsContext = createContext(null)
 
 export const RatingsProvider = ({ children }) => {
   const { user, isPending } = useAuth()
+  const queryClient = useQueryClient()
   const [ratings, setRatings] = useState({})
   const [loadingRatings, setLoadingRatings] = useState(true)
 
@@ -73,11 +75,16 @@ export const RatingsProvider = ({ children }) => {
             timestamp: Number(saved?.timestamp ?? timestamp),
           },
         }))
+        // Invalidate and immediately refetch the release details query to update community stats
+        queryClient.invalidateQueries({ 
+          queryKey: ['release', normalizedAlbumId],
+          refetchType: 'all'
+        })
       })
       .catch(() => {
         // Keep optimistic value.
       })
-  }, [user?.id])
+  }, [user?.id, queryClient])
 
   const getUserRating = useCallback(
     (albumId) => ratings[albumId]?.rating ?? null,
