@@ -35,6 +35,10 @@ const Navigation = () => {
                 <clipPath id="vinylLabelClip">
                   <circle cx="50" cy="50" r="10.8" />
                 </clipPath>
+                <linearGradient id="vinylLabelFill" x1="39.2" y1="39.2" x2="60.8" y2="60.8">
+                  <stop offset="0%" stopColor="#111111" />
+                  <stop offset="100%" stopColor="#2b2b2b" />
+                </linearGradient>
               </defs>
 
               <circle cx="50" cy="50" r="49" fill="url(#vinylBody)" />
@@ -44,15 +48,18 @@ const Navigation = () => {
               <circle cx="50" cy="50" r="23" fill="none" stroke="#f6f6f6" strokeWidth="1" opacity="0.22" />
               <circle cx="50" cy="50" r="16" fill="none" stroke="#fefefe" strokeWidth="0.95" opacity="0.24" />
               <circle cx="50" cy="50" r="12.4" fill="#f8f8f8" opacity="0.9" />
-              <image
-                href="/mbdtf-cover.jpg"
-                x="39.2"
-                y="39.2"
-                width="21.6"
-                height="21.6"
-                preserveAspectRatio="xMidYMid slice"
+              <circle cx="50" cy="50" r="10.8" fill="url(#vinylLabelFill)" />
+              <text
+                x="50"
+                y="53.8"
+                textAnchor="middle"
+                fontSize="8.8"
+                fontWeight="700"
+                fill="#f5f5f5"
                 clipPath="url(#vinylLabelClip)"
-              />
+              >
+                M
+              </text>
               <circle cx="50" cy="50" r="10.8" fill="none" stroke="#ffffff" strokeWidth="0.9" opacity="0.55" />
               <circle cx="50" cy="50" r="2.1" fill="#d9d9d9" />
 

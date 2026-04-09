@@ -1,0 +1,21 @@
+<svg width="256" height="256" viewBox="0 0 256 256" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="256" height="256" rx="64" fill="#050505"/>
+  <circle cx="128" cy="128" r="86" fill="url(#disc)"/>
+  <circle cx="128" cy="128" r="60" stroke="rgba(255,255,255,0.18)" stroke-width="6"/>
+  <circle cx="128" cy="128" r="38" stroke="rgba(255,255,255,0.14)" stroke-width="5"/>
+  <circle cx="128" cy="128" r="24" fill="#F2F2F2"/>
+  <circle cx="128" cy="128" r="6" fill="#050505"/>
+  <path d="M72 104C84 78 110 60 140 60" stroke="url(#shine)" stroke-width="14" stroke-linecap="round"/>
+  <defs>
+    <radialGradient id="disc" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(100 88) rotate(50.4403) scale(122.935)">
+      <stop stop-color="#FFFFFF"/>
+      <stop offset="0.35" stop-color="#E8E8E8"/>
+      <stop offset="0.7" stop-color="#BEBEBE"/>
+      <stop offset="1" stop-color="#8D8D8D"/>
+    </radialGradient>
+    <linearGradient id="shine" x1="72" y1="104" x2="140" y2="60" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFFFFF" stop-opacity="0.8"/>
+      <stop offset="1" stop-color="#FFFFFF" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+</svg>
