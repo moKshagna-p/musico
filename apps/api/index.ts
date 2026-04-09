@@ -606,10 +606,52 @@ const app = new Elysia()
 
     const profile = await ensureUserProfile(authUser.id)
 
-    const [followerRows, followingRows] = await Promise.all([
+    const [followerRows, followingRows, recentRatingsRows, ratingActivityRows] = await Promise.all([
       db.select({ id: userFollow.id }).from(userFollow).where(eq(userFollow.followingId, authUser.id)),
       db.select({ id: userFollow.id }).from(userFollow).where(eq(userFollow.followerId, authUser.id)),
+      db
+        .select({
+          albumId: userRating.albumId,
+          rating: userRating.rating,
+          updatedAt: userRating.updatedAt,
+        })
+        .from(userRating)
+        .where(eq(userRating.userId, authUser.id))
+        .orderBy(desc(userRating.updatedAt))
+        .limit(10),
+      db
+        .select({
+          albumId: activity.albumId,
+          albumName: activity.albumName,
+          albumCover: activity.albumCover,
+          createdAt: activity.createdAt,
+        })
+        .from(activity)
+        .where(and(eq(activity.userId, authUser.id), eq(activity.type, 'rated')))
+        .orderBy(desc(activity.createdAt))
+        .limit(50),
     ])
+
+    const latestActivityByAlbum = new Map<string, { albumName: string | null; albumCover: string | null }>()
+    for (const row of ratingActivityRows) {
+      const albumId = String(row.albumId ?? '').trim()
+      if (!albumId || latestActivityByAlbum.has(albumId)) continue
+      latestActivityByAlbum.set(albumId, {
+        albumName: row.albumName ? String(row.albumName) : null,
+        albumCover: row.albumCover ? String(row.albumCover) : null,
+      })
+    }
+
+    const recentRatings = recentRatingsRows.map((row) => {
+      const activityMeta = latestActivityByAlbum.get(String(row.albumId))
+      return {
+        albumId: row.albumId,
+        rating: row.rating,
+        timestamp: row.updatedAt.getTime(),
+        albumName: activityMeta?.albumName ?? '',
+        albumCover: activityMeta?.albumCover ?? '',
+      }
+    })
 
     set.headers ??= {}
     set.headers['Cache-Control'] = 'no-store'
@@ -621,6 +663,7 @@ const app = new Elysia()
         image: authUser.image ?? null,
         followerCount: followerRows.length,
         followingCount: followingRows.length,
+        recentRatings,
       },
     }
   })

@@ -234,6 +234,22 @@ const Profile = () => {
     [ratings],
   )
 
+  const recentRatingPreviews = useMemo(
+    () =>
+      Array.isArray(socialProfile?.recentRatings)
+        ? socialProfile.recentRatings
+            .map((item) => ({
+              albumId: String(item?.albumId ?? '').trim(),
+              rating: Number(item?.rating ?? 0),
+              timestamp: Number(item?.timestamp ?? 0),
+              name: String(item?.albumName ?? '').trim(),
+              cover: String(item?.albumCover ?? '').trim(),
+            }))
+            .filter((item) => item.albumId && Number.isFinite(item.rating) && item.rating > 0)
+        : [],
+    [socialProfile?.recentRatings],
+  )
+
   useEffect(() => {
     const fetchRatedAlbums = async () => {
       if (ratedItems.length === 0) {
@@ -243,7 +259,7 @@ const Profile = () => {
       
       const topItems = [...ratedItems]
         .sort((a, b) => b.timestamp - a.timestamp)
-        .slice(0, 12)
+        .slice(0, 6)
 
       const albums = await Promise.allSettled(
         topItems.map(async (item) => {
@@ -262,8 +278,11 @@ const Profile = () => {
   }, [ratedItems])
 
   const recentlyRated = useMemo(
-    () => [...ratedAlbums].sort((a, b) => b.timestamp - a.timestamp).slice(0, 10),
-    [ratedAlbums],
+    () => {
+      if (recentRatingPreviews.length) return recentRatingPreviews
+      return [...ratedAlbums].sort((a, b) => b.timestamp - a.timestamp).slice(0, 10)
+    },
+    [ratedAlbums, recentRatingPreviews],
   )
 
   const handleSignOut = async () => {
@@ -512,7 +531,7 @@ const Profile = () => {
                     <div className="relative">
                       <img
                         src={album.cover}
-                        alt={album.name}
+                        alt={album.name || 'Album cover'}
                         className="block aspect-square w-full object-cover"
                       />
                       <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-black/80 via-black/15 to-transparent" />
@@ -520,13 +539,13 @@ const Profile = () => {
                         {album.rating.toFixed(1)} / 5
                       </div>
                     </div>
-                    <div className="space-y-2 px-4 py-4">
-                      <div>
-                        <h3 className="line-clamp-1 text-base font-semibold text-white">{album.name}</h3>
+                      <div className="space-y-2 px-4 py-4">
+                        <div>
+                        <h3 className="line-clamp-1 text-base font-semibold text-white">{album.name || 'Untitled album'}</h3>
                         <p className="line-clamp-1 text-sm text-muted">
-                          {album.artist ?? album.artists?.[0] ?? 'Unknown artist'}
+                          {album.artist ?? album.artists?.[0] ?? 'Recently rated'}
                         </p>
-                      </div>
+                        </div>
                       <p className="text-right text-[11px] uppercase tracking-[0.2em] text-muted/80">
                         {formatReviewedAt(album.timestamp)}
                       </p>
