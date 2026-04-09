@@ -8,6 +8,8 @@ const SEARCH_CACHE_VERSION = 'v4'
 
 const featuredCache = { timestamp: 0, data: [] }
 const recentPopularCache = { timestamp: 0, data: [] }
+const SEARCH_CACHE_PREFIX = `musico:search:${SEARCH_CACHE_VERSION}:`
+const RELEASE_CACHE_PREFIX = 'musico:release:'
 
 const storage = {
   get: (key) => {
@@ -31,6 +33,77 @@ const storage = {
 const isFresh = (timestamp, ttl = CACHE_WINDOW) => Date.now() - timestamp < ttl
 
 const AlbumArraySchema = z.array(AlbumSchema)
+
+const patchAlbumStats = (album, albumId, communityRating, reviewCount) => {
+  if (!album || String(album.id) !== String(albumId)) return album
+  return {
+    ...album,
+    communityRating,
+    reviewCount,
+  }
+}
+
+const patchAlbumStatsInCollection = (albums, albumId, communityRating, reviewCount) => {
+  if (!Array.isArray(albums) || !albums.length) return albums
+  return albums.map((album) => patchAlbumStats(album, albumId, communityRating, reviewCount))
+}
+
+export const updateAlbumCommunityStatsInCache = ({ albumId, communityRating, reviewCount }) => {
+  const normalizedAlbumId = String(albumId ?? '').trim()
+  const normalizedRating = Number(communityRating)
+  const normalizedCount = Number(reviewCount)
+
+  if (!normalizedAlbumId) return
+  if (!Number.isFinite(normalizedRating) || !Number.isFinite(normalizedCount)) return
+
+  featuredCache.data = patchAlbumStatsInCollection(
+    featuredCache.data,
+    normalizedAlbumId,
+    normalizedRating,
+    normalizedCount,
+  )
+  recentPopularCache.data = patchAlbumStatsInCollection(
+    recentPopularCache.data,
+    normalizedAlbumId,
+    normalizedRating,
+    normalizedCount,
+  )
+
+  try {
+    for (let index = 0; index < localStorage.length; index += 1) {
+      const key = localStorage.key(index)
+      if (!key) continue
+
+      if (key === `${RELEASE_CACHE_PREFIX}${normalizedAlbumId}`) {
+        const cachedRelease = storage.get(key)
+        if (cachedRelease?.data) {
+          storage.set(key, {
+            ...cachedRelease,
+            data: patchAlbumStats(cachedRelease.data, normalizedAlbumId, normalizedRating, normalizedCount),
+          })
+        }
+        continue
+      }
+
+      if (!key.startsWith(SEARCH_CACHE_PREFIX)) continue
+
+      const cachedSearch = storage.get(key)
+      if (!cachedSearch?.data) continue
+
+      storage.set(key, {
+        ...cachedSearch,
+        data: patchAlbumStatsInCollection(
+          cachedSearch.data,
+          normalizedAlbumId,
+          normalizedRating,
+          normalizedCount,
+        ),
+      })
+    }
+  } catch {
+    // Ignore storage access failures.
+  }
+}
 
 export const getFeaturedReleases = async (limit = 24) => {
   if (featuredCache.data.length && isFresh(featuredCache.timestamp, FEATURED_CACHE_WINDOW)) {

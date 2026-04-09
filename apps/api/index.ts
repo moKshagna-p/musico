@@ -375,6 +375,14 @@ const app = new Elysia()
         },
       })
 
+    const [communityStats] = await db
+      .select({
+        averageRating: sql<number>`coalesce(avg(${userRating.rating}), 0)`,
+        ratingCount: sql<number>`count(*)`,
+      })
+      .from(userRating)
+      .where(eq(userRating.albumId, albumId))
+
     // Record activity for the feed
     recordActivity({
       userId: authUser.id,
@@ -391,6 +399,8 @@ const app = new Elysia()
       data: {
         rating: Math.round(rating),
         timestamp: now.getTime(),
+        communityRating: Number(Number(communityStats?.averageRating ?? 0).toFixed(1)),
+        reviewCount: Number(communityStats?.ratingCount ?? 0),
       },
     }
   })

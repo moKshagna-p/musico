@@ -4,6 +4,7 @@ import { useQueryClient } from '@tanstack/react-query'
 
 import { useAuth } from '../hooks/useAuth.js'
 import { fetchMyRatings, saveMyRating } from '../services/profileDataService.js'
+import { updateAlbumCommunityStatsInCache } from '../services/discogsService.js'
 
 export const RatingsContext = createContext(null)
 
@@ -75,10 +76,51 @@ export const RatingsProvider = ({ children }) => {
             timestamp: Number(saved?.timestamp ?? timestamp),
           },
         }))
-        // Invalidate and immediately refetch the release details query to update community stats
+
+        const nextCommunityRating = Number(saved?.communityRating)
+        const nextReviewCount = Number(saved?.reviewCount)
+        if (Number.isFinite(nextCommunityRating) && Number.isFinite(nextReviewCount)) {
+          updateAlbumCommunityStatsInCache({
+            albumId: normalizedAlbumId,
+            communityRating: nextCommunityRating,
+            reviewCount: nextReviewCount,
+          })
+
+          queryClient.setQueryData(['release', normalizedAlbumId], (current) =>
+            current
+              ? {
+                  ...current,
+                  communityRating: nextCommunityRating,
+                  reviewCount: nextReviewCount,
+                }
+              : current,
+          )
+
+          queryClient.setQueriesData({ queryKey: ['search'] }, (current) => {
+            if (!current?.data || !Array.isArray(current.data)) return current
+
+            return {
+              ...current,
+              data: current.data.map((album) =>
+                String(album?.id) === normalizedAlbumId
+                  ? {
+                      ...album,
+                      communityRating: nextCommunityRating,
+                      reviewCount: nextReviewCount,
+                    }
+                  : album,
+              ),
+            }
+          })
+        }
+
         queryClient.invalidateQueries({ 
           queryKey: ['release', normalizedAlbumId],
           refetchType: 'all'
+        })
+        queryClient.invalidateQueries({
+          queryKey: ['search'],
+          refetchType: 'active',
         })
       })
       .catch(() => {
