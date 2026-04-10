@@ -17,6 +17,10 @@ export const useAuth = () => {
     })
 
   const signOutCurrentUser = async () => authClient.signOut()
+  const refreshSession = async () => {
+    await sessionState.refetch()
+    return authClient.getSession()
+  }
 
   return {
     ...sessionState,
@@ -25,5 +29,6 @@ export const useAuth = () => {
     signInWithEmail,
     signUpWithEmail,
     signOutCurrentUser,
+    refreshSession,
   }
 }

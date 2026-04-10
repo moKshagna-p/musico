@@ -6,7 +6,7 @@ import { useAuth } from '../hooks/useAuth.js'
 
 const Auth = () => {
   const navigate = useNavigate()
-  const { user, signInWithEmail, signUpWithEmail, isPending } = useAuth()
+  const { user, signInWithEmail, signUpWithEmail, refreshSession, isPending } = useAuth()
 
   const [mode, setMode] = useState('sign-in')
   const [name, setName] = useState('')
@@ -45,7 +45,13 @@ const Auth = () => {
         return
       }
 
-      navigate('/')
+      const sessionResult = await refreshSession()
+      if (!sessionResult?.data?.user) {
+        setError('Authentication succeeded, but the session could not be restored. Try signing in once more.')
+        return
+      }
+
+      navigate('/profile')
     } catch {
       setError('Unable to authenticate. Please try again.')
     } finally {
