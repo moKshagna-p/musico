@@ -4,6 +4,7 @@ import { Route, Routes, useLocation, useNavigate } from 'react-router-dom'
 
 import Footer from './components/Footer.jsx'
 import Navigation from './components/Navigation.jsx'
+import PageLoadingState from './components/PageLoadingState.jsx'
 import RouteErrorBoundary from './components/RouteErrorBoundary.jsx'
 import { useAuth } from './hooks/useAuth.js'
 
@@ -105,7 +106,7 @@ const App = () => {
       <Navigation />
       <main className="flex-1">
         <RouteErrorBoundary>
-          <Suspense fallback={<div className="mx-auto max-w-6xl px-4 py-16 text-sm text-muted">Loading...</div>}>
+          <Suspense fallback={<PageLoadingState title="Loading page" cards={6} />}>
             <AnimatePresence mode="wait" initial={false}>
               <Routes location={location} key={location.pathname}>
                 <Route path="/" element={<Home />} />

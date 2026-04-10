@@ -3,6 +3,7 @@ import { FiEdit2, FiLogOut, FiUpload, FiX } from 'react-icons/fi'
 import { Link, useNavigate } from 'react-router-dom'
 
 import PageTransition from '../components/PageTransition.jsx'
+import PageLoadingState, { UserListLoadingState } from '../components/PageLoadingState.jsx'
 import Stats from '../components/Stats.jsx'
 import TopGenres from '../components/TopGenres.jsx'
 import ListCard from '../components/ListCard.jsx'
@@ -28,7 +29,7 @@ const FollowListModal = ({ title, users, loading, onClose }) => (
       <h2 className="font-display text-2xl font-bold">{title}</h2>
       <div className="mt-5 max-h-[60vh] space-y-3 overflow-y-auto pr-1">
         {loading ? (
-          <p className="text-sm text-muted">Loading…</p>
+          <UserListLoadingState />
         ) : users.length ? (
           users.map((person) => (
             <Link
@@ -298,9 +299,7 @@ const Profile = () => {
   if (isPending || !user || loadingRatings) {
     return (
       <PageTransition>
-        <div className="mx-auto max-w-5xl rounded-3xl border border-outline bg-panel p-8 text-center text-muted">
-          Loading profile...
-        </div>
+        <PageLoadingState title="Loading your profile" cards={6} />
       </PageTransition>
     )
   }

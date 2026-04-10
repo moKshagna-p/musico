@@ -5,6 +5,7 @@ import { motion, AnimatePresence, useReducedMotion } from 'framer-motion'
 
 import ActivityCard from '../components/ActivityCard.jsx'
 import FollowButton from '../components/FollowButton.jsx'
+import PageLoadingState from '../components/PageLoadingState.jsx'
 import PageTransition from '../components/PageTransition.jsx'
 import { useAuth } from '../hooks/useAuth.js'
 import useFeed from '../hooks/useFeed.js'
@@ -319,7 +320,7 @@ const Feed = () => {
   if (isPending || !user) {
     return (
       <PageTransition>
-        <div className="mx-auto max-w-2xl py-16 text-center text-muted">Loading\u2026</div>
+        <PageLoadingState title="Loading feed" cards={5} compact />
       </PageTransition>
     )
   }
@@ -412,7 +413,7 @@ const Feed = () => {
                   {loadingMore ? (
                     <span className="inline-flex items-center gap-2">
                       <FiRefreshCw className="h-3 w-3 animate-spin" aria-hidden="true" />
-                      Loading\u2026
+                      Fetching more
                     </span>
                   ) : (
                     'Load More'

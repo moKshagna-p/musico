@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import { FiRefreshCw } from 'react-icons/fi'
 
 import ReviewCard from './ReviewCard.jsx'
 import { fetchAlbumReviews } from '../services/socialService.js'
@@ -78,7 +79,14 @@ const ReviewsList = ({ albumId }) => {
           disabled={loadingMore}
           className="w-full rounded-xl border border-outline py-3 text-xs uppercase tracking-[0.2em] text-muted transition-colors hover:text-white disabled:opacity-50"
         >
-          {loadingMore ? 'Loading...' : 'Load More Reviews'}
+          {loadingMore ? (
+            <span className="inline-flex items-center gap-2">
+              <FiRefreshCw className="h-3 w-3 animate-spin" aria-hidden="true" />
+              Fetching reviews
+            </span>
+          ) : (
+            'Load More Reviews'
+          )}
         </button>
       )}
     </div>

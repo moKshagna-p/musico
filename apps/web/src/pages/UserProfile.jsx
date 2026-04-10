@@ -5,6 +5,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 
 import FollowButton from '../components/FollowButton.jsx'
 import PageTransition from '../components/PageTransition.jsx'
+import PageLoadingState from '../components/PageLoadingState.jsx'
 import { useAuth } from '../hooks/useAuth.js'
 import { fetchUserProfile } from '../services/socialService.js'
 import { getReleaseDetails } from '../services/discogsService.js'
@@ -68,7 +69,7 @@ const UserProfile = () => {
   if (loading) {
     return (
       <PageTransition>
-        <div className="mx-auto max-w-5xl py-16 text-center text-muted">Loading profile...</div>
+        <PageLoadingState title="Loading profile" cards={6} />
       </PageTransition>
     )
   }

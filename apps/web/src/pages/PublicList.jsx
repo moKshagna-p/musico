@@ -3,6 +3,7 @@ import { FiShare2 } from 'react-icons/fi'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 
 import PageTransition from '../components/PageTransition.jsx'
+import PageLoadingState from '../components/PageLoadingState.jsx'
 import { fetchPublicList } from '../services/socialService.js'
 
 const PublicList = () => {
@@ -48,7 +49,7 @@ const PublicList = () => {
   if (loading) {
     return (
       <PageTransition>
-        <div className="mx-auto max-w-5xl py-16 text-center text-muted">Loading list...</div>
+        <PageLoadingState title="Loading list" cards={4} />
       </PageTransition>
     )
   }

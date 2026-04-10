@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 
 import PageTransition from '../components/PageTransition.jsx'
+import PageLoadingState from '../components/PageLoadingState.jsx'
 import { useAuth } from '../hooks/useAuth.js'
 
 const Auth = () => {
@@ -62,8 +63,8 @@ const Auth = () => {
   if (isPending) {
     return (
       <PageTransition>
-        <div aria-live="polite" className="mx-auto max-w-xl rounded-3xl border border-outline bg-panel p-6 text-center text-muted tablet:p-8">
-          Loading Session…
+        <div aria-live="polite">
+          <PageLoadingState title="Loading session" cards={1} compact />
         </div>
       </PageTransition>
     )
