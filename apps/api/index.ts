@@ -39,6 +39,13 @@ const MAX_REVIEW_LENGTH = 280
 const MAX_BIO_LENGTH = 160
 const USERNAME_REGEX = /^[a-z0-9][a-z0-9-]{1,22}[a-z0-9]$/
 
+const normalizeRating = (value: number) => {
+  if (!Number.isFinite(value)) return null
+  const normalized = Math.round(value * 2) / 2
+  if (normalized < 0.5 || normalized > 5) return null
+  return normalized
+}
+
 const rateLimiter = new Map<string, { count: number; resetAt: number }>()
 
 const log = (level: 'info' | 'warn' | 'error', message: string, data: Record<string, unknown> = {}) => {
@@ -344,16 +351,16 @@ const app = new Elysia()
 
     const albumId = String(params?.albumId ?? '').trim()
     const typedBody = body as { rating?: unknown; albumName?: unknown; albumCover?: unknown }
-    const rating = Number(typedBody?.rating)
+    const rating = normalizeRating(Number(typedBody?.rating))
 
     if (!albumId) {
       set.status = 400
       return { error: 'Missing album id.' }
     }
 
-    if (!Number.isFinite(rating) || rating < 1 || rating > 5) {
+    if (rating === null) {
       set.status = 400
-      return { error: 'Rating must be between 1 and 5.' }
+      return { error: 'Rating must be between 0.5 and 5 in 0.5 steps.' }
     }
 
     const now = new Date()
@@ -363,14 +370,14 @@ const app = new Elysia()
         id: crypto.randomUUID(),
         userId: authUser.id,
         albumId,
-        rating: Math.round(rating),
+        rating,
         createdAt: now,
         updatedAt: now,
       })
       .onConflictDoUpdate({
         target: [userRating.userId, userRating.albumId],
         set: {
-          rating: Math.round(rating),
+          rating,
           updatedAt: now,
         },
       })
@@ -390,15 +397,46 @@ const app = new Elysia()
       albumId,
       albumName: String(typedBody?.albumName ?? '').trim() || null,
       albumCover: String(typedBody?.albumCover ?? '').trim() || null,
-      metadata: { rating: Math.round(rating) },
+      metadata: { rating },
     })
 
     set.headers ??= {}
     set.headers['Cache-Control'] = 'no-store'
     return {
       data: {
-        rating: Math.round(rating),
+        rating,
         timestamp: now.getTime(),
+        communityRating: Number(Number(communityStats?.averageRating ?? 0).toFixed(1)),
+        reviewCount: Number(communityStats?.ratingCount ?? 0),
+      },
+    }
+  })
+  .delete('/api/me/ratings/:albumId', async ({ request, params, set }) => {
+    const authUser = await ensureAuthenticated(request, set)
+    if (!authUser) return { error: 'Unauthorized.' }
+
+    const albumId = String(params?.albumId ?? '').trim()
+    if (!albumId) {
+      set.status = 400
+      return { error: 'Missing album id.' }
+    }
+
+    await db.delete(userRating).where(and(eq(userRating.userId, authUser.id), eq(userRating.albumId, albumId)))
+
+    const [communityStats] = await db
+      .select({
+        averageRating: sql<number>`coalesce(avg(${userRating.rating}), 0)`,
+        ratingCount: sql<number>`count(*)`,
+      })
+      .from(userRating)
+      .where(eq(userRating.albumId, albumId))
+
+    set.headers ??= {}
+    set.headers['Cache-Control'] = 'no-store'
+    return {
+      data: {
+        rating: null,
+        timestamp: Date.now(),
         communityRating: Number(Number(communityStats?.averageRating ?? 0).toFixed(1)),
         reviewCount: Number(communityStats?.ratingCount ?? 0),
       },

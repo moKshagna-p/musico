@@ -1,4 +1,4 @@
-import { FaStar } from 'react-icons/fa'
+import RatingStars from './RatingStars.jsx'
 
 const ReviewCard = ({ review }) => {
   const { content, user: reviewer, rating, createdAt } = review
@@ -23,14 +23,7 @@ const ReviewCard = ({ review }) => {
         </div>
 
         {rating != null && (
-          <div className="flex items-center gap-0.5">
-            {Array.from({ length: 5 }).map((_, i) => (
-              <FaStar
-                key={i}
-                className={`h-3 w-3 ${i < rating ? 'text-white' : 'text-white/20'}`}
-              />
-            ))}
-          </div>
+          <RatingStars value={Number(rating)} readOnly size="sm" align="left" />
         )}
       </div>
 

@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { FaStar } from 'react-icons/fa'
+import RatingStars from './RatingStars.jsx'
 
 const ActivityCard = ({ item }) => {
   const { type, user: actor, albumId, albumName, albumCover, targetUser, metadata, createdAt } = item
@@ -23,14 +23,8 @@ const ActivityCard = ({ item }) => {
         return (
           <p className="text-sm text-white/80">
             {userLink} rated {albumLink}{' '}
-            <span className="inline-flex items-center gap-0.5 text-white/70" aria-label={`${rating} out of 5 stars`}>
-              {Array.from({ length: 5 }).map((_, i) => (
-                <FaStar
-                  key={i}
-                  aria-hidden="true"
-                  className={`h-3 w-3 ${i < rating ? 'text-white' : 'text-white/20'}`}
-                />
-              ))}
+            <span className="inline-flex align-middle">
+              <RatingStars value={rating} readOnly size="sm" align="left" />
             </span>
           </p>
         )

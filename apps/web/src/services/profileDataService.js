@@ -19,6 +19,11 @@ export const saveMyRating = async (albumId, rating, meta = {}) => {
   return response.data ?? { rating, timestamp: Date.now() }
 }
 
+export const deleteMyRating = async (albumId) => {
+  const response = await api.delete(`/api/me/ratings/${encodeURIComponent(albumId)}`)
+  return response.data ?? { rating: null, timestamp: Date.now() }
+}
+
 export const fetchMyLists = async () => {
   const response = await api.get('/api/me/lists')
   return Array.isArray(response.data) ? response.data : []

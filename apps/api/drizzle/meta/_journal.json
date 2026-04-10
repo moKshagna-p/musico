@@ -50,6 +50,13 @@
       "when": 1775232000000,
       "tag": "0006_slow_kylun",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1775788200000,
+      "tag": "0007_half_star_ratings",
+      "breakpoints": true
     }
   ]
 }

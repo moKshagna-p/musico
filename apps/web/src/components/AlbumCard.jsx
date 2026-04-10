@@ -1,7 +1,5 @@
 import { memo, useRef } from 'react'
 import { motion } from 'framer-motion'
-import { FiArrowUpRight } from 'react-icons/fi'
-
 import { prefetchReleaseDetails } from '../services/discogsService.js'
 import { useRatings } from '../hooks/useRatings.js'
 import { formatReleaseDate } from '../utils/helpers.js'
@@ -80,14 +78,8 @@ const AlbumCard = ({ album, onSelect }) => {
           value={community.average}
           readOnly
           showValue={community.total > 0}
+          size="sm"
         />
-      </div>
-
-      <div className="flex items-center justify-end border-t border-outline pt-3 text-xs uppercase tracking-[0.3em] text-white">
-        <span className="flex items-center gap-2">
-          Details
-          <FiArrowUpRight aria-hidden="true" />
-        </span>
       </div>
     </MotionArticle>
   )

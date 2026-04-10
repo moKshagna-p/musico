@@ -169,7 +169,7 @@ export const userRating = pgTable(
       .notNull()
       .references(() => user.id, { onDelete: 'cascade' }),
     albumId: text('albumId').notNull(),
-    rating: integer('rating').notNull(),
+    rating: real('rating').notNull(),
     createdAt: timestamp('createdAt', { withTimezone: true, mode: 'date' }).notNull(),
     updatedAt: timestamp('updatedAt', { withTimezone: true, mode: 'date' }).notNull(),
   },

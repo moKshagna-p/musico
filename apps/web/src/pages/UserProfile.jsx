@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react'
 import { FiArrowLeft } from 'react-icons/fi'
-import { FaStar } from 'react-icons/fa'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 
 import FollowButton from '../components/FollowButton.jsx'
 import PageTransition from '../components/PageTransition.jsx'
 import { ProfilePageSkeleton } from '../components/PageLoadingState.jsx'
+import RatingStars from '../components/RatingStars.jsx'
 import { useAuth } from '../hooks/useAuth.js'
 import { fetchUserProfile } from '../services/socialService.js'
 import { getReleaseDetails } from '../services/discogsService.js'
@@ -159,13 +159,8 @@ const UserProfile = () => {
                             <div>
                               <h3 className="font-bold text-white">{album.name}</h3>
                               <p className="text-white">{album.artist ?? album.artists?.[0] ?? 'Unknown artist'}</p>
-                              <div className="mt-2 flex items-center justify-center gap-1">
-                                {Array.from({ length: 5 }).map((_, index) => (
-                                  <FaStar
-                                    key={index}
-                                    className={`h-3 w-3 ${index < Number(album.rating ?? 0) ? 'text-white' : 'text-white/20'}`}
-                                  />
-                                ))}
+                              <div className="mt-2 flex justify-center">
+                                <RatingStars value={Number(album.rating ?? 0)} readOnly size="sm" align="left" />
                               </div>
                             </div>
                           </div>
