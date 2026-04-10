@@ -3,7 +3,7 @@ import { FiEdit2, FiLogOut, FiUpload, FiX } from 'react-icons/fi'
 import { Link, useNavigate } from 'react-router-dom'
 
 import PageTransition from '../components/PageTransition.jsx'
-import PageLoadingState, { UserListLoadingState } from '../components/PageLoadingState.jsx'
+import { ProfilePageSkeleton, UserListLoadingState } from '../components/PageLoadingState.jsx'
 import Stats from '../components/Stats.jsx'
 import TopGenres from '../components/TopGenres.jsx'
 import ListCard from '../components/ListCard.jsx'
@@ -299,7 +299,7 @@ const Profile = () => {
   if (isPending || !user || loadingRatings) {
     return (
       <PageTransition>
-        <PageLoadingState title="Loading your profile" cards={6} />
+        <ProfilePageSkeleton showActions />
       </PageTransition>
     )
   }
