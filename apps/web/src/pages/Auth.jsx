@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 
 import PageTransition from '../components/PageTransition.jsx'
@@ -21,6 +21,12 @@ const Auth = () => {
     () => (submitting ? (mode === 'sign-in' ? 'Signing In…' : 'Creating Account…') : title),
     [submitting, mode, title],
   )
+
+  useEffect(() => {
+    if (!isPending && user) {
+      navigate('/', { replace: true })
+    }
+  }, [isPending, user, navigate])
 
   const onSubmit = async (event) => {
     event.preventDefault()
@@ -52,7 +58,7 @@ const Auth = () => {
         return
       }
 
-      navigate('/profile')
+      navigate('/', { replace: true })
     } catch {
       setError('Unable to authenticate. Please try again.')
     } finally {
@@ -70,23 +76,7 @@ const Auth = () => {
     )
   }
 
-  if (user) {
-    return (
-      <PageTransition>
-        <div className="mx-auto max-w-xl rounded-3xl border border-outline bg-panel p-6 text-center tablet:p-8">
-          <p className="text-sm uppercase tracking-[0.3em] text-muted">Signed in as</p>
-          <p className="mt-2 break-all text-xl text-white tablet:text-2xl">{user.email}</p>
-          <button
-            type="button"
-            onClick={() => navigate('/')}
-            className="mt-6 rounded-full border border-outline px-5 py-2 text-xs uppercase tracking-[0.35em] text-muted transition hover:text-white"
-          >
-            Go Home
-          </button>
-        </div>
-      </PageTransition>
-    )
-  }
+  if (user) return null
 
   return (
     <PageTransition>

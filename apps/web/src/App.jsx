@@ -60,7 +60,7 @@ const App = () => {
       if (hasTimedOut) {
         window.localStorage.removeItem(LAST_ACTIVITY_KEY)
         await signOutCurrentUser()
-        navigate('/auth', { replace: true })
+        navigate('/', { replace: true })
       }
     }
 
