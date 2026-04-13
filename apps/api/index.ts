@@ -4,7 +4,7 @@ import { and, desc, eq, ilike, inArray, lt, or, sql } from 'drizzle-orm'
 
 import { auth } from './auth'
 import { db } from './db'
-import { getRecentPopularReleases, getReleaseDetails, searchReleases } from './discogs'
+import { getReleaseDetails, searchReleases } from './discogs'
 import { env, validateProductionEnv } from './env'
 import { recordSearchQuery } from './searchSignals'
 import {
@@ -20,7 +20,7 @@ import {
 import {
   getFeaturedFallbackReleases,
   getRecentPopularFallbackReleases,
-  getStoredTrendingAlbums,
+  getStoredTrendingAlbumsEnsuringFresh,
   isStoredTrendingTableMissingError,
   refreshStoredTrendingAlbums,
   refreshStoredHomeAlbums,
@@ -1633,11 +1633,7 @@ const app = new Elysia()
 
       if (mode === 'recent-popular') {
         try {
-          data = await getStoredTrendingAlbums(limit, 'recent-popular')
-          if (!data.length) {
-            console.warn('[featured] recent release snapshot empty, falling back to Discogs cache')
-            data = await getRecentPopularFallbackReleases(limit)
-          }
+          data = await getStoredTrendingAlbumsEnsuringFresh(limit, 'recent-popular')
         } catch (error) {
           if (!isStoredTrendingTableMissingError(error)) throw error
           console.warn('[featured] stored_trending_album missing for recent releases, falling back to Discogs cache')
@@ -1645,16 +1641,19 @@ const app = new Elysia()
         }
       } else {
         try {
-          data = await getStoredTrendingAlbums(limit)
-          if (!data.length) {
-            console.warn('[featured] most happening snapshot empty, falling back to Discogs cache')
-            data = await getFeaturedFallbackReleases(limit)
-          }
+          data = await getStoredTrendingAlbumsEnsuringFresh(limit)
         } catch (error) {
           if (!isStoredTrendingTableMissingError(error)) throw error
           console.warn('[featured] stored_trending_album missing for most happening, falling back to Discogs cache')
           data = await getFeaturedFallbackReleases(limit)
         }
+      }
+
+      if (!data.length) {
+        console.warn('[featured] stored snapshot empty, falling back to Discogs cache')
+        data = mode === 'recent-popular'
+          ? await getRecentPopularFallbackReleases(limit)
+          : await getFeaturedFallbackReleases(limit)
       }
 
       set.headers ??= {}

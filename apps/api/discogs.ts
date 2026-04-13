@@ -7,7 +7,7 @@ import type { ReleaseDetails, ReleaseSummary } from './types'
 
 import { db } from './db'
 import { env } from './env'
-import { featuredCache as featuredCacheTable, searchCache as searchCacheTable } from './schema'
+import { featuredCache as featuredCacheTable, releaseCache as releaseCacheTable, searchCache as searchCacheTable } from './schema'
 
 const DISCOGS_BASE = 'https://api.discogs.com'
 const sanitizeDiscogsCredential = (value?: string) => {
@@ -221,6 +221,77 @@ const toReleaseSummary = (release: ReleaseDetails | ReleaseSummary): ReleaseSumm
   reviewCount: Number(release.reviewCount ?? 0),
 })
 
+const toTrack = (track: unknown, index: number) => {
+  const entry = (track ?? {}) as Partial<ReleaseDetails['tracks'][number]>
+  return {
+    id: String(entry.id ?? `track-${index}`).trim() || `track-${index}`,
+    name: String(entry.name ?? `Track ${index + 1}`).trim() || `Track ${index + 1}`,
+    duration_ms: Number.isFinite(Number(entry.duration_ms)) ? Math.max(0, Math.round(Number(entry.duration_ms))) : 0,
+    track_number: Number.isFinite(Number(entry.track_number)) ? Math.max(1, Math.round(Number(entry.track_number))) : index + 1,
+  }
+}
+
+const toReleaseDetails = (value: unknown): ReleaseDetails | null => {
+  if (!value || typeof value !== 'object') return null
+
+  const release = value as Partial<ReleaseDetails>
+  const id = String(release.id ?? '').trim()
+  if (!id) return null
+
+  return {
+    id,
+    name: String(release.name ?? 'Untitled').trim() || 'Untitled',
+    artists: Array.isArray(release.artists) ? release.artists.filter(Boolean).map(String) : [],
+    releaseDate: release.releaseDate ?? null,
+    releaseYear: Number.isFinite(Number(release.releaseYear)) ? Number(release.releaseYear) : null,
+    cover: String(release.cover ?? '').trim(),
+    totalTracks: Number.isFinite(Number(release.totalTracks)) ? Math.max(0, Math.round(Number(release.totalTracks))) : 0,
+    albumType: String(release.albumType ?? 'Release').trim() || 'Release',
+    label: release.label ? String(release.label).trim() : undefined,
+    popularity: Number.isFinite(Number(release.popularity)) ? Math.max(0, Math.round(Number(release.popularity))) : 0,
+    external_urls: {
+      discogs: release.external_urls?.discogs ? String(release.external_urls.discogs).trim() : undefined,
+    },
+    genres: Array.isArray(release.genres) ? release.genres.filter(Boolean).map(String) : [],
+    communityRating: Number.isFinite(Number(release.communityRating)) ? Number(release.communityRating) : 0,
+    reviewCount: Number.isFinite(Number(release.reviewCount)) ? Math.max(0, Math.round(Number(release.reviewCount))) : 0,
+    tracks: Array.isArray(release.tracks) ? release.tracks.map(toTrack) : [],
+  }
+}
+
+const getCachedReleaseDetails = async (releaseId: string, allowExpired = false) => {
+  const rows = await db.select().from(releaseCacheTable).where(eq(releaseCacheTable.releaseId, releaseId)).limit(1)
+  const cached = rows[0]
+  if (!cached) return null
+  if (!allowExpired && !isNotExpired(cached.expiresAt)) return null
+  return toReleaseDetails(cached.payload)
+}
+
+const upsertReleaseDetailsCache = async (release: ReleaseDetails) => {
+  const now = new Date()
+  const expiresAt = new Date(now.getTime() + RELEASE_CACHE_WINDOW)
+
+  await db
+    .insert(releaseCacheTable)
+    .values({
+      releaseId: release.id,
+      payload: release,
+      expiresAt,
+      refreshedAt: now,
+      createdAt: now,
+      updatedAt: now,
+    })
+    .onConflictDoUpdate({
+      target: releaseCacheTable.releaseId,
+      set: {
+        payload: release,
+        expiresAt,
+        refreshedAt: now,
+        updatedAt: now,
+      },
+    })
+}
+
 const requestDiscogs = async (endpoint: string, params: Record<string, string | number | undefined> = {}) => {
   const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
   const throttleDiscogs = async () => {
@@ -293,7 +364,9 @@ const requestDiscogs = async (endpoint: string, params: Record<string, string | 
     const retryableStatus = response.status === 429 || response.status >= 500
     if (retryableStatus && attempt < DISCOGS_MAX_RETRIES) {
       const retryAfterMs = parseRetryAfterMs(response.headers.get('retry-after'))
-      await wait(Math.max(backoffMs(attempt), retryAfterMs ?? 0))
+      const delayMs = Math.max(backoffMs(attempt), retryAfterMs ?? 0)
+      discogsNextRequestAt = Math.max(discogsNextRequestAt, Date.now() + delayMs)
+      await wait(delayMs)
       continue
     }
 
@@ -1099,11 +1172,22 @@ export const getReleaseDetails = async (releaseId: string): Promise<ReleaseDetai
   const memoryCached = releaseMemoryCache.get(releaseId)
   if (memoryCached) return memoryCached
 
-  // 2. Check for deduplication (if already fetching this album, join that request)
+  // 2. Check persistent DB cache next
+  try {
+    const cached = await getCachedReleaseDetails(releaseId)
+    if (cached) {
+      releaseMemoryCache.set(releaseId, cached)
+      return cached
+    }
+  } catch {
+    // Ignore release cache read failures and continue to live fetch.
+  }
+
+  // 3. Check for deduplication (if already fetching this album, join that request)
   const inFlight = releaseRequestsInFlight.get(releaseId)
   if (inFlight) return inFlight
 
-  // 3. Create a fetch promise to share with other callers
+  // 4. Create a fetch promise to share with other callers
   const fetchPromise = (async () => {
     // Extract the real Discogs ID and type from the prefixed ID
     const isMaster = releaseId.startsWith('m:')
@@ -1117,6 +1201,9 @@ export const getReleaseDetails = async (releaseId: string): Promise<ReleaseDetai
       
       // Store in memory LRU
       releaseMemoryCache.set(releaseId, normalized)
+      void upsertReleaseDetailsCache(normalized).catch(() => {
+        // Ignore DB cache write failures.
+      })
       return normalized
     }
 
@@ -1136,6 +1223,16 @@ export const getReleaseDetails = async (releaseId: string): Promise<ReleaseDetai
       const response = await requestDiscogs(`/releases/${cleanId}`)
       return normalizeAndCache(response, response.tracklist?.length)
     } catch (error) {
+      try {
+        const staleCached = await getCachedReleaseDetails(releaseId, true)
+        if (staleCached) {
+          releaseMemoryCache.set(releaseId, staleCached)
+          return staleCached
+        }
+      } catch {
+        // Ignore stale cache read failures and continue throwing the original error.
+      }
+
       if (isRelease) throw error
       const message = error instanceof Error ? error.message : ''
       if (!message.includes('404') && !isMaster) throw error

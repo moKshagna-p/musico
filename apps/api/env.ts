@@ -48,7 +48,7 @@ export const env = {
   SEARCH_MAX_PAGES: parsePositiveInteger(readEnv('SEARCH_MAX_PAGES'), 4),
   SEARCH_QUERY_PAGES: parsePositiveInteger(readEnv('SEARCH_QUERY_PAGES'), 3),
   SEARCH_MIN_RESULTS_BEFORE_PAGING: parsePositiveInteger(readEnv('SEARCH_MIN_RESULTS_BEFORE_PAGING'), 60),
-  DISCOGS_MIN_REQUEST_INTERVAL_MS: parsePositiveInteger(readEnv('DISCOGS_MIN_REQUEST_INTERVAL_MS'), 350),
+  DISCOGS_MIN_REQUEST_INTERVAL_MS: parsePositiveInteger(readEnv('DISCOGS_MIN_REQUEST_INTERVAL_MS'), 1100),
   DISCOGS_MAX_RETRIES: parsePositiveInteger(readEnv('DISCOGS_MAX_RETRIES'), 4),
   RELEASE_CACHE_MAX_ENTRIES: parsePositiveInteger(readEnv('RELEASE_CACHE_MAX_ENTRIES'), 1500),
   CRON_SECRET: sanitizeOptionalSecret(readEnv('CRON_SECRET')),

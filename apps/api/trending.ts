@@ -10,6 +10,7 @@ import {
   getRecentPopularReleases,
   searchReleases,
 } from './discogs'
+import { env } from './env'
 import { getTopSearchQueries } from './searchSignals'
 import { storedTrendingAlbum } from './schema'
 
@@ -17,6 +18,9 @@ type StoredMode = 'featured' | 'recent-popular'
 
 const DEFAULT_MODE: StoredMode = 'featured'
 const MAX_LIMIT = 50
+const DEFAULT_SNAPSHOT_LIMIT = 24
+const STORED_TRENDING_REFRESH_WINDOW_MS = env.FEATURED_CACHE_TTL_MS
+const storedRefreshInFlight = new Map<StoredMode, Promise<{ refreshedAt: Date; insertedOrUpdated: number; data: ReleaseSummary[] }>>()
 
 export const isStoredTrendingTableMissingError = (error: unknown) => {
   const code = typeof error === 'object' && error && 'code' in error ? String(error.code) : ''
@@ -37,6 +41,8 @@ const toDateOrNull = (value: unknown) => {
   }
   return null
 }
+
+const getSnapshotTargetLimit = (requestedLimit: number) => Math.max(clampLimit(requestedLimit), DEFAULT_SNAPSHOT_LIMIT)
 
 const normalizeRelease = (release: ReleaseSummary): ReleaseSummary => ({
   id: String(release.id ?? '').trim(),
@@ -302,14 +308,57 @@ export const getStoredTrendingAlbums = async (limit = 24, mode: StoredMode = DEF
   )
 }
 
+const getLatestStoredSnapshotAt = async (mode: StoredMode = DEFAULT_MODE) => {
+  const latestSnapshot = await db
+    .select({
+      lastSeenAt: sql<Date | null>`max(${storedTrendingAlbum.lastSeenAt})`,
+    })
+    .from(storedTrendingAlbum)
+    .where(eq(storedTrendingAlbum.mode, mode))
+
+  return toDateOrNull(latestSnapshot[0]?.lastSeenAt)
+}
+
+const isStoredSnapshotFresh = (snapshotAt: Date | null) =>
+  Boolean(snapshotAt && Date.now() - snapshotAt.getTime() < STORED_TRENDING_REFRESH_WINDOW_MS)
+
 export const refreshStoredTrendingAlbums = async (mode: StoredMode = DEFAULT_MODE, limit = 24) => {
+  const existing = storedRefreshInFlight.get(mode)
+  if (existing) return existing
+
+  const targetLimit = getSnapshotTargetLimit(limit)
+  const refreshPromise = (async () => {
+    const snapshot = await getSourceSnapshotByMode(mode, targetLimit)
+    return upsertStoredSnapshot(mode, snapshot)
+  })()
+
+  storedRefreshInFlight.set(mode, refreshPromise)
+  return refreshPromise.finally(() => {
+    storedRefreshInFlight.delete(mode)
+  })
+}
+
+export const getStoredTrendingAlbumsEnsuringFresh = async (limit = 24, mode: StoredMode = DEFAULT_MODE) => {
   const safeLimit = clampLimit(limit)
-  const snapshot = await getSourceSnapshotByMode(mode, safeLimit)
-  return upsertStoredSnapshot(mode, snapshot)
+  const latestSnapshotAt = await getLatestStoredSnapshotAt(mode)
+
+  if (isStoredSnapshotFresh(latestSnapshotAt)) {
+    return getStoredTrendingAlbums(safeLimit, mode)
+  }
+
+  try {
+    const refreshed = await refreshStoredTrendingAlbums(mode, safeLimit)
+    return refreshed.data.slice(0, safeLimit)
+  } catch (error) {
+    if (latestSnapshotAt) {
+      return getStoredTrendingAlbums(safeLimit, mode)
+    }
+    throw error
+  }
 }
 
 export const refreshStoredHomeAlbums = async (params?: { happeningLimit?: number; recentLimit?: number }) => {
-  const happeningLimit = clampLimit(params?.happeningLimit ?? 12, 12)
+  const happeningLimit = clampLimit(params?.happeningLimit ?? 24, 24)
   const recentLimit = clampLimit(params?.recentLimit ?? 24, 24)
 
   const [mostHappening, recentReleases] = await Promise.all([
