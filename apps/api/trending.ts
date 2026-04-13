@@ -7,6 +7,7 @@ import { db } from './db'
 import {
   fetchRecentReleaseCandidatesFromDiscogs,
   getFeaturedReleases,
+  getReleaseDetails,
   getRecentPopularReleases,
   searchReleases,
 } from './discogs'
@@ -20,6 +21,7 @@ const DEFAULT_MODE: StoredMode = 'featured'
 const MAX_LIMIT = 50
 const DEFAULT_SNAPSHOT_LIMIT = 24
 const STORED_TRENDING_REFRESH_WINDOW_MS = env.FEATURED_CACHE_TTL_MS
+const HOME_RELEASE_DETAILS_PREWARM_LIMIT = env.HOME_RELEASE_DETAILS_PREWARM_LIMIT
 const storedRefreshInFlight = new Map<StoredMode, Promise<{ refreshedAt: Date; insertedOrUpdated: number; data: ReleaseSummary[] }>>()
 
 export const isStoredTrendingTableMissingError = (error: unknown) => {
@@ -43,6 +45,20 @@ const toDateOrNull = (value: unknown) => {
 }
 
 const getSnapshotTargetLimit = (requestedLimit: number) => Math.max(clampLimit(requestedLimit), DEFAULT_SNAPSHOT_LIMIT)
+
+const prewarmReleaseDetails = async (releases: ReleaseSummary[], limit = HOME_RELEASE_DETAILS_PREWARM_LIMIT) => {
+  const targetSize = Math.max(0, Math.round(limit))
+  if (!targetSize) return
+
+  const releaseIds = releases
+    .map((release) => String(release.id ?? '').trim())
+    .filter(Boolean)
+    .slice(0, targetSize)
+
+  if (!releaseIds.length) return
+
+  await Promise.allSettled(releaseIds.map((releaseId) => getReleaseDetails(releaseId)))
+}
 
 const normalizeRelease = (release: ReleaseSummary): ReleaseSummary => ({
   id: String(release.id ?? '').trim(),
@@ -329,7 +345,11 @@ export const refreshStoredTrendingAlbums = async (mode: StoredMode = DEFAULT_MOD
   const targetLimit = getSnapshotTargetLimit(limit)
   const refreshPromise = (async () => {
     const snapshot = await getSourceSnapshotByMode(mode, targetLimit)
-    return upsertStoredSnapshot(mode, snapshot)
+    const result = await upsertStoredSnapshot(mode, snapshot)
+    void prewarmReleaseDetails(result.data).catch(() => {
+      // Ignore detail prewarm failures so snapshot refresh still succeeds.
+    })
+    return result
   })()
 
   storedRefreshInFlight.set(mode, refreshPromise)

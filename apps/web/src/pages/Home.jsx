@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom'
 import AlbumGrid from '../components/AlbumGrid.jsx'
 import Hero from '../components/Hero.jsx'
 import PageTransition from '../components/PageTransition.jsx'
-import { getFeaturedReleases, getRecentPopularReleases } from '../services/discogsService.js'
+import { getHomeSections } from '../services/discogsService.js'
 
 const Home = () => {
   const navigate = useNavigate()
@@ -23,25 +23,20 @@ const Home = () => {
       setHappeningError(null)
       setRecentError(null)
 
-      const [mostHappeningResult, recentReleasesResult] = await Promise.allSettled([
-          getFeaturedReleases(24),
-          getRecentPopularReleases(24),
-      ])
-
-      if (mostHappeningResult.status === 'fulfilled') {
-        setMostHappeningAlbums(mostHappeningResult.value)
-      } else {
-        setHappeningError(mostHappeningResult.reason?.message ?? 'Unable to load most happening albums.')
+      try {
+        const sections = await getHomeSections({ happeningLimit: 24, recentLimit: 24 })
+        setMostHappeningAlbums(Array.isArray(sections?.mostHappening?.data) ? sections.mostHappening.data : [])
+        setRecentAlbums(Array.isArray(sections?.recentReleases?.data) ? sections.recentReleases.data : [])
+        setHappeningError(sections?.mostHappening?.error ?? null)
+        setRecentError(sections?.recentReleases?.error ?? null)
+      } catch (error) {
+        const message = error?.message ?? 'Unable to load homepage data.'
+        setHappeningError(message)
+        setRecentError(message)
+      } finally {
+        setHappeningLoading(false)
+        setRecentLoading(false)
       }
-
-      if (recentReleasesResult.status === 'fulfilled') {
-        setRecentAlbums(recentReleasesResult.value)
-      } else {
-        setRecentError(recentReleasesResult.reason?.message ?? 'Unable to load recent releases.')
-      }
-
-      setHappeningLoading(false)
-      setRecentLoading(false)
     }
 
     loadHomeSections()

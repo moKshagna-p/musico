@@ -203,6 +203,25 @@ const attachMusicoCommunityStats = async <T extends { id: string; communityRatin
   })
 }
 
+const loadStoredFeaturedSection = async (mode: 'featured' | 'recent-popular', limit: number) => {
+  try {
+    const data = await getStoredTrendingAlbumsEnsuringFresh(limit, mode)
+    if (data.length) return data
+
+    console.warn('[featured] stored snapshot empty, falling back to Discogs cache', { mode, limit })
+    return mode === 'recent-popular'
+      ? await getRecentPopularFallbackReleases(limit)
+      : await getFeaturedFallbackReleases(limit)
+  } catch (error) {
+    if (!isStoredTrendingTableMissingError(error)) throw error
+
+    console.warn('[featured] stored_trending_album missing, falling back to Discogs cache', { mode, limit })
+    return mode === 'recent-popular'
+      ? await getRecentPopularFallbackReleases(limit)
+      : await getFeaturedFallbackReleases(limit)
+  }
+}
+
 // Helper to record an activity event (fire-and-forget, never blocks the response)
 const recordActivity = (params: {
   userId: string
@@ -1629,32 +1648,8 @@ const app = new Elysia()
       const limitParam = Number(query?.limit)
       const limit = Number.isFinite(limitParam) ? Math.min(Math.max(limitParam, 1), 50) : 24
       const mode = String(query?.mode ?? '').toLowerCase()
-      let data
-
-      if (mode === 'recent-popular') {
-        try {
-          data = await getStoredTrendingAlbumsEnsuringFresh(limit, 'recent-popular')
-        } catch (error) {
-          if (!isStoredTrendingTableMissingError(error)) throw error
-          console.warn('[featured] stored_trending_album missing for recent releases, falling back to Discogs cache')
-          data = await getRecentPopularFallbackReleases(limit)
-        }
-      } else {
-        try {
-          data = await getStoredTrendingAlbumsEnsuringFresh(limit)
-        } catch (error) {
-          if (!isStoredTrendingTableMissingError(error)) throw error
-          console.warn('[featured] stored_trending_album missing for most happening, falling back to Discogs cache')
-          data = await getFeaturedFallbackReleases(limit)
-        }
-      }
-
-      if (!data.length) {
-        console.warn('[featured] stored snapshot empty, falling back to Discogs cache')
-        data = mode === 'recent-popular'
-          ? await getRecentPopularFallbackReleases(limit)
-          : await getFeaturedFallbackReleases(limit)
-      }
+      const normalizedMode = mode === 'recent-popular' ? 'recent-popular' : 'featured'
+      const data = await loadStoredFeaturedSection(normalizedMode, limit)
 
       set.headers ??= {}
       set.headers['Cache-Control'] = 'public, max-age=60'
@@ -1663,6 +1658,50 @@ const app = new Elysia()
       console.error('[featured] error', error)
       set.status = 502
       return { error: 'Unable to load featured releases right now.' }
+    }
+  })
+  .get('/api/home', async ({ query, set }) => {
+    try {
+      const happeningLimitParam = Number(query?.happeningLimit)
+      const recentLimitParam = Number(query?.recentLimit)
+      const happeningLimit = Number.isFinite(happeningLimitParam) ? Math.min(Math.max(happeningLimitParam, 1), 50) : 24
+      const recentLimit = Number.isFinite(recentLimitParam) ? Math.min(Math.max(recentLimitParam, 1), 50) : 24
+
+      const [mostHappening, recentReleases] = await Promise.allSettled([
+        loadStoredFeaturedSection('featured', happeningLimit),
+        loadStoredFeaturedSection('recent-popular', recentLimit),
+      ])
+
+      const mostHappeningData = mostHappening.status === 'fulfilled'
+        ? await attachMusicoCommunityStats(mostHappening.value)
+        : []
+      const recentReleasesData = recentReleases.status === 'fulfilled'
+        ? await attachMusicoCommunityStats(recentReleases.value)
+        : []
+
+      const allFailed = mostHappening.status === 'rejected' && recentReleases.status === 'rejected'
+      if (allFailed) set.status = 502
+
+      set.headers ??= {}
+      set.headers['Cache-Control'] = 'public, max-age=60'
+      return {
+        mostHappening: {
+          data: mostHappeningData,
+          ...(mostHappening.status === 'rejected'
+            ? { error: 'Unable to load most happening albums.' }
+            : {}),
+        },
+        recentReleases: {
+          data: recentReleasesData,
+          ...(recentReleases.status === 'rejected'
+            ? { error: 'Unable to load recent releases.' }
+            : {}),
+        },
+      }
+    } catch (error) {
+      console.error('[home] error', error)
+      set.status = 502
+      return { error: 'Unable to load homepage data right now.' }
     }
   })
   .get('/api/search', async ({ query, set }) => {

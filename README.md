@@ -61,7 +61,7 @@ Turbo monorepo for a React/Vite frontend and a Bun/Elysia API proxy.
 ## Backend behavior
 
 - Proxies Discogs search/release endpoints while normalizing payloads for UI use.
-- Stores most happening and recent release snapshots in Postgres and refreshes them lazily every 7 days on first request after expiry.
+- Stores most happening and recent release snapshots in Postgres, prewarms top release details, and refreshes them weekly.
 - Stores search results in Postgres using SHA-256 query hashes to reuse repeated searches and reduce upstream API calls.
 - Stores ratings and lists in Postgres per authenticated user (`/api/me/*`) so profile data is isolated by account.
 - Keeps release detail caching in memory for 1 hour.
@@ -72,6 +72,7 @@ Turbo monorepo for a React/Vite frontend and a Bun/Elysia API proxy.
 - The API exposes:
   - `GET /health` for process health
   - `GET /ready` for readiness including database connectivity
+- For weekly snapshot refresh, schedule `GET /api/cron/home-refresh` with `Authorization: Bearer <CRON_SECRET>` from Railway/Vercel Cron or another scheduler.
 - Production startup requires runtime env vars and does not read from the root `.env` file automatically.
 - Recommended production split:
   - deploy `apps/api` as a backend service

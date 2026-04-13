@@ -8,6 +8,13 @@ const SEARCH_CACHE_VERSION = 'v4'
 
 const featuredCache = { timestamp: 0, data: [] }
 const recentPopularCache = { timestamp: 0, data: [] }
+const homeSectionsCache = {
+  timestamp: 0,
+  data: {
+    mostHappening: { data: [], error: null },
+    recentReleases: { data: [], error: null },
+  },
+}
 const SEARCH_CACHE_PREFIX = `musico:search:${SEARCH_CACHE_VERSION}:`
 const RELEASE_CACHE_PREFIX = 'musico:release:'
 
@@ -150,6 +157,72 @@ export const getRecentPopularReleases = async (limit = 24) => {
   recentPopularCache.timestamp = Date.now()
   recentPopularCache.data = data
   return data.slice(0, limit)
+}
+
+export const getHomeSections = async (options = {}) => {
+  const happeningLimit = Number.isFinite(options?.happeningLimit) ? options.happeningLimit : 24
+  const recentLimit = Number.isFinite(options?.recentLimit) ? options.recentLimit : 24
+
+  if (isFresh(homeSectionsCache.timestamp, FEATURED_CACHE_WINDOW)) {
+    return {
+      mostHappening: {
+        data: homeSectionsCache.data.mostHappening.data.slice(0, happeningLimit),
+        error: homeSectionsCache.data.mostHappening.error,
+      },
+      recentReleases: {
+        data: homeSectionsCache.data.recentReleases.data.slice(0, recentLimit),
+        error: homeSectionsCache.data.recentReleases.error,
+      },
+    }
+  }
+
+  const response = await validatedRequest({
+    url: '/api/home',
+    params: {
+      happeningLimit,
+      recentLimit,
+    },
+  })
+
+  const mostHappeningData = Array.isArray(response?.mostHappening?.data) ? response.mostHappening.data : []
+  const recentReleasesData = Array.isArray(response?.recentReleases?.data) ? response.recentReleases.data : []
+
+  const mostHappeningResult = AlbumArraySchema.safeParse(mostHappeningData)
+  if (!mostHappeningResult.success) {
+    console.warn('[Validation Warning] Home most happening malformed:', mostHappeningResult.error.format())
+  }
+
+  const recentReleasesResult = AlbumArraySchema.safeParse(recentReleasesData)
+  if (!recentReleasesResult.success) {
+    console.warn('[Validation Warning] Home recent releases malformed:', recentReleasesResult.error.format())
+  }
+
+  featuredCache.timestamp = Date.now()
+  featuredCache.data = mostHappeningData
+  recentPopularCache.timestamp = Date.now()
+  recentPopularCache.data = recentReleasesData
+  homeSectionsCache.timestamp = Date.now()
+  homeSectionsCache.data = {
+    mostHappening: {
+      data: mostHappeningData,
+      error: response?.mostHappening?.error ?? null,
+    },
+    recentReleases: {
+      data: recentReleasesData,
+      error: response?.recentReleases?.error ?? null,
+    },
+  }
+
+  return {
+    mostHappening: {
+      data: mostHappeningData.slice(0, happeningLimit),
+      error: response?.mostHappening?.error ?? null,
+    },
+    recentReleases: {
+      data: recentReleasesData.slice(0, recentLimit),
+      error: response?.recentReleases?.error ?? null,
+    },
+  }
 }
 
 export const searchReleases = async (query, options = {}) => {
