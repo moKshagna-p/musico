@@ -57,6 +57,7 @@ Turbo monorepo for a React/Vite frontend and a Bun/Elysia API proxy.
 - Generate migration: `bun run --cwd apps/api db:generate`
 - Apply migration: `bun run --cwd apps/api db:migrate`
 - Open Drizzle Studio: `bun run --cwd apps/api db:studio`
+- Production API start applies pending Drizzle migrations before boot.
 
 ## Backend behavior
 
