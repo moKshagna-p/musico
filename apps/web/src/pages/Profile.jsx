@@ -7,6 +7,7 @@ import { ProfilePageSkeleton, UserListLoadingState } from '../components/PageLoa
 import Stats from '../components/Stats.jsx'
 import TopGenres from '../components/TopGenres.jsx'
 import ListCard from '../components/ListCard.jsx'
+import CoverImage from '../components/CoverImage.jsx'
 import UsernameSetup from '../components/UsernameSetup.jsx'
 import { useAuth } from '../hooks/useAuth.js'
 import { useLists } from '../hooks/useLists.js'
@@ -528,7 +529,7 @@ const Profile = () => {
                 >
                   <div className="overflow-hidden rounded-2xl border border-outline/70 bg-panel/70 transition-colors duration-200 group-hover:border-white/20">
                     <div className="relative">
-                      <img
+                      <CoverImage
                         src={album.cover}
                         alt={album.name || 'Album cover'}
                         className="block aspect-square w-full object-cover"

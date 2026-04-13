@@ -6,6 +6,7 @@ import FollowButton from '../components/FollowButton.jsx'
 import PageTransition from '../components/PageTransition.jsx'
 import { ProfilePageSkeleton } from '../components/PageLoadingState.jsx'
 import RatingStars from '../components/RatingStars.jsx'
+import CoverImage from '../components/CoverImage.jsx'
 import { useAuth } from '../hooks/useAuth.js'
 import { fetchUserProfile } from '../services/socialService.js'
 import { getReleaseDetails } from '../services/discogsService.js'
@@ -52,7 +53,12 @@ const UserProfile = () => {
       const results = await Promise.allSettled(
         profile.recentRatings.slice(0, 12).map(async (item) => {
           const details = await getReleaseDetails(item.albumId)
-          return { ...item, ...details }
+          return {
+            ...item,
+            ...details,
+            name: details?.name || item?.albumName || 'Untitled',
+            cover: details?.cover || item?.albumCover || '',
+          }
         }),
       )
       if (!cancelled) {
@@ -153,7 +159,7 @@ const UserProfile = () => {
                   {ratedAlbumDetails.map((album) => (
                     <Link to={`/album/${album.albumId}`} key={album.albumId}>
                       <div className="group relative overflow-hidden rounded-lg">
-                        <img src={album.cover} alt={album.name} className="aspect-square w-full object-cover transition-transform duration-300 group-hover:scale-[1.03]" />
+                        <CoverImage src={album.cover} alt={album.name} className="aspect-square w-full object-cover transition-transform duration-300 group-hover:scale-[1.03]" />
                         <div className="absolute inset-0 bg-black/50 opacity-0 transition-opacity duration-300 group-hover:opacity-100">
                           <div className="flex h-full items-center justify-center text-center">
                             <div>
@@ -181,7 +187,7 @@ const UserProfile = () => {
                       <h3 className="text-lg font-bold">{list.name}</h3>
                       <div className="mt-4 grid grid-cols-3 gap-2">
                         {list.albums.slice(0, 6).map((album) => (
-                          <img key={album.id} src={album.cover} alt={album.name} className="aspect-square w-full rounded-md object-cover" />
+                          <CoverImage key={album.id} src={album.cover} alt={album.name} className="aspect-square w-full rounded-md object-cover" />
                         ))}
                       </div>
                     </Link>

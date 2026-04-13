@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { FiShare2 } from 'react-icons/fi'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 
+import CoverImage from '../components/CoverImage.jsx'
 import PageTransition from '../components/PageTransition.jsx'
 import PageLoadingState from '../components/PageLoadingState.jsx'
 import { fetchPublicList } from '../services/socialService.js'
@@ -101,7 +102,7 @@ const PublicList = () => {
             {list.albums.map((album) => (
               <Link to={`/album/${album.id}`} key={album.id}>
                 <div className="group relative overflow-hidden rounded-lg">
-                  <img
+                  <CoverImage
                     src={album.cover}
                     alt={album.name}
                     className="aspect-square w-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"

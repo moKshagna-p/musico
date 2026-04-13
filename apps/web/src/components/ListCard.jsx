@@ -1,6 +1,7 @@
 import { motion } from 'framer-motion'
 import { Link } from 'react-router-dom'
 import { FiChevronRight } from 'react-icons/fi'
+import CoverImage from './CoverImage.jsx'
 
 const ListCard = ({ list }) => {
   const MotionDiv = motion.div
@@ -48,7 +49,7 @@ const ListCard = ({ list }) => {
                     style={{ rotate: `${rotate}deg` }}
                     className="relative aspect-square w-24 shrink-0 overflow-hidden rounded-xl border border-white/10 bg-black/40 shadow-2xl transition-transform group-hover:scale-105 group-hover:rotate-0"
                   >
-                    <img
+                    <CoverImage
                       src={album.cover}
                       alt=""
                       className="h-full w-full object-cover"

@@ -134,6 +134,69 @@ const parseProfileImage = (value: unknown) => {
   }
 }
 
+const normalizeAlbumId = (value: unknown) => String(value ?? '').trim()
+
+const getReleasePreviewMap = async (albumIds: unknown[]) => {
+  const uniqueAlbumIds = [...new Set(albumIds.map(normalizeAlbumId).filter(Boolean))]
+  if (!uniqueAlbumIds.length) {
+    return new Map<string, { name: string; cover: string; artists: string[]; releaseYear: number | null }>()
+  }
+
+  const previews = await Promise.allSettled(
+    uniqueAlbumIds.map(async (albumId) => {
+      const details = await getReleaseDetails(albumId)
+      return [
+        albumId,
+        {
+          name: String(details.name ?? '').trim(),
+          cover: String(details.cover ?? '').trim(),
+          artists: Array.isArray(details.artists) ? details.artists.filter(Boolean).map(String) : [],
+          releaseYear: Number.isFinite(Number(details.releaseYear)) ? Number(details.releaseYear) : null,
+        },
+      ] as const
+    }),
+  )
+
+  return new Map(
+    previews
+      .filter(
+        (
+          entry,
+        ): entry is PromiseFulfilledResult<
+          readonly [string, { name: string; cover: string; artists: string[]; releaseYear: number | null }]
+        > => entry.status === 'fulfilled',
+      )
+      .map((entry) => entry.value),
+  )
+}
+
+const getCanonicalAlbumMetadata = async (
+  albumId: string,
+  fallback: {
+    name?: unknown
+    cover?: unknown
+    artists?: unknown
+    releaseYear?: unknown
+  } = {},
+) => {
+  try {
+    const details = await getReleaseDetails(albumId)
+    return {
+      name: String(details.name ?? fallback.name ?? 'Untitled').trim() || 'Untitled',
+      cover: String(details.cover ?? fallback.cover ?? '').trim(),
+      artists: Array.isArray(details.artists) ? details.artists.filter(Boolean).map(String).slice(0, 3) : toSafeArtists(fallback.artists),
+      releaseYear: Number.isFinite(Number(details.releaseYear)) ? Number(details.releaseYear) : parseReleaseYear(fallback.releaseYear),
+    }
+  } catch {
+    return {
+      name: String(fallback.name ?? 'Untitled').trim() || 'Untitled',
+      cover: String(fallback.cover ?? '').trim(),
+      artists: toSafeArtists(fallback.artists),
+      releaseYear: parseReleaseYear(fallback.releaseYear),
+    }
+  }
+}
+
 const getAuthUser = async (request: Request) => {
   const session = await auth.api.getSession({ headers: request.headers })
   return session?.user ?? null
@@ -382,6 +445,11 @@ const app = new Elysia()
       return { error: 'Rating must be between 0.5 and 5 in 0.5 steps.' }
     }
 
+    const albumMeta = await getCanonicalAlbumMetadata(albumId, {
+      name: typedBody?.albumName,
+      cover: typedBody?.albumCover,
+    })
+
     const now = new Date()
     await db
       .insert(userRating)
@@ -414,8 +482,8 @@ const app = new Elysia()
       userId: authUser.id,
       type: 'rated',
       albumId,
-      albumName: String(typedBody?.albumName ?? '').trim() || null,
-      albumCover: String(typedBody?.albumCover ?? '').trim() || null,
+      albumName: albumMeta.name || null,
+      albumCover: albumMeta.cover || null,
       metadata: { rating },
     })
 
@@ -485,19 +553,33 @@ const app = new Elysia()
       albumsByList.set(entry.listId, group)
     })
 
+    const previewAlbumIds = [...lists]
+      .sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime())
+      .flatMap((list) =>
+        (albumsByList.get(list.id) ?? [])
+          .sort((a, b) => b.addedAt.getTime() - a.addedAt.getTime())
+          .slice(0, 4)
+          .map((album) => album.albumId),
+      )
+
+    const releasePreviewMap = await getReleasePreviewMap(previewAlbumIds)
+
     const data = [...lists]
       .sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime())
       .map((list) => {
         const listAlbums = (albumsByList.get(list.id) ?? [])
           .sort((a, b) => b.addedAt.getTime() - a.addedAt.getTime())
-          .map((album) => ({
-            id: album.albumId,
-            name: album.name,
-            cover: album.cover,
-            artists: Array.isArray(album.artists) ? album.artists : [],
-            releaseYear: album.releaseYear,
-            addedAt: album.addedAt.getTime(),
-          }))
+          .map((album) => {
+            const preview = releasePreviewMap.get(album.albumId)
+            return {
+              id: album.albumId,
+              name: preview?.name || album.name,
+              cover: preview?.cover || album.cover,
+              artists: preview?.artists?.length ? preview.artists : Array.isArray(album.artists) ? album.artists : [],
+              releaseYear: preview?.releaseYear ?? album.releaseYear,
+              addedAt: album.addedAt.getTime(),
+            }
+          })
 
         return {
           id: list.id,
@@ -620,17 +702,21 @@ const app = new Elysia()
       return { error: 'This list is full.' }
     }
 
-    const albumName = String(album?.name ?? 'Untitled').trim() || 'Untitled'
-    const albumCover = String(album?.cover ?? '').trim()
+    const albumMeta = await getCanonicalAlbumMetadata(albumId, {
+      name: album?.name,
+      cover: album?.cover,
+      artists: album?.artists,
+      releaseYear: album?.releaseYear,
+    })
 
     await db.insert(userListAlbum).values({
       id: crypto.randomUUID(),
       listId,
       albumId,
-      name: albumName,
-      cover: albumCover,
-      artists: toSafeArtists(album?.artists),
-      releaseYear: parseReleaseYear(album?.releaseYear),
+      name: albumMeta.name,
+      cover: albumMeta.cover,
+      artists: albumMeta.artists,
+      releaseYear: albumMeta.releaseYear,
       addedAt: now,
     })
     await db.update(userList).set({ updatedAt: now }).where(eq(userList.id, listId))
@@ -640,8 +726,8 @@ const app = new Elysia()
       userId: authUser.id,
       type: 'listed',
       albumId,
-      albumName,
-      albumCover,
+      albumName: albumMeta.name,
+      albumCover: albumMeta.cover,
       metadata: { listName: targetList.name, listId },
     })
 
@@ -689,6 +775,8 @@ const app = new Elysia()
         .limit(50),
     ])
 
+    const releasePreviewMap = await getReleasePreviewMap(recentRatingsRows.map((row) => row.albumId))
+
     const latestActivityByAlbum = new Map<string, { albumName: string | null; albumCover: string | null }>()
     for (const row of ratingActivityRows) {
       const albumId = String(row.albumId ?? '').trim()
@@ -701,12 +789,13 @@ const app = new Elysia()
 
     const recentRatings = recentRatingsRows.map((row) => {
       const activityMeta = latestActivityByAlbum.get(String(row.albumId))
+      const preview = releasePreviewMap.get(String(row.albumId))
       return {
         albumId: row.albumId,
         rating: row.rating,
         timestamp: row.updatedAt.getTime(),
-        albumName: activityMeta?.albumName ?? '',
-        albumCover: activityMeta?.albumCover ?? '',
+        albumName: preview?.name || activityMeta?.albumName || '',
+        albumCover: preview?.cover || activityMeta?.albumCover || '',
       }
     })
 
@@ -922,6 +1011,11 @@ const app = new Elysia()
       albumsByList.set(entry.listId, group)
     })
 
+    const releasePreviewMap = await getReleasePreviewMap([
+      ...ratings.map((rating) => rating.albumId),
+      ...listAlbums.map((album) => album.albumId),
+    ])
+
     // Check if the requesting user is following this profile
     let isFollowing = false
     if (authUser?.id && authUser.id !== profile.userId) {
@@ -937,11 +1031,16 @@ const app = new Elysia()
     const recentRatings = [...ratings]
       .sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime())
       .slice(0, 12)
-      .map((r) => ({
-        albumId: r.albumId,
-        rating: r.rating,
-        timestamp: r.updatedAt.getTime(),
-      }))
+      .map((r) => {
+        const preview = releasePreviewMap.get(r.albumId)
+        return {
+          albumId: r.albumId,
+          rating: r.rating,
+          timestamp: r.updatedAt.getTime(),
+          albumName: preview?.name ?? '',
+          albumCover: preview?.cover ?? '',
+        }
+      })
 
     // Recent reviews (last 10)
     const recentReviews = [...reviews]
@@ -963,12 +1062,15 @@ const app = new Elysia()
         const albums = (albumsByList.get(list.id) ?? [])
           .sort((a, b) => b.addedAt.getTime() - a.addedAt.getTime())
           .slice(0, 6)
-          .map((a) => ({
-            id: a.albumId,
-            name: a.name,
-            cover: a.cover,
-            artists: Array.isArray(a.artists) ? a.artists : [],
-          }))
+          .map((a) => {
+            const preview = releasePreviewMap.get(a.albumId)
+            return {
+              id: a.albumId,
+              name: preview?.name || a.name,
+              cover: preview?.cover || a.cover,
+              artists: preview?.artists?.length ? preview.artists : Array.isArray(a.artists) ? a.artists : [],
+            }
+          })
         return {
           id: list.id,
           name: list.name,
@@ -1273,6 +1375,12 @@ const app = new Elysia()
       return { error: 'Review content is required.' }
     }
 
+    const albumMeta = await getCanonicalAlbumMetadata(albumId, {
+      name: typed.albumName,
+      cover: typed.albumCover,
+      artists: typed.albumArtists,
+    })
+
     const now = new Date()
     await db
       .insert(userReview)
@@ -1281,9 +1389,9 @@ const app = new Elysia()
         userId: authUser.id,
         albumId,
         content,
-        albumName: String(typed.albumName ?? '').trim(),
-        albumCover: String(typed.albumCover ?? '').trim(),
-        albumArtists: toSafeArtists(typed.albumArtists),
+        albumName: albumMeta.name,
+        albumCover: albumMeta.cover,
+        albumArtists: albumMeta.artists,
         createdAt: now,
         updatedAt: now,
       })
@@ -1291,9 +1399,9 @@ const app = new Elysia()
         target: [userReview.userId, userReview.albumId],
         set: {
           content,
-          albumName: String(typed.albumName ?? '').trim(),
-          albumCover: String(typed.albumCover ?? '').trim(),
-          albumArtists: toSafeArtists(typed.albumArtists),
+          albumName: albumMeta.name,
+          albumCover: albumMeta.cover,
+          albumArtists: albumMeta.artists,
           updatedAt: now,
         },
       })
@@ -1302,8 +1410,8 @@ const app = new Elysia()
       userId: authUser.id,
       type: 'reviewed',
       albumId,
-      albumName: String(typed.albumName ?? '').trim() || null,
-      albumCover: String(typed.albumCover ?? '').trim() || null,
+      albumName: albumMeta.name || null,
+      albumCover: albumMeta.cover || null,
       metadata: { snippet: content.slice(0, 100) },
     })
 
@@ -1470,16 +1578,21 @@ const app = new Elysia()
       .from(userListAlbum)
       .where(eq(userListAlbum.listId, listId))
 
+    const releasePreviewMap = await getReleasePreviewMap(albums.map((album) => album.albumId))
+
     const sortedAlbums = [...albums]
       .sort((a, b) => b.addedAt.getTime() - a.addedAt.getTime())
-      .map((a) => ({
-        id: a.albumId,
-        name: a.name,
-        cover: a.cover,
-        artists: Array.isArray(a.artists) ? a.artists : [],
-        releaseYear: a.releaseYear,
-        addedAt: a.addedAt.getTime(),
-      }))
+      .map((a) => {
+        const preview = releasePreviewMap.get(a.albumId)
+        return {
+          id: a.albumId,
+          name: preview?.name || a.name,
+          cover: preview?.cover || a.cover,
+          artists: preview?.artists?.length ? preview.artists : Array.isArray(a.artists) ? a.artists : [],
+          releaseYear: preview?.releaseYear ?? a.releaseYear,
+          addedAt: a.addedAt.getTime(),
+        }
+      })
 
     set.headers ??= {}
     set.headers['Cache-Control'] = 'public, max-age=30'

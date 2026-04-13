@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom'
+import CoverImage from './CoverImage.jsx'
 import RatingStars from './RatingStars.jsx'
 
 const ActivityCard = ({ item }) => {
@@ -62,7 +63,7 @@ const ActivityCard = ({ item }) => {
     <div className="flex gap-4 rounded-2xl border border-outline/40 bg-panel/30 p-4 transition-all hover:border-outline/60 hover:bg-panel/50">
       {albumCover && (type === 'rated' || type === 'reviewed' || type === 'listed') ? (
         <Link to={`/album/${albumId}`} className="shrink-0">
-          <img
+          <CoverImage
             src={albumCover}
             alt={albumName ?? ''}
             width={56}
