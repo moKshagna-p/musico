@@ -4,7 +4,18 @@ import { Route, Routes, useLocation, useNavigate } from 'react-router-dom'
 
 import Footer from './components/Footer.jsx'
 import Navigation from './components/Navigation.jsx'
-import PageLoadingState from './components/PageLoadingState.jsx'
+import PageTransition from './components/PageTransition.jsx'
+import {
+  AlbumDetailsPageSkeleton,
+  AuthPageSkeleton,
+  DiscoverPageSkeleton,
+  FeedPageSkeleton,
+  HomePageSkeleton,
+  NotFoundPageSkeleton,
+  ProfilePageSkeleton,
+  PublicListPageSkeleton,
+  SearchResultsPageSkeleton,
+} from './components/PageLoadingState.jsx'
 import RouteErrorBoundary from './components/RouteErrorBoundary.jsx'
 import { useAuth } from './hooks/useAuth.js'
 
@@ -21,6 +32,18 @@ const NotFound = lazy(() => import('./pages/NotFound.jsx'))
 
 const INACTIVITY_TIMEOUT_MS = 20 * 60 * 1000
 const LAST_ACTIVITY_KEY = 'musico:last-activity-at'
+
+const withRouteFallback = (element, fallback) => (
+  <Suspense
+    fallback={(
+      <PageTransition>
+        {fallback}
+      </PageTransition>
+    )}
+  >
+    {element}
+  </Suspense>
+)
 
 const App = () => {
   const location = useLocation()
@@ -106,22 +129,20 @@ const App = () => {
       <Navigation />
       <main className="flex-1">
         <RouteErrorBoundary>
-          <Suspense fallback={<PageLoadingState title="Loading page" cards={6} />}>
-            <AnimatePresence mode="wait" initial={false}>
-              <Routes location={location} key={location.pathname}>
-                <Route path="/" element={<Home />} />
-                <Route path="/discover" element={<Discover />} />
-                <Route path="/search" element={<SearchResults />} />
-                <Route path="/profile" element={<Profile />} />
-                <Route path="/profile/:username" element={<UserProfile />} />
-                <Route path="/feed" element={<Feed />} />
-                <Route path="/lists/:listId" element={<PublicList />} />
-                <Route path="/auth" element={<Auth />} />
-                <Route path="/album/:albumId" element={<AlbumDetails />} />
-                <Route path="*" element={<NotFound />} />
-              </Routes>
-            </AnimatePresence>
-          </Suspense>
+          <AnimatePresence mode="wait" initial={false}>
+            <Routes location={location} key={location.pathname}>
+              <Route path="/" element={withRouteFallback(<Home />, <HomePageSkeleton />)} />
+              <Route path="/discover" element={withRouteFallback(<Discover />, <DiscoverPageSkeleton />)} />
+              <Route path="/search" element={withRouteFallback(<SearchResults />, <SearchResultsPageSkeleton />)} />
+              <Route path="/profile" element={withRouteFallback(<Profile />, <ProfilePageSkeleton showActions />)} />
+              <Route path="/profile/:username" element={withRouteFallback(<UserProfile />, <ProfilePageSkeleton withBackButton />)} />
+              <Route path="/feed" element={withRouteFallback(<Feed />, <FeedPageSkeleton />)} />
+              <Route path="/lists/:listId" element={withRouteFallback(<PublicList />, <PublicListPageSkeleton />)} />
+              <Route path="/auth" element={withRouteFallback(<Auth />, <AuthPageSkeleton />)} />
+              <Route path="/album/:albumId" element={withRouteFallback(<AlbumDetails />, <AlbumDetailsPageSkeleton />)} />
+              <Route path="*" element={withRouteFallback(<NotFound />, <NotFoundPageSkeleton />)} />
+            </Routes>
+          </AnimatePresence>
         </RouteErrorBoundary>
       </main>
       <Footer />
