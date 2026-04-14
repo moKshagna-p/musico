@@ -7,6 +7,10 @@
     {
       "source": "/api",
       "destination": "https://musicoapi-production.up.railway.app/api"
+    },
+    {
+      "source": "/((?!api).*)",
+      "destination": "/index.html"
     }
   ]
 }
