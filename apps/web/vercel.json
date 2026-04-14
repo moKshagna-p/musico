@@ -1,8 +1,12 @@
 {
   "rewrites": [
     {
-      "source": "/(.*)",
-      "destination": "/index.html"
+      "source": "/api/:path*",
+      "destination": "https://musicoapi-production.up.railway.app/api/:path*"
+    },
+    {
+      "source": "/api",
+      "destination": "https://musicoapi-production.up.railway.app/api"
     }
   ]
 }

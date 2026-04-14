@@ -16,11 +16,12 @@ export const auth = betterAuth({
   secret: env.BETTER_AUTH_SECRET,
   trustedOrigins: env.ALLOWED_ORIGINS,
   advanced: {
-    // Vercel frontend -> Railway API is a cross-site cookie flow in production.
+    // Vercel Proxy -> Railway API flow.
     useSecureCookies: isHttpsAuthUrl,
     crossOrigin: true,
     defaultCookieAttributes: {
-      sameSite: isHttpsAuthUrl ? 'none' : 'lax',
+      // With the proxy, we are technically same-site, so 'lax' is safer and better for Safari.
+      sameSite: 'lax',
       secure: isHttpsAuthUrl,
       httpOnly: true,
     },
