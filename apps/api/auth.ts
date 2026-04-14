@@ -17,9 +17,12 @@ export const auth = betterAuth({
   trustedOrigins: env.ALLOWED_ORIGINS,
   advanced: {
     // Vercel frontend -> Railway API is a cross-site cookie flow in production.
+    useSecureCookies: isHttpsAuthUrl,
+    crossOrigin: true,
     defaultCookieAttributes: {
       sameSite: isHttpsAuthUrl ? 'none' : 'lax',
       secure: isHttpsAuthUrl,
+      httpOnly: true,
     },
   },
   emailAndPassword: {

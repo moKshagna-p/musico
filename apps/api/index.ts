@@ -368,6 +368,8 @@ const app = new Elysia()
       origin: allowedOrigin,
       methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
       credentials: true,
+      allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Set-Cookie'],
+      exposedHeaders: ['Set-Cookie'],
     }),
   )
   .mount(auth.handler)
