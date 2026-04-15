@@ -118,6 +118,10 @@ const App = () => {
     }
   }, [isPending, user])
 
+  useEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: 'auto' })
+  }, [location.pathname, location.search])
+
   return (
     <div className="flex min-h-screen flex-col bg-canvas text-white">
       <Navigation />

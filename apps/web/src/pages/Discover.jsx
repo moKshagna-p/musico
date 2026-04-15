@@ -1,4 +1,3 @@
-import { useEffect, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 
@@ -9,8 +8,6 @@ import SearchBar from '../components/SearchBar.jsx'
 import { useAuth } from '../hooks/useAuth.js'
 import { getRecentPopularReleases } from '../services/discogsService.js'
 
-const MIN_LIVE_SEARCH_LENGTH = 3
-const LIVE_SEARCH_DEBOUNCE_MS = 300
 const RECENT_RELEASES_LIMIT = 24
 
 const Discover = () => {
@@ -18,24 +15,12 @@ const Discover = () => {
   const { user, isPending } = useAuth()
   const historyScope = user?.id ?? 'guest'
   const enableHistory = !isPending && Boolean(user?.id)
-  const [liveQuery, setLiveQuery] = useState('')
 
   const recentReleasesQuery = useQuery({
     queryKey: ['featured', 'recent-popular', RECENT_RELEASES_LIMIT],
     queryFn: () => getRecentPopularReleases(RECENT_RELEASES_LIMIT),
     staleTime: 1000 * 60 * 5,
   })
-
-  useEffect(() => {
-    const trimmed = liveQuery.trim()
-    if (trimmed.length < MIN_LIVE_SEARCH_LENGTH) return
-
-    const timer = setTimeout(() => {
-      navigate(`/search?q=${encodeURIComponent(trimmed)}`)
-    }, LIVE_SEARCH_DEBOUNCE_MS)
-
-    return () => clearTimeout(timer)
-  }, [liveQuery, navigate])
 
   if (recentReleasesQuery.isLoading && !recentReleasesQuery.data) {
     return (
@@ -69,7 +54,6 @@ const Discover = () => {
         <SearchBar
           query=""
           onSearch={handleSearch}
-          onValueChange={setLiveQuery}
           placeholder="Search artists or albums..."
           enablePredictive
           historyScope={historyScope}
