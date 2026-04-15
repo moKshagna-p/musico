@@ -37,6 +37,7 @@ const MAX_LISTS_PER_USER = 30
 const MAX_ALBUMS_PER_LIST = 200
 const MAX_REVIEW_LENGTH = 280
 const MAX_BIO_LENGTH = 160
+const MAX_RELEASE_PREVIEW_LOOKUPS = 36
 const USERNAME_REGEX = /^[a-z0-9][a-z0-9-]{1,22}[a-z0-9]$/
 
 const normalizeRating = (value: number) => {
@@ -137,7 +138,7 @@ const parseProfileImage = (value: unknown) => {
 const normalizeAlbumId = (value: unknown) => String(value ?? '').trim()
 
 const getReleasePreviewMap = async (albumIds: unknown[]) => {
-  const uniqueAlbumIds = [...new Set(albumIds.map(normalizeAlbumId).filter(Boolean))]
+  const uniqueAlbumIds = [...new Set(albumIds.map(normalizeAlbumId).filter(Boolean))].slice(0, MAX_RELEASE_PREVIEW_LOOKUPS)
   if (!uniqueAlbumIds.length) {
     return new Map<string, { name: string; cover: string; artists: string[]; releaseYear: number | null }>()
   }
@@ -694,12 +695,12 @@ const app = new Elysia()
       }
     }
 
-    const currentCount = await db
-      .select({ id: userListAlbum.id })
+    const [currentCountRow] = await db
+      .select({ count: sql<number>`count(*)` })
       .from(userListAlbum)
       .where(eq(userListAlbum.listId, listId))
 
-    if (currentCount.length >= MAX_ALBUMS_PER_LIST) {
+    if (Number(currentCountRow?.count ?? 0) >= MAX_ALBUMS_PER_LIST) {
       set.status = 400
       return { error: 'This list is full.' }
     }
@@ -751,9 +752,9 @@ const app = new Elysia()
 
     const profile = await ensureUserProfile(authUser.id)
 
-    const [followerRows, followingRows, recentRatingsRows, ratingActivityRows] = await Promise.all([
-      db.select({ id: userFollow.id }).from(userFollow).where(eq(userFollow.followingId, authUser.id)),
-      db.select({ id: userFollow.id }).from(userFollow).where(eq(userFollow.followerId, authUser.id)),
+    const [followerCountRows, followingCountRows, recentRatingsRows, ratingActivityRows] = await Promise.all([
+      db.select({ count: sql<number>`count(*)` }).from(userFollow).where(eq(userFollow.followingId, authUser.id)),
+      db.select({ count: sql<number>`count(*)` }).from(userFollow).where(eq(userFollow.followerId, authUser.id)),
       db
         .select({
           albumId: userRating.albumId,
@@ -776,6 +777,9 @@ const app = new Elysia()
         .orderBy(desc(activity.createdAt))
         .limit(50),
     ])
+
+    const followerCount = Number(followerCountRows[0]?.count ?? 0)
+    const followingCount = Number(followingCountRows[0]?.count ?? 0)
 
     const releasePreviewMap = await getReleasePreviewMap(recentRatingsRows.map((row) => row.albumId))
 
@@ -809,8 +813,8 @@ const app = new Elysia()
         bio: profile.bio,
         isPublic: profile.isPublic,
         image: authUser.image ?? null,
-        followerCount: followerRows.length,
-        followingCount: followingRows.length,
+        followerCount,
+        followingCount,
         recentRatings,
       },
     }
@@ -964,10 +968,13 @@ const app = new Elysia()
       }
 
       // Count followers/following even for private profiles (public metadata)
-      const [followerRows, followingRows] = await Promise.all([
-        db.select({ id: userFollow.id }).from(userFollow).where(eq(userFollow.followingId, profile.userId)),
-        db.select({ id: userFollow.id }).from(userFollow).where(eq(userFollow.followerId, profile.userId)),
+      const [followerCountRows, followingCountRows] = await Promise.all([
+        db.select({ count: sql<number>`count(*)` }).from(userFollow).where(eq(userFollow.followingId, profile.userId)),
+        db.select({ count: sql<number>`count(*)` }).from(userFollow).where(eq(userFollow.followerId, profile.userId)),
       ])
+
+      const followerCount = Number(followerCountRows[0]?.count ?? 0)
+      const followingCount = Number(followingCountRows[0]?.count ?? 0)
 
       set.headers ??= {}
       set.headers['Cache-Control'] = 'public, max-age=30'
@@ -980,8 +987,8 @@ const app = new Elysia()
           isPrivate: true,
           joinedAt: targetUser.createdAt.getTime(),
           stats: null,
-          followerCount: followerRows.length,
-          followingCount: followingRows.length,
+          followerCount,
+          followingCount,
           isFollowing,
           isOwnProfile: false,
           recentRatings: [],
@@ -992,13 +999,52 @@ const app = new Elysia()
     }
 
     // Fetch stats in parallel
-    const [ratings, reviews, lists, followerRows, followingRows] = await Promise.all([
-      db.select().from(userRating).where(eq(userRating.userId, profile.userId)),
-      db.select().from(userReview).where(eq(userReview.userId, profile.userId)),
+    const [ratingSummaryRows, reviewSummaryRows, recentRatingsRows, recentReviewsRows, lists, followerCountRows, followingCountRows] = await Promise.all([
+      db
+        .select({
+          totalRated: sql<number>`count(*)`,
+          averageRating: sql<number>`coalesce(avg(${userRating.rating}), 0)`,
+        })
+        .from(userRating)
+        .where(eq(userRating.userId, profile.userId)),
+      db
+        .select({
+          totalReviews: sql<number>`count(*)`,
+        })
+        .from(userReview)
+        .where(eq(userReview.userId, profile.userId)),
+      db
+        .select({
+          albumId: userRating.albumId,
+          rating: userRating.rating,
+          updatedAt: userRating.updatedAt,
+        })
+        .from(userRating)
+        .where(eq(userRating.userId, profile.userId))
+        .orderBy(desc(userRating.updatedAt))
+        .limit(12),
+      db
+        .select({
+          albumId: userReview.albumId,
+          content: userReview.content,
+          albumName: userReview.albumName,
+          albumCover: userReview.albumCover,
+          albumArtists: userReview.albumArtists,
+          createdAt: userReview.createdAt,
+        })
+        .from(userReview)
+        .where(eq(userReview.userId, profile.userId))
+        .orderBy(desc(userReview.createdAt))
+        .limit(10),
       db.select().from(userList).where(eq(userList.userId, profile.userId)),
-      db.select({ id: userFollow.id }).from(userFollow).where(eq(userFollow.followingId, profile.userId)),
-      db.select({ id: userFollow.id }).from(userFollow).where(eq(userFollow.followerId, profile.userId)),
+      db.select({ count: sql<number>`count(*)` }).from(userFollow).where(eq(userFollow.followingId, profile.userId)),
+      db.select({ count: sql<number>`count(*)` }).from(userFollow).where(eq(userFollow.followerId, profile.userId)),
     ])
+
+    const ratingSummary = ratingSummaryRows[0]
+    const reviewSummary = reviewSummaryRows[0]
+    const followerCount = Number(followerCountRows[0]?.count ?? 0)
+    const followingCount = Number(followingCountRows[0]?.count ?? 0)
 
     // Get list albums for display
     const listIds = lists.map((l) => l.id)
@@ -1014,7 +1060,7 @@ const app = new Elysia()
     })
 
     const releasePreviewMap = await getReleasePreviewMap([
-      ...ratings.map((rating) => rating.albumId),
+      ...recentRatingsRows.map((rating) => rating.albumId),
       ...listAlbums.map((album) => album.albumId),
     ])
 
@@ -1030,10 +1076,7 @@ const app = new Elysia()
     }
 
     // Recent ratings (last 12)
-    const recentRatings = [...ratings]
-      .sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime())
-      .slice(0, 12)
-      .map((r) => {
+    const recentRatings = recentRatingsRows.map((r) => {
         const preview = releasePreviewMap.get(r.albumId)
         return {
           albumId: r.albumId,
@@ -1045,10 +1088,7 @@ const app = new Elysia()
       })
 
     // Recent reviews (last 10)
-    const recentReviews = [...reviews]
-      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
-      .slice(0, 10)
-      .map((r) => ({
+    const recentReviews = recentReviewsRows.map((r) => ({
         albumId: r.albumId,
         content: r.content,
         albumName: r.albumName,
@@ -1083,9 +1123,9 @@ const app = new Elysia()
       })
 
     // Compute average rating
-    const avgRating = ratings.length
-      ? ratings.reduce((sum, r) => sum + r.rating, 0) / ratings.length
-      : 0
+    const avgRating = Number(ratingSummary?.averageRating ?? 0)
+    const totalRated = Number(ratingSummary?.totalRated ?? 0)
+    const totalReviews = Number(reviewSummary?.totalReviews ?? 0)
 
     set.headers ??= {}
     set.headers['Cache-Control'] = 'public, max-age=30'
@@ -1098,13 +1138,13 @@ const app = new Elysia()
         isPrivate: false,
         joinedAt: targetUser.createdAt.getTime(),
         stats: {
-          totalRated: ratings.length,
+          totalRated,
           averageRating: Math.round(avgRating * 10) / 10,
-          totalReviews: reviews.length,
+          totalReviews,
           totalLists: lists.length,
         },
-        followerCount: followerRows.length,
-        followingCount: followingRows.length,
+        followerCount,
+        followingCount,
         isFollowing,
         isOwnProfile: authUser?.id === profile.userId,
         recentRatings,

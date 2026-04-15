@@ -30,9 +30,12 @@ const HighlightMatch = ({ text, match }) => {
 const SearchBar = ({
   query = '',
   onSearch,
+  onValueChange,
   placeholder,
   autoFocus,
   historyScope = 'guest',
+  enablePredictive = true,
+  enableHistory = true,
 }) => {
   const navigate = useNavigate()
   const MotionDiv = motion.div
@@ -42,7 +45,9 @@ const SearchBar = ({
   const inputRef = useRef(null)
   
   // 1. Professional Fetching with local debouncing & cancellation
-  const { suggestions, isLoading, isFetching } = useSearch(value, { enabled: isFocused })
+  const { suggestions, isLoading, isFetching } = useSearch(value, {
+    enabled: enablePredictive && isFocused,
+  })
   
   const [recentSearches, setRecentSearches] = useState([])
 
@@ -63,21 +68,33 @@ const SearchBar = ({
   }, [query])
 
   useEffect(() => {
+    if (!enableHistory) {
+      setRecentSearches([])
+      return
+    }
+
     setRecentSearches(getSearchHistory(historyScope))
-  }, [historyScope, isFocused])
+  }, [enableHistory, historyScope, isFocused])
 
   const submitSearch = (term) => {
     const trimmed = term?.trim() ?? ''
     if (!trimmed) return
 
-    addToSearchHistory(trimmed, historyScope)
+    if (enableHistory) {
+      addToSearchHistory(trimmed, historyScope)
+    }
     onSearch?.(trimmed)
     setIsFocused(false)
     inputRef.current?.blur()
   }
 
+  const applyValue = (nextValue) => {
+    setValue(nextValue)
+    onValueChange?.(nextValue)
+  }
+
   const handleKeyDown = (e) => {
-    const totalCount = suggestions.length
+    const totalCount = enablePredictive ? suggestions.length : 0
     
     if (e.key === 'ArrowDown') {
       e.preventDefault()
@@ -86,7 +103,7 @@ const SearchBar = ({
       e.preventDefault()
       setActiveSuggestionIndex(prev => (prev > 0 ? prev - 1 : totalCount - 1))
     } else if (e.key === 'Enter') {
-      if (activeSuggestionIndex >= 0 && suggestions[activeSuggestionIndex]) {
+      if (enablePredictive && activeSuggestionIndex >= 0 && suggestions[activeSuggestionIndex]) {
         e.preventDefault()
         const item = suggestions[activeSuggestionIndex]
         navigate(`/album/${item.id}`)
@@ -100,7 +117,9 @@ const SearchBar = ({
     }
   }
 
-  const showDropdown = isFocused && (value.length >= 3 || recentSearches.length > 0)
+  const showSuggestions = enablePredictive && value.length >= 3
+  const showRecentSearches = enableHistory && recentSearches.length > 0 && value.length < 3
+  const showDropdown = isFocused && (showSuggestions || showRecentSearches)
 
   return (
     <div className="relative z-50">
@@ -117,7 +136,8 @@ const SearchBar = ({
           ref={inputRef}
           value={value}
           onChange={(e) => {
-            setValue(e.target.value)
+            const nextValue = e.target.value
+            applyValue(nextValue)
             setActiveSuggestionIndex(-1)
           }}
           onFocus={() => setIsFocused(true)}
@@ -131,7 +151,7 @@ const SearchBar = ({
         <div className="flex items-center gap-2">
           {value && (
             <button 
-              onClick={() => setValue('')}
+              onClick={() => applyValue('')}
               className="p-1 text-muted hover:text-white"
             >
               <FiX />
@@ -152,7 +172,7 @@ const SearchBar = ({
             className="absolute left-0 right-0 top-[calc(100%+0.5rem)] overflow-hidden rounded-2xl border border-outline bg-panel/95 shadow-2xl backdrop-blur-xl"
           >
             {/* Quick Results */}
-            {value.length >= 3 && (
+            {showSuggestions && (
               <div className="p-2">
                 <div className="flex items-center justify-between px-3 py-2">
                   <p className="text-[10px] font-bold uppercase tracking-[0.3em] text-muted">Suggestions</p>
@@ -198,7 +218,7 @@ const SearchBar = ({
             )}
 
             {/* Recent Searches */}
-            {recentSearches.length > 0 && value.length < 3 && (
+            {showRecentSearches && (
               <div className="p-2">
                 <div className="flex items-center justify-between px-3 py-2">
                   <p className="text-[10px] font-bold uppercase tracking-[0.3em] text-muted text-center">Recent Searches</p>
@@ -215,7 +235,7 @@ const SearchBar = ({
                 </div>
                 <div className="mt-1 space-y-1">
                   {recentSearches.map((term) => (
-                    <div key={term} className="group flex items-center justify-between rounded-xl px-3 py-2 hover:bg-white/5 transition-colors cursor-pointer" onClick={() => setValue(term)}>
+                    <div key={term} className="group flex items-center justify-between rounded-xl px-3 py-2 hover:bg-white/5 transition-colors cursor-pointer" onClick={() => applyValue(term)}>
                       <div className="flex items-center gap-3 min-w-0">
                         <FiClock className="shrink-0 text-muted" />
                         <span className="truncate text-sm text-white/80">{term}</span>

@@ -91,11 +91,11 @@ const App = () => {
       window.localStorage.setItem(LAST_ACTIVITY_KEY, String(Date.now()))
     }
 
-    // Throttle writes to localStorage to avoid excessive updates for high-frequency events.
+    // Throttle writes to localStorage to avoid excessive updates.
     let lastWrite = 0
     const touchLastActivityThrottled = () => {
       const now = Date.now()
-      if (now - lastWrite < 10000) return
+      if (now - lastWrite < 15000) return
       lastWrite = now
       touchLastActivity()
     }
@@ -108,18 +108,12 @@ const App = () => {
 
     touchLastActivity()
     window.addEventListener('pointerdown', touchLastActivityThrottled, { passive: true })
-    window.addEventListener('keydown', touchLastActivityThrottled, { passive: true })
-    window.addEventListener('scroll', touchLastActivityThrottled, { passive: true })
-    window.addEventListener('mousemove', touchLastActivityThrottled, { passive: true })
-    window.addEventListener('touchstart', touchLastActivityThrottled, { passive: true })
+    window.addEventListener('keydown', touchLastActivityThrottled)
     document.addEventListener('visibilitychange', onVisibilityChange)
 
     return () => {
       window.removeEventListener('pointerdown', touchLastActivityThrottled)
       window.removeEventListener('keydown', touchLastActivityThrottled)
-      window.removeEventListener('scroll', touchLastActivityThrottled)
-      window.removeEventListener('mousemove', touchLastActivityThrottled)
-      window.removeEventListener('touchstart', touchLastActivityThrottled)
       document.removeEventListener('visibilitychange', onVisibilityChange)
     }
   }, [isPending, user])

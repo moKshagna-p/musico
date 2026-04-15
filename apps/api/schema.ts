@@ -176,6 +176,7 @@ export const userRating = pgTable(
   (table) => [
     uniqueIndex('user_rating_user_album_unique').on(table.userId, table.albumId),
     index('user_rating_user_id_idx').on(table.userId),
+    index('user_rating_album_id_idx').on(table.albumId),
   ],
 )
 

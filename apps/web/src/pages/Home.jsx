@@ -1,46 +1,46 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 
 import AlbumGrid from '../components/AlbumGrid.jsx'
 import Hero from '../components/Hero.jsx'
 import PageTransition from '../components/PageTransition.jsx'
+import { HomePageSkeleton } from '../components/PageLoadingState.jsx'
 import { getHomeSections } from '../services/discogsService.js'
+
+const HOME_SECTION_LIMIT = 24
 
 const Home = () => {
   const navigate = useNavigate()
-  const [mostHappeningAlbums, setMostHappeningAlbums] = useState([])
-  const [recentAlbums, setRecentAlbums] = useState([])
   const [showAllHappeningAlbums, setShowAllHappeningAlbums] = useState(false)
-  const [happeningLoading, setHappeningLoading] = useState(true)
-  const [recentLoading, setRecentLoading] = useState(true)
-  const [happeningError, setHappeningError] = useState(null)
-  const [recentError, setRecentError] = useState(null)
 
-  useEffect(() => {
-    const loadHomeSections = async () => {
-      setHappeningLoading(true)
-      setRecentLoading(true)
-      setHappeningError(null)
-      setRecentError(null)
+  const homeSectionsQuery = useQuery({
+    queryKey: ['home-sections', HOME_SECTION_LIMIT, HOME_SECTION_LIMIT],
+    queryFn: () =>
+      getHomeSections({
+        happeningLimit: HOME_SECTION_LIMIT,
+        recentLimit: HOME_SECTION_LIMIT,
+      }),
+    staleTime: 1000 * 60 * 5,
+  })
 
-      try {
-        const sections = await getHomeSections({ happeningLimit: 24, recentLimit: 24 })
-        setMostHappeningAlbums(Array.isArray(sections?.mostHappening?.data) ? sections.mostHappening.data : [])
-        setRecentAlbums(Array.isArray(sections?.recentReleases?.data) ? sections.recentReleases.data : [])
-        setHappeningError(sections?.mostHappening?.error ?? null)
-        setRecentError(sections?.recentReleases?.error ?? null)
-      } catch (error) {
-        const message = error?.message ?? 'Unable to load homepage data.'
-        setHappeningError(message)
-        setRecentError(message)
-      } finally {
-        setHappeningLoading(false)
-        setRecentLoading(false)
-      }
-    }
+  const mostHappeningAlbums = Array.isArray(homeSectionsQuery.data?.mostHappening?.data)
+    ? homeSectionsQuery.data.mostHappening.data
+    : []
+  const recentAlbums = Array.isArray(homeSectionsQuery.data?.recentReleases?.data)
+    ? homeSectionsQuery.data.recentReleases.data
+    : []
+  const requestErrorMessage = homeSectionsQuery.error?.message ?? null
+  const happeningError = requestErrorMessage ?? homeSectionsQuery.data?.mostHappening?.error ?? null
+  const recentError = requestErrorMessage ?? homeSectionsQuery.data?.recentReleases?.error ?? null
 
-    loadHomeSections()
-  }, [])
+  if (homeSectionsQuery.isLoading && !homeSectionsQuery.data) {
+    return (
+      <PageTransition>
+        <HomePageSkeleton />
+      </PageTransition>
+    )
+  }
 
   const handleAlbumSelect = (id) => {
     navigate(`/album/${id}`, { state: { from: '/', query: '' } })
@@ -69,7 +69,7 @@ const Home = () => {
           </div>
           <AlbumGrid
             albums={visibleMostHappeningAlbums}
-            loading={happeningLoading}
+            loading={false}
             error={happeningError}
             onSelect={handleAlbumSelect}
           />
@@ -84,7 +84,7 @@ const Home = () => {
           </div>
           <AlbumGrid
             albums={recentAlbums}
-            loading={recentLoading}
+            loading={false}
             error={recentError}
             onSelect={handleAlbumSelect}
           />

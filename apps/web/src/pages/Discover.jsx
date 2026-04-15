@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 
 import AlbumGrid from '../components/AlbumGrid.jsx'
+import { DiscoverPageSkeleton } from '../components/PageLoadingState.jsx'
 import PageTransition from '../components/PageTransition.jsx'
 import SearchBar from '../components/SearchBar.jsx'
 import { useAuth } from '../hooks/useAuth.js'
@@ -9,32 +11,20 @@ import { getRecentPopularReleases } from '../services/discogsService.js'
 
 const MIN_LIVE_SEARCH_LENGTH = 3
 const LIVE_SEARCH_DEBOUNCE_MS = 300
+const RECENT_RELEASES_LIMIT = 24
 
 const Discover = () => {
   const navigate = useNavigate()
   const { user, isPending } = useAuth()
   const historyScope = user?.id ?? 'guest'
   const enableHistory = !isPending && Boolean(user?.id)
-  const [albums, setAlbums] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState(null)
   const [liveQuery, setLiveQuery] = useState('')
 
-  useEffect(() => {
-    const loadFeatured = async () => {
-      setLoading(true)
-      setError(null)
-      try {
-        const releases = await getRecentPopularReleases(24)
-        setAlbums(releases)
-      } catch (err) {
-        setError(err?.message ?? 'Unable to load featured releases.')
-      } finally {
-        setLoading(false)
-      }
-    }
-    loadFeatured()
-  }, [])
+  const recentReleasesQuery = useQuery({
+    queryKey: ['featured', 'recent-popular', RECENT_RELEASES_LIMIT],
+    queryFn: () => getRecentPopularReleases(RECENT_RELEASES_LIMIT),
+    staleTime: 1000 * 60 * 5,
+  })
 
   useEffect(() => {
     const trimmed = liveQuery.trim()
@@ -46,6 +36,17 @@ const Discover = () => {
 
     return () => clearTimeout(timer)
   }, [liveQuery, navigate])
+
+  if (recentReleasesQuery.isLoading && !recentReleasesQuery.data) {
+    return (
+      <PageTransition>
+        <DiscoverPageSkeleton />
+      </PageTransition>
+    )
+  }
+
+  const albums = Array.isArray(recentReleasesQuery.data) ? recentReleasesQuery.data : []
+  const error = recentReleasesQuery.error?.message ?? null
 
   const handleSearch = (value) => {
     if (value?.trim()) {
@@ -77,7 +78,7 @@ const Discover = () => {
 
         <div>
           <p className="mb-4 text-xs uppercase tracking-[0.4em] text-muted">Recent Releases</p>
-          <AlbumGrid albums={albums} loading={loading} error={error} onSelect={handleAlbumSelect} />
+          <AlbumGrid albums={albums} loading={false} error={error} onSelect={handleAlbumSelect} />
         </div>
       </div>
     </PageTransition>
