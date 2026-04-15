@@ -26,7 +26,7 @@ const SearchResults = () => {
     error, 
     correctedQuery 
   } = useSearch(query, { 
-    limit: 24, // Full page results
+    limit: 12, // Smart engine result cap
     enabled: !!query 
   })
 

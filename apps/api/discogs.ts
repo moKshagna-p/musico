@@ -29,12 +29,17 @@ const FEATURED_RETRY_COOLDOWN_MS = env.FEATURED_RETRY_COOLDOWN_MS
 const SEARCH_RETRY_COOLDOWN_MS = env.SEARCH_RETRY_COOLDOWN_MS
 const FEATURED_REFRESH_SIZE = 50
 const FEATURED_DETAIL_HYDRATION_LIMIT = env.FEATURED_DETAIL_HYDRATION_LIMIT
-const SEARCH_CACHE_VERSION = 'v8'
-const SEARCH_RESULTS_PER_PAGE = 100
+const SEARCH_CACHE_VERSION = 'v9'
+const SEARCH_RESULTS_PER_PAGE = 50
 const SEARCH_MAX_PAGES = env.SEARCH_MAX_PAGES
 const SEARCH_QUERY_PAGES = env.SEARCH_QUERY_PAGES
 const SEARCH_MIN_RESULTS_BEFORE_PAGING = env.SEARCH_MIN_RESULTS_BEFORE_PAGING
-const SEARCH_ARTIST_CANDIDATE_LIMIT = 5
+const SEARCH_ARTIST_CANDIDATE_LIMIT = 3
+const SMART_SEARCH_RESULT_LIMIT = 12
+const SMART_SEARCH_PRIMARY_LIMIT = 6
+const SMART_SEARCH_STRONG_MATCH_THRESHOLD = 0.72
+const SMART_SEARCH_CLOSE_MATCH_THRESHOLD = 0.56
+const SMART_SEARCH_CORRECTION_TRIGGER_SCORE = 0.7
 const DISCOGS_MIN_REQUEST_INTERVAL_MS = env.DISCOGS_MIN_REQUEST_INTERVAL_MS
 const DISCOGS_MAX_RETRIES = env.DISCOGS_MAX_RETRIES
 const RELEASE_CACHE_MAX_ENTRIES = env.RELEASE_CACHE_MAX_ENTRIES
@@ -48,8 +53,13 @@ const releaseMemoryCache = new LRUCache<string, ReleaseDetails>({
 // ── Request deduplication Map ──
 const releaseRequestsInFlight = new Map<string, Promise<ReleaseDetails>>()
 
+type RankedSearchBatch = {
+  data: ReleaseSummary[]
+  bestMatchScore: number
+}
+
 const featuredRefreshInFlight = new Map<string, Promise<ReleaseSummary[]>>()
-const searchRefreshInFlight = new Map<string, Promise<ReleaseSummary[]>>()
+const searchRefreshInFlight = new Map<string, Promise<RankedSearchBatch>>()
 let discogsNextRequestAt = 0
 
 const HEADERS: Record<string, string> = {
@@ -673,14 +683,23 @@ const fuzzyScore = (query: string, candidate: string): number => {
 const FUZZY_SIMILARITY_THRESHOLD = 0.45
 
 const fetchFuzzySuggestions = async (sourceQuery: string): Promise<string | null> => {
-  // Use Discogs general search to find approximate artist/album name matches
-  const response = await requestDiscogs('/database/search', {
-    q: sourceQuery,
-    per_page: 25,
-    type: 'artist',
-  })
+  const [masterResultsResponse, artistResultsResponse] = await Promise.all([
+    requestDiscogs('/database/search', {
+      q: sourceQuery,
+      per_page: 20,
+      type: 'master',
+      format: 'album',
+    }),
+    requestDiscogs('/database/search', {
+      q: sourceQuery,
+      per_page: 15,
+      type: 'artist',
+    }),
+  ])
 
-  const results = Array.isArray(response?.results) ? response.results : []
+  const masterResults = Array.isArray(masterResultsResponse?.results) ? masterResultsResponse.results : []
+  const artistResults = Array.isArray(artistResultsResponse?.results) ? artistResultsResponse.results : []
+  const results = [...masterResults, ...artistResults]
   if (!results.length) return null
 
   let bestCandidate: string | null = null
@@ -688,15 +707,165 @@ const fetchFuzzySuggestions = async (sourceQuery: string): Promise<string | null
 
   for (const entry of results) {
     const title = typeof entry?.title === 'string' ? stripDiscogsDisambiguation(entry.title) : ''
-    if (!title) continue
-    const score = fuzzyScore(sourceQuery, title)
-    if (score > bestScore && score >= FUZZY_SIMILARITY_THRESHOLD) {
-      bestScore = score
-      bestCandidate = title
+    const artist = extractMasterArtist(entry)
+    const album = extractMasterAlbum(entry)
+    const candidates = [title, artist, album].filter(Boolean)
+
+    for (const candidate of candidates) {
+      const score = fuzzyScore(sourceQuery, candidate)
+      if (score > bestScore && score >= FUZZY_SIMILARITY_THRESHOLD) {
+        bestScore = score
+        bestCandidate = candidate
+      }
     }
   }
 
   return bestCandidate
+}
+
+const toNormalizedTokens = (value: string) => normalizeSearchValue(value).split(' ').filter(Boolean)
+
+const countGenreMatches = (seedGenres: Set<string>, release: ReleaseSummary) => {
+  if (!seedGenres.size || !release.genres?.length) return 0
+  const normalizedGenres = release.genres.map((genre) => normalizeSearchValue(genre)).filter(Boolean)
+  return normalizedGenres.reduce((count, genre) => (seedGenres.has(genre) ? count + 1 : count), 0)
+}
+
+type ScoredRelease = {
+  release: ReleaseSummary
+  intentScore: number
+  rankScore: number
+  isExactNameMatch: boolean
+  isExactArtistMatch: boolean
+}
+
+const scoreReleaseAgainstQuery = (release: ReleaseSummary, sourceQuery: string): ScoredRelease => {
+  const normalizedQuery = normalizeSearchValue(sourceQuery)
+  const queryTokens = toNormalizedTokens(sourceQuery)
+  const normalizedName = normalizeSearchValue(release.name ?? '')
+  const normalizedArtists = (release.artists ?? []).map((artist) => normalizeSearchValue(artist)).filter(Boolean)
+  const albumType = normalizeSearchValue(release.albumType ?? '')
+
+  const nameFuzzy = fuzzyScore(normalizedQuery, normalizedName)
+  const bestArtistFuzzy = normalizedArtists.reduce(
+    (best, artist) => Math.max(best, fuzzyScore(normalizedQuery, artist)),
+    0,
+  )
+
+  const tokenCoverage = queryTokens.length
+    ? queryTokens.filter((token) => normalizedName.includes(token) || normalizedArtists.some((artist) => artist.includes(token))).length /
+      queryTokens.length
+    : 0
+
+  const exactName = normalizedName === normalizedQuery
+  const exactArtist = normalizedArtists.includes(normalizedQuery)
+  const startsWithMatch =
+    normalizedName.startsWith(normalizedQuery) || normalizedArtists.some((artist) => artist.startsWith(normalizedQuery))
+  const includesMatch =
+    normalizedName.includes(normalizedQuery) || normalizedArtists.some((artist) => artist.includes(normalizedQuery))
+
+  let intentScore = Math.max(nameFuzzy * 0.94, bestArtistFuzzy, tokenCoverage * 0.9)
+  if (exactName || exactArtist) intentScore += 0.42
+  else if (startsWithMatch) intentScore += 0.22
+  else if (includesMatch) intentScore += 0.1
+
+  if (albumType.includes('single') || albumType.includes('ep')) {
+    intentScore -= 0.08
+  }
+
+  const qualityBoost =
+    Math.min(Number(release.popularity ?? 0) / 6000, 0.22) +
+    Math.min(Number(release.reviewCount ?? 0) / 250, 0.18) +
+    Math.min(Math.max(Number(release.communityRating ?? 0), 0) / 10, 0.12)
+
+  const rankScore = intentScore * 0.84 + qualityBoost * 0.16
+
+  return {
+    release,
+    intentScore: Math.max(0, Number(intentScore.toFixed(4))),
+    rankScore: Number(rankScore.toFixed(4)),
+    isExactNameMatch: exactName,
+    isExactArtistMatch: exactArtist,
+  }
+}
+
+const buildSmartSearchResults = (releases: ReleaseSummary[], sourceQuery: string): RankedSearchBatch => {
+  const ranked = dedupeByReleaseId(releases)
+    .map((release) => scoreReleaseAgainstQuery(release, sourceQuery))
+    .filter((entry) => entry.intentScore > 0)
+    .sort((a, b) => {
+      const intentDiff = b.intentScore - a.intentScore
+      if (intentDiff !== 0) return intentDiff
+      const rankDiff = b.rankScore - a.rankScore
+      if (rankDiff !== 0) return rankDiff
+      return releaseScore(b.release) - releaseScore(a.release)
+    })
+
+  const bestMatchScore = ranked[0]?.intentScore ?? 0
+
+  const exactMatches = ranked.filter((entry) => entry.isExactNameMatch || entry.isExactArtistMatch)
+  if (exactMatches.length > SMART_SEARCH_RESULT_LIMIT) {
+    return {
+      data: exactMatches.map((entry) => entry.release),
+      bestMatchScore,
+    }
+  }
+
+  const selected = new Map<string, ReleaseSummary>()
+  exactMatches.forEach((entry) => {
+    selected.set(entry.release.id, entry.release)
+  })
+
+  const remainingRanked = ranked.filter((entry) => !selected.has(entry.release.id))
+
+  const strongPrimary = remainingRanked.filter((entry) => entry.intentScore >= SMART_SEARCH_STRONG_MATCH_THRESHOLD)
+  const closePrimary = remainingRanked.filter((entry) => entry.intentScore >= SMART_SEARCH_CLOSE_MATCH_THRESHOLD)
+  const primaryPool = strongPrimary.length ? strongPrimary : closePrimary.length ? closePrimary : remainingRanked
+  const primarySlots = Math.max(0, SMART_SEARCH_PRIMARY_LIMIT - selected.size)
+  const primary = primaryPool.slice(0, primarySlots)
+  primary.forEach((entry) => {
+    selected.set(entry.release.id, entry.release)
+  })
+
+  const seedGenres = new Set(
+    primary
+      .flatMap((entry) => entry.release.genres ?? [])
+      .map((genre) => normalizeSearchValue(genre))
+      .filter(Boolean),
+  )
+
+  const similar = remainingRanked
+    .filter((entry) => !selected.has(entry.release.id))
+    .map((entry) => ({
+      ...entry,
+      genreMatches: countGenreMatches(seedGenres, entry.release),
+    }))
+    .filter((entry) => entry.genreMatches > 0 || entry.intentScore >= SMART_SEARCH_CLOSE_MATCH_THRESHOLD)
+    .sort((a, b) => {
+      const genreDiff = b.genreMatches - a.genreMatches
+      if (genreDiff !== 0) return genreDiff
+      const rankDiff = b.rankScore - a.rankScore
+      if (rankDiff !== 0) return rankDiff
+      return releaseScore(b.release) - releaseScore(a.release)
+    })
+
+  for (const entry of similar) {
+    if (selected.size >= SMART_SEARCH_RESULT_LIMIT) break
+    selected.set(entry.release.id, entry.release)
+  }
+
+  if (selected.size < SMART_SEARCH_RESULT_LIMIT) {
+    for (const entry of remainingRanked) {
+      if (selected.size >= SMART_SEARCH_RESULT_LIMIT) break
+      if (selected.has(entry.release.id)) continue
+      selected.set(entry.release.id, entry.release)
+    }
+  }
+
+  return {
+    data: Array.from(selected.values()).slice(0, SMART_SEARCH_RESULT_LIMIT),
+    bestMatchScore,
+  }
 }
 
 const extractMasterArtist = (entry: any) => {
@@ -1045,58 +1214,48 @@ const upsertSearchCache = async (queryHash: string, normalizedQuery: string, pay
     })
 }
 
-const refreshSearchQuery = async (queryHash: string, normalizedQuery: string, sourceQuery: string) => {
+const refreshSearchQuery = async (queryHash: string, normalizedQuery: string, sourceQuery: string): Promise<RankedSearchBatch> => {
   const existing = searchRefreshInFlight.get(queryHash)
   if (existing) return existing
 
   const refreshPromise = (async () => {
-    const [artistScopedResults, queryResults] = await Promise.all([
-      fetchAllSearchPages({
-        artist: sourceQuery,
-        type: 'master',
-        format: 'album',
-      }, SEARCH_MAX_PAGES),
-      fetchAllSearchPages({
+    const queryResults = await fetchAllSearchPages(
+      {
         q: sourceQuery,
         type: 'master',
         format: 'album',
-      }, SEARCH_QUERY_PAGES),
-    ])
+      },
+      SEARCH_QUERY_PAGES,
+      SMART_SEARCH_RESULT_LIMIT,
+    )
 
-    const normalized = mapDiscogsMasterSearchResults([...artistScopedResults, ...queryResults])
+    const artistCandidates = inferArtistCandidates(queryResults, sourceQuery)
+    const artistScopedBatches = await Promise.all(
+      artistCandidates.slice(0, SEARCH_ARTIST_CANDIDATE_LIMIT).map((artist) =>
+        fetchAllSearchPages(
+          {
+            artist,
+            type: 'master',
+            format: 'album',
+          },
+          Math.min(2, SEARCH_MAX_PAGES),
+          SMART_SEARCH_RESULT_LIMIT,
+        ),
+      ),
+    )
+
+    const normalized = mapDiscogsMasterSearchResults([...queryResults, ...artistScopedBatches.flat()])
     const curated = dedupeReleasedAlbums(normalized).filter((release) => {
       const albumType = (release.albumType ?? '').toLowerCase()
       // Broaden filter to catch things labeled slightly differently but still likely albums
       return albumType.includes('album') || albumType.includes('lp') || albumType === 'release' || !albumType
     })
 
-    const preferredArtists = [
-      sourceQuery,
-      ...artistScopedResults.map((entry: any) => extractMasterArtist(entry)).filter(Boolean),
-      ...queryResults.map((entry: any) => extractMasterArtist(entry)).filter(Boolean),
-    ]
+    const rankedChronological = dedupeByReleaseId(sortReleasedAlbumsChronologically(curated, artistCandidates))
+    const smart = buildSmartSearchResults(rankedChronological, sourceQuery)
 
-    // Final sorting: Exact matches on query string (artist or album) get top priority
-    const lowerQuery = sourceQuery.toLowerCase()
-    const ordered = dedupeByReleaseId(sortReleasedAlbumsChronologically(curated, preferredArtists))
-      .sort((a, b) => {
-        const aName = (a.name ?? '').toLowerCase()
-        const bName = (b.name ?? '').toLowerCase()
-        const aArtist = (a.artists?.[0] ?? '').toLowerCase()
-        const bArtist = (b.artists?.[0] ?? '').toLowerCase()
-
-        const aExact = aName === lowerQuery || aArtist === lowerQuery
-        const bExact = bName === lowerQuery || bArtist === lowerQuery
-
-        if (aExact && !bExact) return -1
-        if (!aExact && bExact) return 1
-        
-        // If both or neither are exact, use release quality score
-        return releaseScore(b) - releaseScore(a)
-      })
-
-    await upsertSearchCache(queryHash, normalizedQuery, ordered)
-    return ordered
+    await upsertSearchCache(queryHash, normalizedQuery, smart.data)
+    return smart
   })()
 
   searchRefreshInFlight.set(queryHash, refreshPromise)
@@ -1121,46 +1280,77 @@ export const searchReleases = async (query: string): Promise<SearchResult> => {
   const refreshedAt = cached?.refreshedAt?.getTime?.() ?? 0
   const recentRefresh = refreshedAt > 0 && Date.now() - refreshedAt < SEARCH_RETRY_COOLDOWN_MS
 
+  const getCorrectedSearchResults = async (corrected: string) => {
+    const correctedNorm = normalizeCacheQuery(corrected)
+    const correctedHash = createQueryHash(correctedNorm)
+
+    const correctedCached = await getCachedSearch(correctedHash)
+    const correctedPayload = toReleaseSummaryArray(correctedCached?.payload)
+    const correctedRefreshedAt = correctedCached?.refreshedAt?.getTime?.() ?? 0
+    const correctedRecentRefresh = correctedRefreshedAt > 0 && Date.now() - correctedRefreshedAt < SEARCH_RETRY_COOLDOWN_MS
+
+    if (
+      correctedPayload.length &&
+      isNotExpired(correctedCached?.expiresAt) &&
+      (!shouldRefreshSummaryPayload(correctedPayload) || correctedRecentRefresh)
+    ) {
+      return buildSmartSearchResults(correctedPayload, corrected)
+    }
+
+    return refreshSearchQuery(correctedHash, correctedNorm, corrected)
+  }
+
   if (
     cachedPayload.length &&
     isNotExpired(cached?.expiresAt) &&
     (!shouldRefreshSummaryPayload(cachedPayload) || recentRefresh)
   ) {
-    return { data: cachedPayload }
+    const cachedSmart = buildSmartSearchResults(cachedPayload, trimmed)
+    if (cachedSmart.bestMatchScore >= SMART_SEARCH_CORRECTION_TRIGGER_SCORE) {
+      return { data: cachedSmart.data }
+    }
+
+    try {
+      const corrected = await fetchFuzzySuggestions(trimmed)
+      if (corrected && normalizeSearchValue(corrected) !== normalizeSearchValue(trimmed)) {
+        const correctedSmart = await getCorrectedSearchResults(corrected)
+        if (correctedSmart.bestMatchScore > cachedSmart.bestMatchScore) {
+          return { data: correctedSmart.data, correctedQuery: corrected }
+        }
+      }
+    } catch {
+      // Ignore correction lookup failures and fall back to cached results.
+    }
+
+    return { data: cachedSmart.data }
   }
 
   try {
     const results = await refreshSearchQuery(queryHash, normalizedQuery, trimmed)
 
-    // If the primary search returned results, return them directly
-    if (results.length) return { data: results }
+    if (results.data.length && results.bestMatchScore >= SMART_SEARCH_CORRECTION_TRIGGER_SCORE) {
+      return { data: results.data }
+    }
+
+    if (results.data.length && results.bestMatchScore >= SMART_SEARCH_CLOSE_MATCH_THRESHOLD) {
+      return { data: results.data }
+    }
 
     // ─── Fuzzy fallback: try to find an approximate match ────────────
     const corrected = await fetchFuzzySuggestions(trimmed)
     if (corrected && normalizeSearchValue(corrected) !== normalizeSearchValue(trimmed)) {
-      const correctedNorm = normalizeCacheQuery(corrected)
-      const correctedHash = createQueryHash(correctedNorm)
-
-      // Check if corrected query is already cached
-      const correctedCached = await getCachedSearch(correctedHash)
-      const correctedPayload = toReleaseSummaryArray(correctedCached?.payload)
-      if (
-        correctedPayload.length &&
-        isNotExpired(correctedCached?.expiresAt) &&
-        (!shouldRefreshSummaryPayload(correctedPayload) || recentRefresh)
-      ) {
-        return { data: correctedPayload, correctedQuery: corrected }
-      }
-
-      const correctedResults = await refreshSearchQuery(correctedHash, correctedNorm, corrected)
-      if (correctedResults.length) {
-        return { data: correctedResults, correctedQuery: corrected }
+      const correctedResults = await getCorrectedSearchResults(corrected)
+      if (correctedResults.data.length && correctedResults.bestMatchScore > results.bestMatchScore) {
+        return { data: correctedResults.data, correctedQuery: corrected }
       }
     }
 
-    return { data: results }
+    return { data: results.data }
   } catch {
-    if (cachedPayload.length) return { data: cachedPayload }
+    if (cachedPayload.length) {
+      const cachedSmart = buildSmartSearchResults(cachedPayload, trimmed)
+      return { data: cachedSmart.data }
+    }
     throw new Error('Search unavailable right now. Please try again shortly.')
   }
 }
