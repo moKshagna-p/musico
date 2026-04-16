@@ -27,12 +27,22 @@ const AlbumDetails = () => {
   const location = useLocation()
   const { albumId } = useParams()
   const { user } = useAuth()
-  const { lists, createList, toggleAlbumInList, getListsContainingAlbum } = useLists()
+  const {
+    lists,
+    listenLaterList,
+    createList,
+    toggleAlbumInList,
+    toggleAlbumInListenLater,
+    getListsContainingAlbum,
+    isAlbumInListenLater,
+  } = useLists()
   const { rateAlbum, getUserRating, getCommunityStats } = useRatings()
   const isSignedIn = Boolean(user?.id)
 
   const [newListName, setNewListName] = useState('')
   const [listStatus, setListStatus] = useState('')
+  const [listenLaterPending, setListenLaterPending] = useState(false)
+  const [busyListIds, setBusyListIds] = useState(() => new Set())
   const [reviewKey, setReviewKey] = useState(0) // increment to refresh reviews list
 
   // Professional Data Fetching with TanStack Query
@@ -64,6 +74,7 @@ const AlbumDetails = () => {
     () => new Set(getListsContainingAlbum(album?.id ?? '')),
     [album?.id, getListsContainingAlbum],
   )
+  const inListenLater = useMemo(() => isAlbumInListenLater(album?.id ?? ''), [album?.id, isAlbumInListenLater])
 
   useEffect(() => {
     // Reset local component state when navigating to a new album
@@ -122,19 +133,64 @@ const AlbumDetails = () => {
       setListStatus('Sign in to update lists.')
       return
     }
-    const result = await toggleAlbumInList(listId, albumSummary)
-    if (!result.ok) {
-      if (result.reason === 'auth') {
-        setListStatus('Sign in to update lists.')
-      } else if (result.reason === 'limit') {
-        setListStatus('This list already has the maximum number of albums.')
-      } else {
-        setListStatus('Unable to update list right now.')
+    setBusyListIds((prev) => {
+      const next = new Set(prev)
+      next.add(listId)
+      return next
+    })
+
+    try {
+      const result = await toggleAlbumInList(listId, albumSummary)
+      if (!result.ok) {
+        if (result.reason === 'auth') {
+          setListStatus('Sign in to update lists.')
+        } else if (result.reason === 'limit') {
+          setListStatus('This list already has the maximum number of albums.')
+        } else {
+          setListStatus('Unable to update list right now.')
+        }
+        return
       }
+
+      setListStatus(result.added ? `Added to ${result.listName}.` : `Removed from ${result.listName}.`)
+    } finally {
+      setBusyListIds((prev) => {
+        const next = new Set(prev)
+        next.delete(listId)
+        return next
+      })
+    }
+  }
+
+  const handleToggleListenLater = async () => {
+    if (listenLaterPending) return
+    if (!isSignedIn) {
+      setListStatus('Sign in to save albums to Listen Later.')
       return
     }
 
-    setListStatus(result.added ? `Added to ${result.listName}.` : `Removed from ${result.listName}.`)
+    setListenLaterPending(true)
+    try {
+      const result = await toggleAlbumInListenLater(albumSummary)
+      if (!result.ok) {
+        if (result.reason === 'auth') {
+          setListStatus('Sign in to update Listen Later.')
+        } else if (result.reason === 'limit') {
+          setListStatus('Listen Later is full. Remove one album to continue.')
+        } else {
+          setListStatus('Unable to update Listen Later right now.')
+        }
+        return
+      }
+
+      if (result.added) {
+        setListStatus(result.createdList ? 'Created Listen Later and added this album.' : 'Added to Listen Later.')
+      } else {
+        setListStatus('Removed from Listen Later.')
+      }
+    } finally {
+      setListenLaterPending(false)
+    }
   }
 
   const goBack = () => {
@@ -267,6 +323,25 @@ const AlbumDetails = () => {
                 <p className="text-xs uppercase tracking-[0.2em] text-white/60">{lists.length} total</p>
               </div>
 
+              <div className="relative z-10 mt-3">
+                <button
+                  type="button"
+                  onClick={handleToggleListenLater}
+                  disabled={!isSignedIn || listenLaterPending}
+                  className={`inline-flex touch-manipulation items-center gap-2 rounded-full border px-4 py-2 text-xs uppercase tracking-[0.2em] transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas disabled:cursor-not-allowed disabled:opacity-55 ${
+                    inListenLater
+                      ? 'border-white/70 bg-white text-canvas shadow-[0_8px_24px_rgba(255,255,255,0.25)]'
+                      : 'border-white/25 bg-white/[0.06] text-white/85 hover:border-white/55 hover:bg-white/[0.14]'
+                  }`}
+                >
+                  {inListenLater ? <FiCheck aria-hidden="true" /> : <FiPlus aria-hidden="true" />}
+                  <span>Listen Later</span>
+                  <span className={`${inListenLater ? 'text-canvas/70' : 'text-white/55'} tabular-nums text-[0.62rem]`}>
+                    {listenLaterList?.albums?.length ?? 0}
+                  </span>
+                </button>
+              </div>
+
               <form onSubmit={handleCreateList} className="relative z-10 mt-4 flex items-center gap-2 border-b border-white/20 pb-2">
                 <label className="sr-only" htmlFor="new-list-name">
                   New List Name
@@ -308,6 +383,7 @@ const AlbumDetails = () => {
                 {lists.length ? (
                   lists.map((list, index) => {
                     const isActive = listsContainingAlbum.has(list.id)
+                    const isBusy = busyListIds.has(list.id)
                     const variants = [
                       'rotate-[-1.8deg]',
                       'rotate-[1.4deg]',
@@ -320,7 +396,7 @@ const AlbumDetails = () => {
                       <button
                         key={list.id}
                         type="button"
-                        disabled={!isSignedIn}
+                        disabled={!isSignedIn || isBusy}
                         onClick={() => handleToggleList(list.id)}
                         className={`inline-flex touch-manipulation items-center gap-2 rounded-full border px-4 py-2 text-xs uppercase tracking-[0.2em] transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas disabled:cursor-not-allowed disabled:opacity-55 ${
                           isActive
@@ -330,8 +406,8 @@ const AlbumDetails = () => {
                       >
                         {isActive ? <FiCheck aria-hidden="true" /> : <FiPlus aria-hidden="true" />}
                         <span className="max-w-28 truncate tablet:max-w-36">{list.name}</span>
-                        <span className={`${isActive ? 'text-canvas/70' : 'text-white/55'} tabular-nums text-[0.62rem]`}>
-                          {list.albums.length}
+                        <span className={`${isActive ? 'text-canvas/70' : 'text-white/55'} min-w-[2.2rem] text-right tabular-nums text-[0.62rem]`}>
+                          {isBusy ? '...' : list.albums.length}
                         </span>
                       </button>
                     )

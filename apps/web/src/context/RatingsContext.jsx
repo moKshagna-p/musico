@@ -136,14 +136,6 @@ export const RatingsProvider = ({ children }) => {
           })
         }
 
-        queryClient.invalidateQueries({ 
-          queryKey: ['release', normalizedAlbumId],
-          refetchType: 'all'
-        })
-        queryClient.invalidateQueries({
-          queryKey: ['search'],
-          refetchType: 'active',
-        })
       })
       .catch(() => {
         setRatings((prev) => {

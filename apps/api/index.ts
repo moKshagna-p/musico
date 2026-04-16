@@ -180,6 +180,18 @@ const getCanonicalAlbumMetadata = async (
     releaseYear?: unknown
   } = {},
 ) => {
+  const fallbackMeta = {
+    name: String(fallback.name ?? 'Untitled').trim() || 'Untitled',
+    cover: String(fallback.cover ?? '').trim(),
+    artists: toSafeArtists(fallback.artists),
+    releaseYear: parseReleaseYear(fallback.releaseYear),
+  }
+
+  const shouldUseFallbackFirst = fallbackMeta.name !== 'Untitled'
+  if (shouldUseFallbackFirst) {
+    return fallbackMeta
+  }
+
   try {
     const details = await getReleaseDetails(albumId)
     return {
@@ -189,12 +201,7 @@ const getCanonicalAlbumMetadata = async (
       releaseYear: Number.isFinite(Number(details.releaseYear)) ? Number(details.releaseYear) : parseReleaseYear(fallback.releaseYear),
     }
   } catch {
-    return {
-      name: String(fallback.name ?? 'Untitled').trim() || 'Untitled',
-      cover: String(fallback.cover ?? '').trim(),
-      artists: toSafeArtists(fallback.artists),
-      releaseYear: parseReleaseYear(fallback.releaseYear),
-    }
+    return fallbackMeta
   }
 }
 
@@ -601,7 +608,20 @@ const app = new Elysia()
     const authUser = await ensureAuthenticated(request, set)
     if (!authUser) return { error: 'Unauthorized.' }
 
-    const name = normalizeListName((body as { name?: unknown })?.name)
+    const typedBody = body as {
+      name?: unknown
+      album?: {
+        id?: unknown
+        name?: unknown
+        cover?: unknown
+        artists?: unknown
+        releaseYear?: unknown
+      }
+    }
+
+    const name = normalizeListName(typedBody?.name)
+    const initialAlbum = typedBody?.album
+    const initialAlbumId = String(initialAlbum?.id ?? '').trim()
     if (!name) {
       set.status = 400
       return { error: 'List name is required.' }
@@ -630,15 +650,63 @@ const app = new Elysia()
 
     await db.insert(userList).values(created)
 
+    let initialAlbumEntry: {
+      id: string
+      name: string
+      cover: string
+      artists: string[]
+      releaseYear: number | null
+      addedAt: number
+    } | null = null
+
+    if (initialAlbumId) {
+      const albumMeta = await getCanonicalAlbumMetadata(initialAlbumId, {
+        name: initialAlbum?.name,
+        cover: initialAlbum?.cover,
+        artists: initialAlbum?.artists,
+        releaseYear: initialAlbum?.releaseYear,
+      })
+
+      await db.insert(userListAlbum).values({
+        id: crypto.randomUUID(),
+        listId: created.id,
+        albumId: initialAlbumId,
+        name: albumMeta.name,
+        cover: albumMeta.cover,
+        artists: albumMeta.artists,
+        releaseYear: albumMeta.releaseYear,
+        addedAt: now,
+      })
+
+      recordActivity({
+        userId: authUser.id,
+        type: 'listed',
+        albumId: initialAlbumId,
+        albumName: albumMeta.name,
+        albumCover: albumMeta.cover,
+        metadata: { listName: created.name, listId: created.id },
+      })
+
+      initialAlbumEntry = {
+        id: initialAlbumId,
+        name: albumMeta.name,
+        cover: albumMeta.cover,
+        artists: albumMeta.artists,
+        releaseYear: albumMeta.releaseYear,
+        addedAt: now.getTime(),
+      }
+    }
+
     set.headers ??= {}
     set.headers['Cache-Control'] = 'no-store'
     return {
       data: {
         id: created.id,
         name: created.name,
-        albums: [],
+        albums: initialAlbumEntry ? [initialAlbumEntry] : [],
         createdAt: created.createdAt.getTime(),
         updatedAt: created.updatedAt.getTime(),
+        added: Boolean(initialAlbumEntry),
       },
     }
   })
