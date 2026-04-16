@@ -419,4 +419,57 @@ export const ProfilePageSkeleton = ({ withBackButton = false, showActions = fals
   )
 }
 
+export const AdminDashboardPageSkeleton = () => {
+  return (
+    <section aria-busy="true" aria-label="Loading admin dashboard" className="space-y-8">
+      <header className="rounded-[2rem] border border-outline/70 bg-panel/50 p-6 tablet:p-10">
+        <div className="h-3 w-28 rounded-full bg-outline/70" />
+        <div className="mt-3 h-14 w-full max-w-lg rounded-[1.25rem] bg-gradient-to-r from-white/10 via-white/5 to-white/10 bg-[length:320px_100%] animate-shimmer" />
+        <div className="mt-3 h-4 w-72 rounded-full bg-outline/60" />
+      </header>
+
+      <div className="grid gap-4 tablet:grid-cols-2 laptop:grid-cols-4">
+        {Array.from({ length: 4 }).map((_, index) => (
+          <div key={index} className="rounded-2xl border border-outline/70 bg-panel/50 p-5">
+            <div className="flex items-center justify-between">
+              <div className="h-3 w-24 rounded-full bg-outline/60" />
+              <div className="h-4 w-4 rounded-full bg-outline/50" />
+            </div>
+            <div className="mt-4 h-10 w-20 rounded-full bg-outline/75" />
+          </div>
+        ))}
+      </div>
+
+      <section className="grid gap-4 laptop:grid-cols-[1.25fr,1fr]">
+        <div className="rounded-3xl border border-outline/70 bg-panel/40 p-6">
+          <div className="h-8 w-40 rounded-full bg-gradient-to-r from-white/10 via-white/5 to-white/10 bg-[length:220px_100%] animate-shimmer" />
+          <div className="mt-5 grid gap-3 tablet:grid-cols-2">
+            {Array.from({ length: 4 }).map((_, index) => (
+              <div key={index} className="rounded-2xl border border-outline/60 bg-canvas/40 p-4">
+                <div className="h-4 w-28 rounded-full bg-outline/60" />
+                <div className="mt-2 h-3 w-40 rounded-full bg-outline/45" />
+                <div className="mt-4 h-7 w-14 rounded-full bg-outline/70" />
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="rounded-3xl border border-outline/70 bg-panel/40 p-6">
+          <div className="h-8 w-36 rounded-full bg-gradient-to-r from-white/10 via-white/5 to-white/10 bg-[length:220px_100%] animate-shimmer" />
+          <div className="mt-4 space-y-2">
+            {Array.from({ length: 4 }).map((_, index) => (
+              <div key={index} className="rounded-xl border border-outline/55 bg-canvas/35 px-4 py-3">
+                <div className="flex items-center justify-between">
+                  <div className="h-4 w-32 rounded-full bg-outline/55" />
+                  <div className="h-4 w-10 rounded-full bg-outline/70" />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+    </section>
+  )
+}
+
 export default PageLoadingState

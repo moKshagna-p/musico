@@ -9,7 +9,6 @@ import RatingStars from '../components/RatingStars.jsx'
 import CoverImage from '../components/CoverImage.jsx'
 import { useAuth } from '../hooks/useAuth.js'
 import { fetchUserProfile } from '../services/socialService.js'
-import { getReleaseDetails } from '../services/discogsService.js'
 
 const UserProfile = () => {
   const { username } = useParams()
@@ -18,7 +17,6 @@ const UserProfile = () => {
   const [profile, setProfile] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
-  const [ratedAlbumDetails, setRatedAlbumDetails] = useState([])
 
   useEffect(() => {
     let cancelled = false
@@ -42,35 +40,11 @@ const UserProfile = () => {
     }
   }, [username])
 
-  useEffect(() => {
-    if (!profile?.recentRatings?.length) {
-      setRatedAlbumDetails([])
-      return
-    }
-
-    let cancelled = false
-    const fetchDetails = async () => {
-      const results = await Promise.allSettled(
-        profile.recentRatings.slice(0, 12).map(async (item) => {
-          const details = await getReleaseDetails(item.albumId)
-          return {
-            ...item,
-            ...details,
-            name: details?.name || item?.albumName || 'Untitled',
-            cover: details?.cover || item?.albumCover || '',
-          }
-        }),
-      )
-      if (!cancelled) {
-        setRatedAlbumDetails(results.filter((entry) => entry.status === 'fulfilled').map((entry) => entry.value))
-      }
-    }
-
-    void fetchDetails()
-    return () => {
-      cancelled = true
-    }
-  }, [profile?.recentRatings])
+  const ratedAlbumDetails = profile?.recentRatings?.map((item) => ({
+    ...item,
+    name: item?.albumName || 'Untitled',
+    cover: item?.albumCover || '',
+  })) ?? []
 
   if (loading) {
     return (

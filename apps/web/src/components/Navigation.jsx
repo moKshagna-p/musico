@@ -1,10 +1,12 @@
 import { NavLink, useNavigate } from 'react-router-dom'
 
 import { useAuth } from '../hooks/useAuth.js'
+import { useAdminAccess } from '../hooks/useAdminAccess.js'
 
 const Navigation = () => {
   const navigate = useNavigate()
   const { user } = useAuth()
+  const { isAdmin } = useAdminAccess()
 
   return (
     <header className="sticky top-0 z-40 border-b border-outline/60 bg-canvas/95 backdrop-blur">
@@ -86,6 +88,11 @@ const Navigation = () => {
           {user && (
             <NavLink to="/feed" className={({ isActive }) => (isActive ? 'text-white' : 'hover:text-white')}>
               Feed
+            </NavLink>
+          )}
+          {isAdmin && (
+            <NavLink to="/admin" className={({ isActive }) => (isActive ? 'text-white' : 'hover:text-white')}>
+              Admin
             </NavLink>
           )}
           {user ? (

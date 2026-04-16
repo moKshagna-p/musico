@@ -100,7 +100,7 @@ export const ListsProvider = ({ children }) => {
   }, [isPending, user?.id])
 
   const createList = useCallback(
-    async (name) => {
+    async (name, options = {}) => {
       if (!user?.id) return { ok: false, reason: 'auth' }
 
       const normalized = normalizeListName(name)
@@ -111,11 +111,16 @@ export const ListsProvider = ({ children }) => {
       if (lists.length >= listStorageConfig.MAX_LISTS) return { ok: false, reason: 'limit' }
 
       try {
-        const created = normalizeRemoteList(await createMyList(normalized))
+        const initialAlbum = toListAlbumSummary(options?.initialAlbum)
+        const created = normalizeRemoteList(await createMyList(normalized, initialAlbum))
         if (!created) return { ok: false, reason: 'invalid' }
 
         setLists((prev) => sortListsByUpdatedAt([created, ...prev]))
-        return { ok: true, list: created }
+        return {
+          ok: true,
+          list: created,
+          added: Boolean(initialAlbum && created.albums.some((entry) => entry.id === initialAlbum.id)),
+        }
       } catch (error) {
         const message = String(error?.message ?? '').toLowerCase()
         if (message.includes('already exists')) return { ok: false, reason: 'duplicate' }

@@ -29,8 +29,9 @@ export const fetchMyLists = async () => {
   return Array.isArray(response.data) ? response.data : []
 }
 
-export const createMyList = async (name) => {
-  const response = await api.post('/api/me/lists', { name })
+export const createMyList = async (name, album) => {
+  const payload = album ? { name, album } : { name }
+  const response = await api.post('/api/me/lists', payload)
   return response.data ?? null
 }
 

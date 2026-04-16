@@ -64,6 +64,13 @@
       "when": 1776297600000,
       "tag": "0008_user_rating_album_lookup",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1776466800000,
+      "tag": "0009_admin_access",
+      "breakpoints": true
     }
   ]
 }

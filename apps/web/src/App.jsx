@@ -7,6 +7,7 @@ import Navigation from './components/Navigation.jsx'
 import PageTransition from './components/PageTransition.jsx'
 import {
   AlbumDetailsPageSkeleton,
+  AdminDashboardPageSkeleton,
   AuthPageSkeleton,
   DiscoverPageSkeleton,
   FeedPageSkeleton,
@@ -29,6 +30,7 @@ const PublicList = lazy(() => import('./pages/PublicList.jsx'))
 const Auth = lazy(() => import('./pages/Auth.jsx'))
 const AlbumDetails = lazy(() => import('./pages/AlbumDetails.jsx'))
 const NotFound = lazy(() => import('./pages/NotFound.jsx'))
+const AdminDashboard = lazy(() => import('./pages/AdminDashboard.jsx'))
 
 const INACTIVITY_TIMEOUT_MS = 20 * 60 * 1000
 const LAST_ACTIVITY_KEY = 'musico:last-activity-at'
@@ -137,6 +139,7 @@ const App = () => {
               <Route path="/feed" element={withRouteFallback(<Feed />, <FeedPageSkeleton />)} />
               <Route path="/lists/:listId" element={withRouteFallback(<PublicList />, <PublicListPageSkeleton />)} />
               <Route path="/auth" element={withRouteFallback(<Auth />, <AuthPageSkeleton />)} />
+              <Route path="/admin" element={withRouteFallback(<AdminDashboard />, <AdminDashboardPageSkeleton />)} />
               <Route path="/album/:albumId" element={withRouteFallback(<AlbumDetails />, <AlbumDetailsPageSkeleton />)} />
               <Route path="*" element={withRouteFallback(<NotFound />, <NotFoundPageSkeleton />)} />
             </Routes>

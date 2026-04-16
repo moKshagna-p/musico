@@ -9,6 +9,7 @@ import { env, validateProductionEnv } from './env'
 import { recordSearchQuery } from './searchSignals'
 import {
   activity,
+  adminUser,
   user,
   userFollow,
   userList,
@@ -39,6 +40,7 @@ const MAX_REVIEW_LENGTH = 280
 const MAX_BIO_LENGTH = 160
 const MAX_RELEASE_PREVIEW_LOOKUPS = 36
 const USERNAME_REGEX = /^[a-z0-9][a-z0-9-]{1,22}[a-z0-9]$/
+const BOOTSTRAP_ADMIN_EMAIL = 'mokshagnareddy45@gmail.com'
 
 const normalizeRating = (value: number) => {
   if (!Number.isFinite(value)) return null
@@ -136,6 +138,12 @@ const parseProfileImage = (value: unknown) => {
 }
 
 const normalizeAlbumId = (value: unknown) => String(value ?? '').trim()
+const normalizeEmail = (value: unknown) => String(value ?? '').trim().toLowerCase()
+
+const isMissingAdminTableError = (error: unknown) => {
+  const message = String((error as { message?: string })?.message ?? '')
+  return message.toLowerCase().includes('relation "admin_user" does not exist')
+}
 
 const getReleasePreviewMap = async (albumIds: unknown[]) => {
   const uniqueAlbumIds = [...new Set(albumIds.map(normalizeAlbumId).filter(Boolean))].slice(0, MAX_RELEASE_PREVIEW_LOOKUPS)
@@ -217,6 +225,37 @@ const ensureAuthenticated = async (request: Request, set: { status?: number }) =
     return null
   }
   return user
+}
+
+const isAdminIdentity = async (identity: { id?: string | null; email?: string | null }) => {
+  const userId = String(identity?.id ?? '').trim()
+  const email = normalizeEmail(identity?.email)
+
+  if (!userId) return false
+  if (email === BOOTSTRAP_ADMIN_EMAIL) return true
+
+  try {
+    const rows = await db.select({ userId: adminUser.userId }).from(adminUser).where(eq(adminUser.userId, userId)).limit(1)
+    return Boolean(rows[0])
+  } catch (error) {
+    if (isMissingAdminTableError(error)) {
+      return false
+    }
+    throw error
+  }
+}
+
+const ensureAdmin = async (request: Request, set: { status?: number }) => {
+  const authUser = await ensureAuthenticated(request, set)
+  if (!authUser) return null
+
+  const allowed = await isAdminIdentity({ id: authUser.id, email: authUser.email })
+  if (!allowed) {
+    set.status = 403
+    return null
+  }
+
+  return authUser
 }
 
 const authorizeCron = (request: Request, set: { status?: number }) => {
@@ -563,30 +602,18 @@ const app = new Elysia()
       albumsByList.set(entry.listId, group)
     })
 
-    const previewAlbumIds = [...lists]
-      .sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime())
-      .flatMap((list) =>
-        (albumsByList.get(list.id) ?? [])
-          .sort((a, b) => b.addedAt.getTime() - a.addedAt.getTime())
-          .slice(0, 4)
-          .map((album) => album.albumId),
-      )
-
-    const releasePreviewMap = await getReleasePreviewMap(previewAlbumIds)
-
     const data = [...lists]
       .sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime())
       .map((list) => {
         const listAlbums = (albumsByList.get(list.id) ?? [])
           .sort((a, b) => b.addedAt.getTime() - a.addedAt.getTime())
           .map((album) => {
-            const preview = releasePreviewMap.get(album.albumId)
             return {
               id: album.albumId,
-              name: preview?.name || album.name,
-              cover: preview?.cover || album.cover,
-              artists: preview?.artists?.length ? preview.artists : Array.isArray(album.artists) ? album.artists : [],
-              releaseYear: preview?.releaseYear ?? album.releaseYear,
+              name: album.name,
+              cover: album.cover,
+              artists: Array.isArray(album.artists) ? album.artists : [],
+              releaseYear: album.releaseYear,
               addedAt: album.addedAt.getTime(),
             }
           })
@@ -820,9 +847,16 @@ const app = new Elysia()
 
     const profile = await ensureUserProfile(authUser.id)
 
-    const [followerCountRows, followingCountRows, recentRatingsRows, ratingActivityRows] = await Promise.all([
+    const [followerCountRows, followingCountRows, ratingSummaryRows, recentRatingsRows, ratingActivityRows, recentReviewMetaRows] = await Promise.all([
       db.select({ count: sql<number>`count(*)` }).from(userFollow).where(eq(userFollow.followingId, authUser.id)),
       db.select({ count: sql<number>`count(*)` }).from(userFollow).where(eq(userFollow.followerId, authUser.id)),
+      db
+        .select({
+          totalRated: sql<number>`count(*)`,
+          averageRating: sql<number>`coalesce(avg(${userRating.rating}), 0)`,
+        })
+        .from(userRating)
+        .where(eq(userRating.userId, authUser.id)),
       db
         .select({
           albumId: userRating.albumId,
@@ -844,12 +878,21 @@ const app = new Elysia()
         .where(and(eq(activity.userId, authUser.id), eq(activity.type, 'rated')))
         .orderBy(desc(activity.createdAt))
         .limit(50),
+      db
+        .select({
+          albumId: userReview.albumId,
+          albumName: userReview.albumName,
+          albumCover: userReview.albumCover,
+        })
+        .from(userReview)
+        .where(eq(userReview.userId, authUser.id))
+        .orderBy(desc(userReview.updatedAt))
+        .limit(50),
     ])
 
     const followerCount = Number(followerCountRows[0]?.count ?? 0)
     const followingCount = Number(followingCountRows[0]?.count ?? 0)
-
-    const releasePreviewMap = await getReleasePreviewMap(recentRatingsRows.map((row) => row.albumId))
+    const ratingSummary = ratingSummaryRows[0]
 
     const latestActivityByAlbum = new Map<string, { albumName: string | null; albumCover: string | null }>()
     for (const row of ratingActivityRows) {
@@ -861,15 +904,25 @@ const app = new Elysia()
       })
     }
 
+    const latestReviewByAlbum = new Map<string, { albumName: string | null; albumCover: string | null }>()
+    for (const row of recentReviewMetaRows) {
+      const albumId = String(row.albumId ?? '').trim()
+      if (!albumId || latestReviewByAlbum.has(albumId)) continue
+      latestReviewByAlbum.set(albumId, {
+        albumName: row.albumName ? String(row.albumName) : null,
+        albumCover: row.albumCover ? String(row.albumCover) : null,
+      })
+    }
+
     const recentRatings = recentRatingsRows.map((row) => {
       const activityMeta = latestActivityByAlbum.get(String(row.albumId))
-      const preview = releasePreviewMap.get(String(row.albumId))
+      const reviewMeta = latestReviewByAlbum.get(String(row.albumId))
       return {
         albumId: row.albumId,
         rating: row.rating,
         timestamp: row.updatedAt.getTime(),
-        albumName: preview?.name || activityMeta?.albumName || '',
-        albumCover: preview?.cover || activityMeta?.albumCover || '',
+        albumName: activityMeta?.albumName || reviewMeta?.albumName || '',
+        albumCover: activityMeta?.albumCover || reviewMeta?.albumCover || '',
       }
     })
 
@@ -883,6 +936,10 @@ const app = new Elysia()
         image: authUser.image ?? null,
         followerCount,
         followingCount,
+        stats: {
+          totalRated: Number(ratingSummary?.totalRated ?? 0),
+          averageRating: Math.round(Number(ratingSummary?.averageRating ?? 0) * 10) / 10,
+        },
         recentRatings,
       },
     }
@@ -989,6 +1046,271 @@ const app = new Elysia()
     return { data: { available: !existing[0], valid: true } }
   })
 
+  // ── Admin routes ──
+
+  .get('/api/admin/me', async ({ request, set }) => {
+    const authUser = await ensureAuthenticated(request, set)
+    if (!authUser) return { error: 'Unauthorized.' }
+
+    const isAdmin = await isAdminIdentity({ id: authUser.id, email: authUser.email })
+
+    set.headers ??= {}
+    set.headers['Cache-Control'] = 'no-store'
+    return {
+      data: {
+        isAdmin,
+      },
+    }
+  })
+  .get('/api/admin/users', async ({ request, query, set }) => {
+    const authUser = await ensureAdmin(request, set)
+    if (!authUser) return { error: 'Forbidden.' }
+
+    const limitParam = Number(query?.limit)
+    const limit = Number.isFinite(limitParam) ? Math.min(Math.max(limitParam, 1), 50) : 25
+    const search = String(query?.q ?? '').trim().toLowerCase()
+
+    const searchPattern = search ? `%${search.replace(/[%_]/g, '')}%` : ''
+
+    try {
+      const candidateUsers = search
+        ? await db
+            .select({
+              id: user.id,
+              name: user.name,
+              email: user.email,
+              image: user.image,
+              createdAt: user.createdAt,
+            })
+            .from(user)
+            .where(
+              or(
+                ilike(user.name, searchPattern),
+                ilike(user.email, searchPattern),
+              ),
+            )
+            .orderBy(desc(user.createdAt))
+            .limit(Math.max(limit * 3, 60))
+        : await db
+            .select({
+              id: user.id,
+              name: user.name,
+              email: user.email,
+              image: user.image,
+              createdAt: user.createdAt,
+            })
+            .from(user)
+            .orderBy(desc(user.createdAt))
+            .limit(120)
+
+      let mergedCandidates = candidateUsers
+
+      if (search) {
+        const profileMatches = await db
+          .select({ userId: userProfile.userId })
+          .from(userProfile)
+          .where(ilike(userProfile.username, searchPattern))
+          .limit(Math.max(limit * 2, 40))
+
+        const profileMatchIds = profileMatches.map((entry) => entry.userId)
+        if (profileMatchIds.length) {
+          const profileUsers = await db
+            .select({
+              id: user.id,
+              name: user.name,
+              email: user.email,
+              image: user.image,
+              createdAt: user.createdAt,
+            })
+            .from(user)
+            .where(inArray(user.id, profileMatchIds))
+
+          const byId = new Map<string, (typeof candidateUsers)[number]>()
+          candidateUsers.forEach((entry) => byId.set(entry.id, entry))
+          profileUsers.forEach((entry) => byId.set(entry.id, entry))
+          mergedCandidates = Array.from(byId.values())
+        }
+      }
+
+      if (!mergedCandidates.length) {
+        set.headers ??= {}
+        set.headers['Cache-Control'] = 'no-store'
+        return { data: [] }
+      }
+
+      const candidateUserIds = mergedCandidates.map((entry) => entry.id)
+      const [profiles, adminRows] = await Promise.all([
+        db
+          .select({
+            userId: userProfile.userId,
+            username: userProfile.username,
+          })
+          .from(userProfile)
+          .where(inArray(userProfile.userId, candidateUserIds)),
+        db.select({ userId: adminUser.userId }).from(adminUser),
+      ])
+
+      const profileByUserId = new Map(profiles.map((entry) => [entry.userId, entry]))
+      const adminUserIds = new Set(adminRows.map((entry) => entry.userId))
+
+      const filtered = mergedCandidates
+        .map((entry) => {
+          const profile = profileByUserId.get(entry.id)
+          const normalizedEmail = normalizeEmail(entry.email)
+          const isBootstrapAdmin = normalizedEmail === BOOTSTRAP_ADMIN_EMAIL
+          return {
+            userId: entry.id,
+            name: entry.name,
+            email: entry.email,
+            username: profile?.username ?? null,
+            image: entry.image ?? null,
+            createdAt: entry.createdAt.getTime(),
+            isAdmin: isBootstrapAdmin || adminUserIds.has(entry.id),
+            isBootstrapAdmin,
+          }
+        })
+        .filter((entry) => {
+          if (!search) return true
+          return (
+            entry.name.toLowerCase().includes(search) ||
+            entry.email.toLowerCase().includes(search) ||
+            String(entry.username ?? '').toLowerCase().includes(search)
+          )
+        })
+        .sort((a, b) => {
+          if (a.isAdmin && !b.isAdmin) return -1
+          if (!a.isAdmin && b.isAdmin) return 1
+          return b.createdAt - a.createdAt
+        })
+        .slice(0, limit)
+
+      set.headers ??= {}
+      set.headers['Cache-Control'] = 'no-store'
+      return { data: filtered }
+    } catch (error) {
+      if (isMissingAdminTableError(error)) {
+        const fallbackUsers = await db
+          .select({
+            id: user.id,
+            name: user.name,
+            email: user.email,
+            image: user.image,
+            createdAt: user.createdAt,
+          })
+          .from(user)
+          .orderBy(desc(user.createdAt))
+          .limit(limit)
+
+        const fallback = fallbackUsers
+          .map((entry) => ({
+            userId: entry.id,
+            name: entry.name,
+            email: entry.email,
+            username: null,
+            image: entry.image ?? null,
+            createdAt: entry.createdAt.getTime(),
+            isAdmin: normalizeEmail(entry.email) === BOOTSTRAP_ADMIN_EMAIL,
+            isBootstrapAdmin: normalizeEmail(entry.email) === BOOTSTRAP_ADMIN_EMAIL,
+          }))
+          .filter((entry) => {
+            if (!search) return true
+            return entry.name.toLowerCase().includes(search) || entry.email.toLowerCase().includes(search)
+          })
+
+        set.headers ??= {}
+        set.headers['Cache-Control'] = 'no-store'
+        return { data: fallback }
+      }
+
+      throw error
+    }
+  })
+  .put('/api/admin/users/:userId/admin', async ({ request, params, body, set }) => {
+    const authUser = await ensureAdmin(request, set)
+    if (!authUser) return { error: 'Forbidden.' }
+
+    const targetUserId = String(params?.userId ?? '').trim()
+    const typedBody = body as { isAdmin?: unknown }
+    const nextIsAdmin = Boolean(typedBody?.isAdmin)
+
+    if (!targetUserId) {
+      set.status = 400
+      return { error: 'Missing target user id.' }
+    }
+
+    const targetRows = await db
+      .select({
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        image: user.image,
+        createdAt: user.createdAt,
+      })
+      .from(user)
+      .where(eq(user.id, targetUserId))
+      .limit(1)
+
+    const target = targetRows[0]
+    if (!target) {
+      set.status = 404
+      return { error: 'Target user not found.' }
+    }
+
+    const targetIsBootstrapAdmin = normalizeEmail(target.email) === BOOTSTRAP_ADMIN_EMAIL
+    if (targetIsBootstrapAdmin && !nextIsAdmin) {
+      set.status = 400
+      return { error: 'Bootstrap admin access cannot be removed.' }
+    }
+
+    const actorIsBootstrapAdmin = normalizeEmail(authUser.email) === BOOTSTRAP_ADMIN_EMAIL
+    if (!nextIsAdmin && targetUserId === authUser.id && !actorIsBootstrapAdmin) {
+      set.status = 400
+      return { error: 'You cannot remove your own admin access.' }
+    }
+
+    try {
+      if (nextIsAdmin) {
+        await db
+          .insert(adminUser)
+          .values({
+            userId: targetUserId,
+            grantedByUserId: authUser.id,
+            createdAt: new Date(),
+          })
+          .onConflictDoNothing()
+      } else {
+        await db.delete(adminUser).where(eq(adminUser.userId, targetUserId))
+      }
+    } catch (error) {
+      if (isMissingAdminTableError(error)) {
+        set.status = 503
+        return { error: 'Admin table migration is missing. Run database migrations and retry.' }
+      }
+      throw error
+    }
+
+    const [profileRow] = await db
+      .select({ username: userProfile.username })
+      .from(userProfile)
+      .where(eq(userProfile.userId, targetUserId))
+      .limit(1)
+
+    set.headers ??= {}
+    set.headers['Cache-Control'] = 'no-store'
+    return {
+      data: {
+        userId: target.id,
+        name: target.name,
+        email: target.email,
+        username: profileRow?.username ?? null,
+        image: target.image ?? null,
+        createdAt: target.createdAt.getTime(),
+        isAdmin: nextIsAdmin || targetIsBootstrapAdmin,
+        isBootstrapAdmin: targetIsBootstrapAdmin,
+      },
+    }
+  })
+
   // ── Public profile routes ──
 
   .get('/api/users/:username', async ({ params, request, set }) => {
@@ -1067,7 +1389,7 @@ const app = new Elysia()
     }
 
     // Fetch stats in parallel
-    const [ratingSummaryRows, reviewSummaryRows, recentRatingsRows, recentReviewsRows, lists, followerCountRows, followingCountRows] = await Promise.all([
+    const [ratingSummaryRows, reviewSummaryRows, recentRatingsRows, recentReviewsRows, ratingActivityRows, lists, followerCountRows, followingCountRows] = await Promise.all([
       db
         .select({
           totalRated: sql<number>`count(*)`,
@@ -1104,6 +1426,17 @@ const app = new Elysia()
         .where(eq(userReview.userId, profile.userId))
         .orderBy(desc(userReview.createdAt))
         .limit(10),
+      db
+        .select({
+          albumId: activity.albumId,
+          albumName: activity.albumName,
+          albumCover: activity.albumCover,
+          createdAt: activity.createdAt,
+        })
+        .from(activity)
+        .where(and(eq(activity.userId, profile.userId), eq(activity.type, 'rated')))
+        .orderBy(desc(activity.createdAt))
+        .limit(80),
       db.select().from(userList).where(eq(userList.userId, profile.userId)),
       db.select({ count: sql<number>`count(*)` }).from(userFollow).where(eq(userFollow.followingId, profile.userId)),
       db.select({ count: sql<number>`count(*)` }).from(userFollow).where(eq(userFollow.followerId, profile.userId)),
@@ -1127,11 +1460,6 @@ const app = new Elysia()
       albumsByList.set(entry.listId, group)
     })
 
-    const releasePreviewMap = await getReleasePreviewMap([
-      ...recentRatingsRows.map((rating) => rating.albumId),
-      ...listAlbums.map((album) => album.albumId),
-    ])
-
     // Check if the requesting user is following this profile
     let isFollowing = false
     if (authUser?.id && authUser.id !== profile.userId) {
@@ -1144,16 +1472,37 @@ const app = new Elysia()
     }
 
     // Recent ratings (last 12)
-    const recentRatings = recentRatingsRows.map((r) => {
-        const preview = releasePreviewMap.get(r.albumId)
-        return {
-          albumId: r.albumId,
-          rating: r.rating,
-          timestamp: r.updatedAt.getTime(),
-          albumName: preview?.name ?? '',
-          albumCover: preview?.cover ?? '',
-        }
+    const latestActivityByAlbum = new Map<string, { albumName: string | null; albumCover: string | null }>()
+    for (const row of ratingActivityRows) {
+      const albumId = String(row.albumId ?? '').trim()
+      if (!albumId || latestActivityByAlbum.has(albumId)) continue
+      latestActivityByAlbum.set(albumId, {
+        albumName: row.albumName ? String(row.albumName) : null,
+        albumCover: row.albumCover ? String(row.albumCover) : null,
       })
+    }
+
+    const latestReviewByAlbum = new Map<string, { albumName: string; albumCover: string }>()
+    for (const row of recentReviewsRows) {
+      const albumId = String(row.albumId ?? '').trim()
+      if (!albumId || latestReviewByAlbum.has(albumId)) continue
+      latestReviewByAlbum.set(albumId, {
+        albumName: row.albumName,
+        albumCover: row.albumCover,
+      })
+    }
+
+    const recentRatings = recentRatingsRows.map((r) => {
+      const activityMeta = latestActivityByAlbum.get(r.albumId)
+      const reviewMeta = latestReviewByAlbum.get(r.albumId)
+      return {
+        albumId: r.albumId,
+        rating: r.rating,
+        timestamp: r.updatedAt.getTime(),
+        albumName: activityMeta?.albumName || reviewMeta?.albumName || '',
+        albumCover: activityMeta?.albumCover || reviewMeta?.albumCover || '',
+      }
+    })
 
     // Recent reviews (last 10)
     const recentReviews = recentReviewsRows.map((r) => ({
@@ -1172,15 +1521,12 @@ const app = new Elysia()
         const albums = (albumsByList.get(list.id) ?? [])
           .sort((a, b) => b.addedAt.getTime() - a.addedAt.getTime())
           .slice(0, 6)
-          .map((a) => {
-            const preview = releasePreviewMap.get(a.albumId)
-            return {
-              id: a.albumId,
-              name: preview?.name || a.name,
-              cover: preview?.cover || a.cover,
-              artists: preview?.artists?.length ? preview.artists : Array.isArray(a.artists) ? a.artists : [],
-            }
-          })
+          .map((a) => ({
+            id: a.albumId,
+            name: a.name,
+            cover: a.cover,
+            artists: Array.isArray(a.artists) ? a.artists : [],
+          }))
         return {
           id: list.id,
           name: list.name,

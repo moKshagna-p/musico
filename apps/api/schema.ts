@@ -217,6 +217,18 @@ export const userListAlbum = pgTable(
   ],
 )
 
+export const adminUser = pgTable(
+  'admin_user',
+  {
+    userId: text('userId')
+      .primaryKey()
+      .references(() => user.id, { onDelete: 'cascade' }),
+    grantedByUserId: text('grantedByUserId').references(() => user.id, { onDelete: 'set null' }),
+    createdAt: timestamp('createdAt', { withTimezone: true, mode: 'date' }).notNull(),
+  },
+  (table) => [index('admin_user_granted_by_idx').on(table.grantedByUserId)],
+)
+
 // ── Social profile (separate table to avoid touching Better Auth's user table) ──
 
 export const userProfile = pgTable(

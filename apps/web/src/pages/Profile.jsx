@@ -12,7 +12,6 @@ import UsernameSetup from '../components/UsernameSetup.jsx'
 import { useAuth } from '../hooks/useAuth.js'
 import { useLists } from '../hooks/useLists.js'
 import { useRatings } from '../hooks/useRatings.js'
-import { getReleaseDetails } from '../services/discogsService.js'
 import { fetchMyFollowers, fetchMyFollowing, fetchMyProfile, updateMyProfile } from '../services/socialService.js'
 
 const FollowListModal = ({ title, users, loading, onClose }) => (
@@ -76,8 +75,7 @@ const Profile = () => {
   const navigate = useNavigate()
   const { user, isPending, signOutCurrentUser } = useAuth()
   const { lists } = useLists()
-  const { ratings, loadingRatings } = useRatings()
-  const [ratedAlbums, setRatedAlbums] = useState([])
+  const { ratings } = useRatings()
 
   // Social profile state
   const [socialProfile, setSocialProfile] = useState(null)
@@ -252,39 +250,19 @@ const Profile = () => {
     [socialProfile?.recentRatings],
   )
 
-  useEffect(() => {
-    const fetchRatedAlbums = async () => {
-      if (ratedItems.length === 0) {
-        setRatedAlbums([])
-        return
-      }
-      
-      const topItems = [...ratedItems]
-        .sort((a, b) => b.timestamp - a.timestamp)
-        .slice(0, 6)
-
-      const albums = await Promise.allSettled(
-        topItems.map(async (item) => {
-          const details = await getReleaseDetails(item.albumId)
-          return { ...item, ...details }
-        }),
-      )
-      setRatedAlbums(
-        albums
-          .filter((entry) => entry.status === 'fulfilled')
-          .map((entry) => entry.value),
-      )
-    }
-
-    void fetchRatedAlbums()
-  }, [ratedItems])
-
   const recentlyRated = useMemo(
     () => {
       if (recentRatingPreviews.length) return recentRatingPreviews
-      return [...ratedAlbums].sort((a, b) => b.timestamp - a.timestamp).slice(0, 10)
+      return ratedItems.slice(0, 10).map((entry) => ({
+        albumId: entry.albumId,
+        rating: entry.rating,
+        timestamp: entry.timestamp,
+        name: 'Recently rated',
+        cover: '',
+        artist: 'Unknown artist',
+      }))
     },
-    [ratedAlbums, recentRatingPreviews],
+    [ratedItems, recentRatingPreviews],
   )
 
   const handleSignOut = async () => {
@@ -292,12 +270,25 @@ const Profile = () => {
     navigate('/auth')
   }
 
-  const totalRated = ratedItems.length
-  const averageRating = totalRated > 0
-    ? ratedItems.reduce((acc, item) => acc + item.rating, 0) / totalRated
-    : 0
+  const totalRated = Number(socialProfile?.stats?.totalRated ?? ratedItems.length)
+  const averageRating = Number.isFinite(Number(socialProfile?.stats?.averageRating))
+    ? Number(socialProfile?.stats?.averageRating)
+    : totalRated > 0
+      ? ratedItems.reduce((acc, item) => acc + item.rating, 0) / totalRated
+      : 0
 
-  if (isPending || !user || loadingRatings) {
+  const statsSourceAlbums = useMemo(
+    () =>
+      recentRatingPreviews.map((item) => ({
+        ...item,
+        name: item.name || 'Recently rated',
+        artist: item.artist || 'Unknown artist',
+        artists: item.artist ? [item.artist] : [],
+      })),
+    [recentRatingPreviews],
+  )
+
+  if (isPending || !user) {
     return (
       <PageTransition>
         <ProfilePageSkeleton showActions />
@@ -512,8 +503,8 @@ const Profile = () => {
         </header>
 
         <main className="mt-10 tablet:mt-16">
-          <Stats ratedAlbums={ratedAlbums} totalRated={totalRated} averageRating={averageRating} />
-          <TopGenres ratedAlbums={ratedAlbums} />
+          <Stats ratedAlbums={statsSourceAlbums} totalRated={totalRated} averageRating={averageRating} />
+          <TopGenres ratedAlbums={statsSourceAlbums} />
 
           <section>
             <div className="mb-10 text-center">

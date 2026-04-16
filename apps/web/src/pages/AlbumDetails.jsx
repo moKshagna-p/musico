@@ -104,7 +104,7 @@ const AlbumDetails = () => {
       setListStatus('Sign in to create and manage lists.')
       return
     }
-    const result = await createList(newListName)
+    const result = await createList(newListName, { initialAlbum: albumSummary })
 
     if (!result.ok) {
       if (result.reason === 'duplicate') {
@@ -120,11 +120,15 @@ const AlbumDetails = () => {
     }
 
     setNewListName('')
-    const toggleResult = await toggleAlbumInList(result.list.id, albumSummary)
-    if (toggleResult.ok && toggleResult.added) {
+    if (result.added) {
       setListStatus(`Created ${result.list.name} and added this album.`)
     } else {
-      setListStatus(`Created ${result.list.name}.`)
+      const toggleResult = await toggleAlbumInList(result.list.id, albumSummary)
+      if (toggleResult.ok && toggleResult.added) {
+        setListStatus(`Created ${result.list.name} and added this album.`)
+      } else {
+        setListStatus(`Created ${result.list.name}.`)
+      }
     }
   }
 
@@ -328,6 +332,7 @@ const AlbumDetails = () => {
                   type="button"
                   onClick={handleToggleListenLater}
                   disabled={!isSignedIn || listenLaterPending}
+                  aria-label="Toggle Listen Later"
                   className={`inline-flex touch-manipulation items-center gap-2 rounded-full border px-4 py-2 text-xs uppercase tracking-[0.2em] transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas disabled:cursor-not-allowed disabled:opacity-55 ${
                     inListenLater
                       ? 'border-white/70 bg-white text-canvas shadow-[0_8px_24px_rgba(255,255,255,0.25)]'
@@ -360,6 +365,7 @@ const AlbumDetails = () => {
                   type="button"
                   onClick={handleCreateList}
                   disabled={!isSignedIn}
+                  aria-label="Create list"
                   className="inline-flex h-9 w-9 touch-manipulation items-center justify-center rounded-full border border-white/35 bg-white/90 text-canvas transition-colors duration-200 hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas disabled:cursor-not-allowed disabled:opacity-45"
                 >
                   <FiPlus aria-hidden="true" />
