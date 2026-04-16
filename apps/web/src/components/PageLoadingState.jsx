@@ -419,6 +419,31 @@ export const ProfilePageSkeleton = ({ withBackButton = false, showActions = fals
   )
 }
 
+export const ListeningHistoryPageSkeleton = () => {
+  return (
+    <section aria-busy="true" aria-label="Loading listening history" className="space-y-8">
+      <div className="h-4 w-32 rounded-full bg-outline/70" />
+
+      <header className="rounded-[2rem] border border-outline/70 bg-panel/45 p-6 tablet:p-10">
+        <div className="h-3 w-36 rounded-full bg-outline/70" />
+        <div className="mt-3 h-14 w-full max-w-lg rounded-[1.25rem] bg-gradient-to-r from-white/10 via-white/5 to-white/10 bg-[length:320px_100%] animate-shimmer" />
+        <div className="mt-3 h-4 w-full max-w-xl rounded-full bg-outline/60" />
+      </header>
+
+      <section className="grid gap-5 tablet:grid-cols-2 laptop:grid-cols-3">
+        {Array.from({ length: 9 }).map((_, index) => (
+          <div key={index} className="space-y-4 rounded-3xl border border-outline/50 bg-panel/60 p-4">
+            <div className="aspect-square rounded-2xl bg-gradient-to-r from-black via-neutral-800 to-black bg-[length:400px_100%] animate-shimmer" />
+            <div className="h-5 w-3/4 rounded-full bg-outline" />
+            <div className="h-4 w-1/2 rounded-full bg-outline/80" />
+            <div className="h-3 w-24 rounded-full bg-outline/60" />
+          </div>
+        ))}
+      </section>
+    </section>
+  )
+}
+
 export const AdminDashboardPageSkeleton = () => {
   return (
     <section aria-busy="true" aria-label="Loading admin dashboard" className="space-y-8">

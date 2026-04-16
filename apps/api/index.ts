@@ -10,6 +10,7 @@ import { recordSearchQuery } from './searchSignals'
 import {
   activity,
   adminUser,
+  releaseCache,
   user,
   userFollow,
   userList,
@@ -113,6 +114,12 @@ const normalizeListName = (value: unknown) =>
 const toSafeArtists = (value: unknown) => {
   if (!Array.isArray(value)) return []
   return value.filter(Boolean).map((entry) => String(entry)).slice(0, 3)
+}
+
+const getCachedReleaseArtists = (payload: unknown) => {
+  if (!payload || typeof payload !== 'object') return []
+  const artists = (payload as { artists?: unknown }).artists
+  return toSafeArtists(artists)
 }
 
 const parseReleaseYear = (value: unknown) => {
@@ -507,7 +514,7 @@ const app = new Elysia()
     const nextCursor = hasMore ? pageRows[pageRows.length - 1]?.updatedAt.getTime() : null
     const pageAlbumIds = [...new Set(pageRows.map((entry) => entry.albumId).filter(Boolean))]
 
-    const [ratingActivityRows, reviewRows, listRows] = pageAlbumIds.length
+    const [ratingActivityRows, reviewRows, listRows, releaseCacheRows] = pageAlbumIds.length
       ? await Promise.all([
           db
             .select({
@@ -531,6 +538,7 @@ const app = new Elysia()
               albumId: userReview.albumId,
               albumName: userReview.albumName,
               albumCover: userReview.albumCover,
+              albumArtists: userReview.albumArtists,
               updatedAt: userReview.updatedAt,
             })
             .from(userReview)
@@ -542,6 +550,7 @@ const app = new Elysia()
               albumId: userListAlbum.albumId,
               albumName: userListAlbum.name,
               albumCover: userListAlbum.cover,
+              albumArtists: userListAlbum.artists,
               addedAt: userListAlbum.addedAt,
             })
             .from(userListAlbum)
@@ -549,8 +558,15 @@ const app = new Elysia()
             .where(and(eq(userList.userId, authUser.id), inArray(userListAlbum.albumId, pageAlbumIds)))
             .orderBy(desc(userListAlbum.addedAt))
             .limit(150),
+          db
+            .select({
+              albumId: releaseCache.releaseId,
+              payload: releaseCache.payload,
+            })
+            .from(releaseCache)
+            .where(inArray(releaseCache.releaseId, pageAlbumIds)),
         ])
-      : [[], [], []]
+      : [[], [], [], []]
 
     const ratingActivityByAlbum = new Map<string, { albumName: string; albumCover: string }>()
     for (const row of ratingActivityRows) {
@@ -562,37 +578,67 @@ const app = new Elysia()
       })
     }
 
-    const reviewByAlbum = new Map<string, { albumName: string; albumCover: string }>()
+    const reviewByAlbum = new Map<string, { albumName: string; albumCover: string; albumArtists: string[] }>()
     for (const row of reviewRows) {
       const albumId = String(row.albumId ?? '').trim()
       if (!albumId || reviewByAlbum.has(albumId)) continue
       reviewByAlbum.set(albumId, {
         albumName: String(row.albumName ?? '').trim(),
         albumCover: String(row.albumCover ?? '').trim(),
+        albumArtists: Array.isArray(row.albumArtists) ? row.albumArtists.filter(Boolean).map(String) : [],
       })
     }
 
-    const listByAlbum = new Map<string, { albumName: string; albumCover: string }>()
+    const listByAlbum = new Map<string, { albumName: string; albumCover: string; albumArtists: string[] }>()
     for (const row of listRows) {
       const albumId = String(row.albumId ?? '').trim()
       if (!albumId || listByAlbum.has(albumId)) continue
       listByAlbum.set(albumId, {
         albumName: String(row.albumName ?? '').trim(),
         albumCover: String(row.albumCover ?? '').trim(),
+        albumArtists: Array.isArray(row.albumArtists) ? row.albumArtists.filter(Boolean).map(String) : [],
       })
     }
+
+    const cachedArtistsByAlbum = new Map<string, string[]>()
+    for (const row of releaseCacheRows) {
+      const albumId = String(row.albumId ?? '').trim()
+      if (!albumId || cachedArtistsByAlbum.has(albumId)) continue
+      const artists = getCachedReleaseArtists(row.payload)
+      if (!artists.length) continue
+      cachedArtistsByAlbum.set(albumId, artists)
+    }
+
+    const missingArtistsAlbumIds = pageAlbumIds.filter((albumId) => {
+      if (reviewByAlbum.get(albumId)?.albumArtists?.length) return false
+      if (listByAlbum.get(albumId)?.albumArtists?.length) return false
+      if (cachedArtistsByAlbum.get(albumId)?.length) return false
+      return true
+    })
+
+    const previewByAlbum = missingArtistsAlbumIds.length ? await getReleasePreviewMap(missingArtistsAlbumIds) : new Map()
 
     const data = pageRows.map((row) => {
       const albumId = String(row.albumId ?? '').trim()
       const fromActivity = ratingActivityByAlbum.get(albumId)
       const fromReview = reviewByAlbum.get(albumId)
       const fromList = listByAlbum.get(albumId)
+      const cachedArtists = cachedArtistsByAlbum.get(albumId) ?? []
+      const preview = previewByAlbum.get(albumId)
       return {
         albumId,
         rating: row.rating,
         timestamp: row.updatedAt.getTime(),
-        albumName: fromActivity?.albumName || fromReview?.albumName || fromList?.albumName || '',
-        albumCover: fromActivity?.albumCover || fromReview?.albumCover || fromList?.albumCover || '',
+        albumName: fromActivity?.albumName || fromReview?.albumName || fromList?.albumName || preview?.name || '',
+        albumCover: fromActivity?.albumCover || fromReview?.albumCover || fromList?.albumCover || preview?.cover || '',
+        albumArtists:
+          fromReview?.albumArtists?.length
+            ? fromReview.albumArtists
+            : fromList?.albumArtists?.length
+              ? fromList.albumArtists
+              : cachedArtists.length
+                ? cachedArtists
+                : (preview?.artists ?? []),
       }
     })
 

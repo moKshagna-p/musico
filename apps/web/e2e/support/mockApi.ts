@@ -311,6 +311,7 @@ export const installApiMocks = async (page: Page) => {
             timestamp,
             albumName: album?.name ?? 'Untitled',
             albumCover: album?.cover ?? '',
+            albumArtists: album?.artists ?? [],
           }
         })
         .sort((a, b) => b.timestamp - a.timestamp)

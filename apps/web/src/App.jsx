@@ -12,6 +12,7 @@ import {
   DiscoverPageSkeleton,
   FeedPageSkeleton,
   HomePageSkeleton,
+  ListeningHistoryPageSkeleton,
   NotFoundPageSkeleton,
   ProfilePageSkeleton,
   PublicListPageSkeleton,
@@ -24,6 +25,7 @@ const Home = lazy(() => import('./pages/Home.jsx'))
 const Discover = lazy(() => import('./pages/Discover.jsx'))
 const SearchResults = lazy(() => import('./pages/SearchResults.jsx'))
 const Profile = lazy(() => import('./pages/Profile.jsx'))
+const ProfileHistory = lazy(() => import('./pages/ProfileHistory.jsx'))
 const UserProfile = lazy(() => import('./pages/UserProfile.jsx'))
 const Feed = lazy(() => import('./pages/Feed.jsx'))
 const PublicList = lazy(() => import('./pages/PublicList.jsx'))
@@ -135,6 +137,7 @@ const App = () => {
               <Route path="/discover" element={withRouteFallback(<Discover />, <DiscoverPageSkeleton />)} />
               <Route path="/search" element={withRouteFallback(<SearchResults />, <SearchResultsPageSkeleton />)} />
               <Route path="/profile" element={withRouteFallback(<Profile />, <ProfilePageSkeleton showActions />)} />
+              <Route path="/profile/history" element={withRouteFallback(<ProfileHistory />, <ListeningHistoryPageSkeleton />)} />
               <Route path="/profile/:username" element={withRouteFallback(<UserProfile />, <ProfilePageSkeleton withBackButton />)} />
               <Route path="/feed" element={withRouteFallback(<Feed />, <FeedPageSkeleton />)} />
               <Route path="/lists/:listId" element={withRouteFallback(<PublicList />, <PublicListPageSkeleton />)} />
