@@ -10,11 +10,11 @@ const Navigation = () => {
 
   return (
     <header className="sticky top-0 z-40 border-b border-outline/60 bg-canvas/95 backdrop-blur">
-      <div className="mx-auto flex max-w-5xl items-center justify-between gap-4 px-4 py-3 tablet:px-6 tablet:py-4">
+      <div className="mx-auto flex max-w-5xl items-center justify-between gap-3 px-3 py-3 tablet:gap-4 tablet:px-6 tablet:py-4">
         <button
           type="button"
           onClick={() => navigate('/')}
-          className="inline-flex min-w-0 items-center gap-2 font-sans text-lg font-semibold tracking-[0.16em] text-white [font-variant-ligatures:none] transition hover:opacity-80 tablet:gap-3 tablet:text-2xl tablet:tracking-[0.24em]"
+          className="inline-flex min-w-0 shrink items-center gap-2 font-sans text-base font-semibold tracking-[0.12em] text-white [font-variant-ligatures:none] transition hover:opacity-80 tablet:gap-3 tablet:text-2xl tablet:tracking-[0.24em]"
           aria-label="Go to Musico home"
         >
           <span
@@ -78,7 +78,7 @@ const Navigation = () => {
           musico
         </button>
 
-        <nav className="flex shrink-0 items-center gap-3 text-[0.64rem] uppercase tracking-[0.2em] text-muted tablet:gap-6 tablet:text-xs tablet:tracking-[0.35em]">
+        <nav className="flex min-w-0 shrink items-center gap-2 overflow-x-auto whitespace-nowrap text-[0.58rem] uppercase tracking-[0.12em] text-muted [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden tablet:gap-6 tablet:text-xs tablet:tracking-[0.35em]">
           <NavLink to="/" className={({ isActive }) => (isActive ? 'text-white' : 'hover:text-white')}>
             Home
           </NavLink>

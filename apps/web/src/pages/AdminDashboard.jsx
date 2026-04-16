@@ -164,7 +164,10 @@ const AdminDashboard = () => {
         </div>
 
         {status ? (
-          <p className="rounded-xl border border-outline/60 bg-canvas/35 px-3 py-2 text-xs uppercase tracking-[0.16em] text-white/80" aria-live="polite">
+          <p
+            className="break-words rounded-xl border border-outline/60 bg-canvas/35 px-3 py-2 text-[11px] uppercase tracking-[0.1em] text-white/80 tablet:text-xs tablet:tracking-[0.16em]"
+            aria-live="polite"
+          >
             {status}
           </p>
         ) : null}
@@ -173,7 +176,7 @@ const AdminDashboard = () => {
           <div className="rounded-3xl border border-outline/70 bg-panel/40 p-5 tablet:p-6">
             <div className="flex flex-col gap-4 tablet:flex-row tablet:items-center tablet:justify-between">
               <h2 className="font-display text-2xl">User Roles</h2>
-              <label className="flex items-center gap-2 rounded-xl border border-outline/60 bg-canvas/40 px-3 py-2 text-sm">
+              <label className="flex w-full items-center gap-2 rounded-xl border border-outline/60 bg-canvas/40 px-3 py-2 text-sm tablet:w-auto">
                 <FiSearch className="text-white/60" aria-hidden="true" />
                 <input
                   value={query}
@@ -203,9 +206,9 @@ const AdminDashboard = () => {
                         {person.username ? <p className="mt-1 text-xs text-muted/80">@{person.username}</p> : null}
                       </div>
 
-                      <div className="flex items-center gap-2">
+                      <div className="flex w-full flex-wrap items-center gap-2 tablet:w-auto tablet:justify-end">
                         <span
-                          className={`inline-flex items-center gap-1 rounded-full border px-3 py-1 text-[10px] uppercase tracking-[0.18em] ${
+                          className={`inline-flex shrink-0 items-center gap-1 rounded-full border px-3 py-1 text-[10px] uppercase tracking-[0.18em] ${
                             person.isAdmin ? 'border-white/40 bg-white/10 text-white' : 'border-outline/70 text-muted'
                           }`}
                         >
@@ -217,7 +220,7 @@ const AdminDashboard = () => {
                           type="button"
                           onClick={() => handleToggleAdmin(person)}
                           disabled={isPending || person.isBootstrapAdmin}
-                          className="inline-flex items-center gap-2 rounded-full border border-outline/70 px-4 py-2 text-xs uppercase tracking-[0.18em] text-white/85 transition hover:border-white/45 hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-50"
+                          className="inline-flex w-full items-center justify-center gap-2 rounded-full border border-outline/70 px-4 py-2 text-xs uppercase tracking-[0.18em] text-white/85 transition hover:border-white/45 hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-50 tablet:w-auto"
                         >
                           {person.isAdmin ? <FiUserX aria-hidden="true" /> : <FiUserCheck aria-hidden="true" />}
                           {isPending ? 'Updating' : person.isAdmin ? 'Remove' : 'Make Admin'}
@@ -242,7 +245,7 @@ const AdminDashboard = () => {
               </div>
               <div className="mt-4 space-y-2">
                 {(overviewQuery.data?.topQueries ?? []).slice(0, 6).map((entry) => (
-                  <div key={entry.normalizedQuery} className="flex items-center justify-between rounded-xl border border-outline/55 bg-canvas/35 px-3 py-2">
+                  <div key={entry.normalizedQuery} className="flex items-center justify-between gap-3 rounded-xl border border-outline/55 bg-canvas/35 px-3 py-2">
                     <div className="min-w-0">
                       <p className="truncate text-sm text-white">{entry.query}</p>
                       <p className="text-[10px] uppercase tracking-[0.16em] text-muted">{formatRelative(entry.lastSearchedAt)}</p>
@@ -267,7 +270,7 @@ const AdminDashboard = () => {
                 {(overviewQuery.data?.recentActivity ?? []).slice(0, 6).map((entry) => (
                   <div key={entry.id} className="rounded-xl border border-outline/55 bg-canvas/35 px-3 py-2">
                     <p className="text-sm text-white/90">{entry.userName}</p>
-                    <p className="text-xs uppercase tracking-[0.14em] text-muted">
+                    <p className="break-words text-xs uppercase tracking-[0.14em] text-muted">
                       {entry.type} {entry.albumName ? `· ${entry.albumName}` : ''} · {formatRelative(entry.createdAt)}
                     </p>
                   </div>
@@ -288,7 +291,7 @@ const AdminDashboard = () => {
               <h2 className="font-display text-2xl">Review Moderation</h2>
               <p className="mt-1 text-xs uppercase tracking-[0.14em] text-muted">Remove spam/abusive content quickly</p>
             </div>
-            <div className="inline-flex items-center gap-1 rounded-full border border-outline/70 bg-canvas/35 p-1">
+            <div className="flex w-full flex-wrap items-center gap-1 rounded-2xl border border-outline/70 bg-canvas/35 p-1 tablet:w-auto tablet:rounded-full">
               {[
                 { key: 'all', label: 'All' },
                 { key: 'flagged', label: 'Flagged' },
@@ -298,7 +301,7 @@ const AdminDashboard = () => {
                   key={option.key}
                   type="button"
                   onClick={() => setReviewFilter(option.key)}
-                  className={`rounded-full px-3 py-1.5 text-[10px] uppercase tracking-[0.16em] transition ${
+                  className={`flex-1 rounded-full px-3 py-1.5 text-[10px] uppercase tracking-[0.16em] transition tablet:flex-none ${
                     reviewFilter === option.key ? 'bg-white text-canvas' : 'text-white/75 hover:bg-white/10'
                   }`}
                 >
@@ -325,9 +328,9 @@ const AdminDashboard = () => {
                         <p className="line-clamp-3 text-sm text-white/85">{review.content}</p>
                       </div>
 
-                      <div className="flex items-center gap-2">
+                      <div className="flex w-full flex-wrap items-center gap-2 tablet:w-auto tablet:justify-end">
                         {review.isFlagged ? (
-                          <span className="inline-flex items-center gap-1 rounded-full border border-[#c6aa7e]/45 bg-[#c6aa7e]/12 px-3 py-1 text-[10px] uppercase tracking-[0.16em] text-[#e6d5b2]">
+                          <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-[#c6aa7e]/45 bg-[#c6aa7e]/12 px-3 py-1 text-[10px] uppercase tracking-[0.16em] text-[#e6d5b2]">
                             <FiAlertTriangle aria-hidden="true" /> Flagged
                           </span>
                         ) : null}
@@ -335,7 +338,7 @@ const AdminDashboard = () => {
                           type="button"
                           onClick={() => handleDeleteReview(review)}
                           disabled={isPending}
-                          className="inline-flex items-center gap-2 rounded-full border border-outline/70 px-4 py-2 text-xs uppercase tracking-[0.16em] text-white/85 transition hover:border-white/45 hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-50"
+                          className="inline-flex w-full items-center justify-center gap-2 rounded-full border border-outline/70 px-4 py-2 text-xs uppercase tracking-[0.16em] text-white/85 transition hover:border-white/45 hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-50 tablet:w-auto"
                         >
                           <FiTrash2 aria-hidden="true" />
                           {isPending ? 'Removing' : 'Remove'}
