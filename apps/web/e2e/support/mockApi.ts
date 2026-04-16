@@ -296,6 +296,38 @@ export const installApiMocks = async (page: Page) => {
       return json(route, { data: payload })
     }
 
+    if (pathname === '/api/me/ratings/history' && method === 'GET') {
+      const limitRaw = Number(url.searchParams.get('limit') ?? 20)
+      const limit = Number.isFinite(limitRaw) ? Math.min(Math.max(limitRaw, 1), 48) : 20
+      const cursorRaw = Number(url.searchParams.get('cursor') ?? 0)
+
+      const historyRows = Array.from(ratings.entries())
+        .map(([albumId, rating], index) => {
+          const album = albumCatalog.find((entry) => entry.id === albumId)
+          const timestamp = Date.now() - index * 60_000
+          return {
+            albumId,
+            rating,
+            timestamp,
+            albumName: album?.name ?? 'Untitled',
+            albumCover: album?.cover ?? '',
+          }
+        })
+        .sort((a, b) => b.timestamp - a.timestamp)
+
+      const filtered = cursorRaw
+        ? historyRows.filter((entry) => entry.timestamp < cursorRaw)
+        : historyRows
+
+      const page = filtered.slice(0, limit)
+      const nextCursor = filtered.length > limit ? page[page.length - 1]?.timestamp ?? null : null
+
+      return json(route, {
+        data: page,
+        nextCursor,
+      })
+    }
+
     if (pathname.startsWith('/api/me/ratings/') && method === 'PUT') {
       const albumId = pathname.split('/').pop() ?? ''
       const body = await parseBody(route)

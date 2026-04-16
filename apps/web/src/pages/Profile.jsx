@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { FiEdit2, FiLogOut, FiUpload, FiX } from 'react-icons/fi'
+import { FiChevronDown, FiChevronUp, FiEdit2, FiLogOut, FiUpload, FiX } from 'react-icons/fi'
 import { Link, useNavigate } from 'react-router-dom'
 
 import PageTransition from '../components/PageTransition.jsx'
@@ -12,6 +12,7 @@ import UsernameSetup from '../components/UsernameSetup.jsx'
 import { useAuth } from '../hooks/useAuth.js'
 import { useLists } from '../hooks/useLists.js'
 import { useRatings } from '../hooks/useRatings.js'
+import { fetchMyRatingsHistory } from '../services/profileDataService.js'
 import { fetchMyFollowers, fetchMyFollowing, fetchMyProfile, updateMyProfile } from '../services/socialService.js'
 
 const FollowListModal = ({ title, users, loading, onClose }) => (
@@ -92,6 +93,11 @@ const Profile = () => {
   const [following, setFollowing] = useState([])
   const [followersLoading, setFollowersLoading] = useState(false)
   const [followingLoading, setFollowingLoading] = useState(false)
+  const [showFullHistory, setShowFullHistory] = useState(false)
+  const [historyItems, setHistoryItems] = useState([])
+  const [historyCursor, setHistoryCursor] = useState(null)
+  const [historyLoading, setHistoryLoading] = useState(false)
+  const [historyLoaded, setHistoryLoaded] = useState(false)
   const fileInputRef = useRef(null)
 
   useEffect(() => {
@@ -99,6 +105,14 @@ const Profile = () => {
       navigate('/auth')
     }
   }, [isPending, user, navigate])
+
+  useEffect(() => {
+    setShowFullHistory(false)
+    setHistoryItems([])
+    setHistoryCursor(null)
+    setHistoryLoaded(false)
+    setHistoryLoading(false)
+  }, [user?.id])
 
   // Load social profile
   useEffect(() => {
@@ -265,6 +279,53 @@ const Profile = () => {
     [ratedItems, recentRatingPreviews],
   )
 
+  const normalizeHistoryEntry = useCallback(
+    (item) => ({
+      albumId: String(item?.albumId ?? '').trim(),
+      rating: Number(item?.rating ?? 0),
+      timestamp: Number(item?.timestamp ?? 0),
+      name: String(item?.albumName ?? item?.name ?? '').trim(),
+      cover: String(item?.albumCover ?? item?.cover ?? '').trim(),
+      artist: String(item?.artist ?? '').trim() || 'Unknown artist',
+    }),
+    [],
+  )
+
+  const loadMoreHistory = useCallback(async () => {
+    if (historyLoading) return
+    setHistoryLoading(true)
+
+    try {
+      const result = await fetchMyRatingsHistory({
+        limit: 24,
+        cursor: historyCursor ?? undefined,
+      })
+
+      setHistoryItems((prev) => {
+        const next = [...prev]
+        const seen = new Set(prev.map((entry) => entry.albumId))
+        for (const rawItem of result.items ?? []) {
+          const normalized = normalizeHistoryEntry(rawItem)
+          if (!normalized.albumId || !Number.isFinite(normalized.rating) || normalized.rating <= 0) continue
+          if (seen.has(normalized.albumId)) continue
+          seen.add(normalized.albumId)
+          next.push(normalized)
+        }
+        return next
+      })
+
+      setHistoryCursor(result.nextCursor ?? null)
+      setHistoryLoaded(true)
+    } finally {
+      setHistoryLoading(false)
+    }
+  }, [historyCursor, historyLoading, normalizeHistoryEntry])
+
+  useEffect(() => {
+    if (!showFullHistory || historyLoaded || historyLoading) return
+    void loadMoreHistory()
+  }, [historyLoaded, historyLoading, loadMoreHistory, showFullHistory])
+
   const handleSignOut = async () => {
     await signOutCurrentUser()
     navigate('/auth')
@@ -287,6 +348,11 @@ const Profile = () => {
       })),
     [recentRatingPreviews],
   )
+
+  const visibleListeningHistory = useMemo(() => {
+    if (!showFullHistory) return recentlyRated
+    return historyItems.length ? historyItems : recentlyRated
+  }, [historyItems, recentlyRated, showFullHistory])
 
   if (isPending || !user) {
     return (
@@ -509,10 +575,22 @@ const Profile = () => {
           <section>
             <div className="mb-10 text-center">
               <p className="text-xs font-bold uppercase tracking-[0.45em] text-muted">Listening History</p>
-              <h2 className="mt-2 font-display text-3xl font-bold tablet:text-4xl">Recently Rated</h2>
+              <h2 className="mt-2 font-display text-3xl font-bold tablet:text-4xl">
+                {showFullHistory ? 'All Rated Albums' : 'Recently Rated'}
+              </h2>
+              <div className="mt-4 flex items-center justify-center">
+                <button
+                  type="button"
+                  onClick={() => setShowFullHistory((prev) => !prev)}
+                  className="inline-flex items-center gap-2 rounded-full border border-outline px-4 py-2 text-xs uppercase tracking-[0.22em] text-muted transition-colors hover:text-white"
+                >
+                  {showFullHistory ? <FiChevronUp aria-hidden="true" /> : <FiChevronDown aria-hidden="true" />}
+                  {showFullHistory ? 'Collapse' : 'Expand History'}
+                </button>
+              </div>
             </div>
             <div className="flex snap-x snap-mandatory gap-4 overflow-x-auto pb-3 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-              {recentlyRated.map((album) => (
+              {visibleListeningHistory.map((album) => (
                 <Link
                   to={`/album/${album.albumId}`}
                   key={album.albumId}
@@ -545,6 +623,19 @@ const Profile = () => {
                 </Link>
               ))}
             </div>
+
+            {showFullHistory && historyCursor && (
+              <div className="mt-6 flex justify-center">
+                <button
+                  type="button"
+                  onClick={loadMoreHistory}
+                  disabled={historyLoading}
+                  className="inline-flex items-center gap-2 rounded-full border border-outline px-5 py-2 text-xs uppercase tracking-[0.2em] text-muted transition-colors hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {historyLoading ? 'Loading...' : 'Load More'}
+                </button>
+              </div>
+            )}
           </section>
 
           <section className="mt-20">

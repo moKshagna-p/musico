@@ -17,6 +17,7 @@ import {
   userProfile,
   userRating,
   userReview,
+  userSearchTrend,
 } from './schema'
 import {
   getFeaturedFallbackReleases,
@@ -475,6 +476,132 @@ const app = new Elysia()
     set.headers ??= {}
     set.headers['Cache-Control'] = 'no-store'
     return { data }
+  })
+  .get('/api/me/ratings/history', async ({ request, query, set }) => {
+    const authUser = await ensureAuthenticated(request, set)
+    if (!authUser) return { error: 'Unauthorized.' }
+
+    const limitParam = Number(query?.limit)
+    const limit = Number.isFinite(limitParam) ? Math.min(Math.max(limitParam, 1), 48) : 20
+    const cursorParam = Number(query?.cursor)
+    const cursor = Number.isFinite(cursorParam) ? new Date(cursorParam) : null
+
+    const conditions = [eq(userRating.userId, authUser.id)]
+    if (cursor && !Number.isNaN(cursor.getTime())) {
+      conditions.push(lt(userRating.updatedAt, cursor))
+    }
+
+    const rows = await db
+      .select({
+        albumId: userRating.albumId,
+        rating: userRating.rating,
+        updatedAt: userRating.updatedAt,
+      })
+      .from(userRating)
+      .where(and(...conditions))
+      .orderBy(desc(userRating.updatedAt))
+      .limit(limit + 1)
+
+    const hasMore = rows.length > limit
+    const pageRows = hasMore ? rows.slice(0, limit) : rows
+    const nextCursor = hasMore ? pageRows[pageRows.length - 1]?.updatedAt.getTime() : null
+    const pageAlbumIds = [...new Set(pageRows.map((entry) => entry.albumId).filter(Boolean))]
+
+    const [ratingActivityRows, reviewRows, listRows] = pageAlbumIds.length
+      ? await Promise.all([
+          db
+            .select({
+              albumId: activity.albumId,
+              albumName: activity.albumName,
+              albumCover: activity.albumCover,
+              createdAt: activity.createdAt,
+            })
+            .from(activity)
+            .where(
+              and(
+                eq(activity.userId, authUser.id),
+                eq(activity.type, 'rated'),
+                inArray(activity.albumId, pageAlbumIds),
+              ),
+            )
+            .orderBy(desc(activity.createdAt))
+            .limit(150),
+          db
+            .select({
+              albumId: userReview.albumId,
+              albumName: userReview.albumName,
+              albumCover: userReview.albumCover,
+              updatedAt: userReview.updatedAt,
+            })
+            .from(userReview)
+            .where(and(eq(userReview.userId, authUser.id), inArray(userReview.albumId, pageAlbumIds)))
+            .orderBy(desc(userReview.updatedAt))
+            .limit(120),
+          db
+            .select({
+              albumId: userListAlbum.albumId,
+              albumName: userListAlbum.name,
+              albumCover: userListAlbum.cover,
+              addedAt: userListAlbum.addedAt,
+            })
+            .from(userListAlbum)
+            .innerJoin(userList, eq(userList.id, userListAlbum.listId))
+            .where(and(eq(userList.userId, authUser.id), inArray(userListAlbum.albumId, pageAlbumIds)))
+            .orderBy(desc(userListAlbum.addedAt))
+            .limit(150),
+        ])
+      : [[], [], []]
+
+    const ratingActivityByAlbum = new Map<string, { albumName: string; albumCover: string }>()
+    for (const row of ratingActivityRows) {
+      const albumId = String(row.albumId ?? '').trim()
+      if (!albumId || ratingActivityByAlbum.has(albumId)) continue
+      ratingActivityByAlbum.set(albumId, {
+        albumName: String(row.albumName ?? '').trim(),
+        albumCover: String(row.albumCover ?? '').trim(),
+      })
+    }
+
+    const reviewByAlbum = new Map<string, { albumName: string; albumCover: string }>()
+    for (const row of reviewRows) {
+      const albumId = String(row.albumId ?? '').trim()
+      if (!albumId || reviewByAlbum.has(albumId)) continue
+      reviewByAlbum.set(albumId, {
+        albumName: String(row.albumName ?? '').trim(),
+        albumCover: String(row.albumCover ?? '').trim(),
+      })
+    }
+
+    const listByAlbum = new Map<string, { albumName: string; albumCover: string }>()
+    for (const row of listRows) {
+      const albumId = String(row.albumId ?? '').trim()
+      if (!albumId || listByAlbum.has(albumId)) continue
+      listByAlbum.set(albumId, {
+        albumName: String(row.albumName ?? '').trim(),
+        albumCover: String(row.albumCover ?? '').trim(),
+      })
+    }
+
+    const data = pageRows.map((row) => {
+      const albumId = String(row.albumId ?? '').trim()
+      const fromActivity = ratingActivityByAlbum.get(albumId)
+      const fromReview = reviewByAlbum.get(albumId)
+      const fromList = listByAlbum.get(albumId)
+      return {
+        albumId,
+        rating: row.rating,
+        timestamp: row.updatedAt.getTime(),
+        albumName: fromActivity?.albumName || fromReview?.albumName || fromList?.albumName || '',
+        albumCover: fromActivity?.albumCover || fromReview?.albumCover || fromList?.albumCover || '',
+      }
+    })
+
+    set.headers ??= {}
+    set.headers['Cache-Control'] = 'no-store'
+    return {
+      data,
+      nextCursor,
+    }
   })
   .put('/api/me/ratings/:albumId', async ({ request, params, body, set }) => {
     const authUser = await ensureAuthenticated(request, set)
@@ -1309,6 +1436,232 @@ const app = new Elysia()
         isBootstrapAdmin: targetIsBootstrapAdmin,
       },
     }
+  })
+
+  .get('/api/admin/overview', async ({ request, set }) => {
+    const authUser = await ensureAdmin(request, set)
+    if (!authUser) return { error: 'Forbidden.' }
+
+    const now = Date.now()
+    const dayMs = 1000 * 60 * 60 * 24
+    const sevenDaysAgo = new Date(now - dayMs * 7)
+
+    try {
+      const [
+        totalUsersRows,
+        newUsersRows,
+        totalRatingsRows,
+        weeklyRatingsRows,
+        totalReviewsRows,
+        weeklyReviewsRows,
+        activeListRows,
+        weeklySearchRows,
+        averageRatingRows,
+        adminRows,
+      ] = await Promise.all([
+        db.select({ count: sql<number>`count(*)` }).from(user),
+        db.select({ count: sql<number>`count(*)` }).from(user).where(sql`${user.createdAt} >= ${sevenDaysAgo}`),
+        db.select({ count: sql<number>`count(*)` }).from(userRating),
+        db.select({ count: sql<number>`count(*)` }).from(userRating).where(sql`${userRating.updatedAt} >= ${sevenDaysAgo}`),
+        db.select({ count: sql<number>`count(*)` }).from(userReview),
+        db.select({ count: sql<number>`count(*)` }).from(userReview).where(sql`${userReview.updatedAt} >= ${sevenDaysAgo}`),
+        db.select({ count: sql<number>`count(*)` }).from(userList),
+        db
+          .select({ count: sql<number>`coalesce(sum(${userSearchTrend.searchCount}), 0)` })
+          .from(userSearchTrend)
+          .where(sql`${userSearchTrend.updatedAt} >= ${sevenDaysAgo}`),
+        db.select({ average: sql<number>`coalesce(avg(${userRating.rating}), 0)` }).from(userRating),
+        db.select({ count: sql<number>`count(*)` }).from(adminUser),
+      ])
+
+      const [recentReviewsRows, topQueriesRows, recentActivitiesRows] = await Promise.all([
+        db
+          .select({
+            id: userReview.id,
+            userId: userReview.userId,
+            albumId: userReview.albumId,
+            albumName: userReview.albumName,
+            content: userReview.content,
+            updatedAt: userReview.updatedAt,
+            userName: user.name,
+            userImage: user.image,
+          })
+          .from(userReview)
+          .innerJoin(user, eq(user.id, userReview.userId))
+          .orderBy(desc(userReview.updatedAt))
+          .limit(8),
+        db
+          .select({
+            query: userSearchTrend.displayQuery,
+            normalizedQuery: userSearchTrend.normalizedQuery,
+            searchCount: userSearchTrend.searchCount,
+            lastSearchedAt: userSearchTrend.lastSearchedAt,
+          })
+          .from(userSearchTrend)
+          .orderBy(desc(userSearchTrend.searchCount), desc(userSearchTrend.lastSearchedAt))
+          .limit(10),
+        db
+          .select({
+            id: activity.id,
+            userId: activity.userId,
+            type: activity.type,
+            albumName: activity.albumName,
+            createdAt: activity.createdAt,
+            userName: user.name,
+          })
+          .from(activity)
+          .innerJoin(user, eq(user.id, activity.userId))
+          .orderBy(desc(activity.createdAt))
+          .limit(8),
+      ])
+
+      const data = {
+        metrics: {
+          totalUsers: Number(totalUsersRows[0]?.count ?? 0),
+          newUsers7d: Number(newUsersRows[0]?.count ?? 0),
+          totalRatings: Number(totalRatingsRows[0]?.count ?? 0),
+          ratings7d: Number(weeklyRatingsRows[0]?.count ?? 0),
+          totalReviews: Number(totalReviewsRows[0]?.count ?? 0),
+          reviews7d: Number(weeklyReviewsRows[0]?.count ?? 0),
+          totalLists: Number(activeListRows[0]?.count ?? 0),
+          searches7d: Number(weeklySearchRows[0]?.count ?? 0),
+          averageRating: Math.round(Number(averageRatingRows[0]?.average ?? 0) * 10) / 10,
+          adminCount: Number(adminRows[0]?.count ?? 0) + 1,
+        },
+        recentReviews: recentReviewsRows.map((entry) => ({
+          id: entry.id,
+          userId: entry.userId,
+          userName: entry.userName,
+          userImage: entry.userImage ?? null,
+          albumId: entry.albumId,
+          albumName: entry.albumName,
+          content: entry.content,
+          updatedAt: entry.updatedAt.getTime(),
+        })),
+        topQueries: topQueriesRows.map((entry) => ({
+          query: entry.query,
+          normalizedQuery: entry.normalizedQuery,
+          searchCount: Number(entry.searchCount ?? 0),
+          lastSearchedAt: entry.lastSearchedAt.getTime(),
+        })),
+        recentActivity: recentActivitiesRows.map((entry) => ({
+          id: entry.id,
+          userId: entry.userId,
+          userName: entry.userName,
+          type: entry.type,
+          albumName: entry.albumName ?? null,
+          createdAt: entry.createdAt.getTime(),
+        })),
+      }
+
+      set.headers ??= {}
+      set.headers['Cache-Control'] = 'no-store'
+      return { data }
+    } catch (error) {
+      if (isMissingAdminTableError(error)) {
+        set.status = 503
+        return { error: 'Admin migration is pending. Run database migrations first.' }
+      }
+      throw error
+    }
+  })
+  .get('/api/admin/reviews', async ({ request, query, set }) => {
+    const authUser = await ensureAdmin(request, set)
+    if (!authUser) return { error: 'Forbidden.' }
+
+    const status = String(query?.status ?? 'all').trim().toLowerCase()
+    const limitParam = Number(query?.limit)
+    const limit = Number.isFinite(limitParam) ? Math.min(Math.max(limitParam, 1), 50) : 20
+
+    const reviews = await db
+      .select({
+        id: userReview.id,
+        userId: userReview.userId,
+        albumId: userReview.albumId,
+        albumName: userReview.albumName,
+        content: userReview.content,
+        createdAt: userReview.createdAt,
+        updatedAt: userReview.updatedAt,
+        userName: user.name,
+        userImage: user.image,
+      })
+      .from(userReview)
+      .innerJoin(user, eq(user.id, userReview.userId))
+      .orderBy(desc(userReview.updatedAt))
+      .limit(limit)
+
+    const mapped = reviews.map((entry) => {
+      const lowerContent = String(entry.content ?? '').toLowerCase()
+      const isFlagged = /spam|hate|abuse|scam|fake/.test(lowerContent)
+
+      return {
+        id: entry.id,
+        userId: entry.userId,
+        userName: entry.userName,
+        userImage: entry.userImage ?? null,
+        albumId: entry.albumId,
+        albumName: entry.albumName,
+        content: entry.content,
+        createdAt: entry.createdAt.getTime(),
+        updatedAt: entry.updatedAt.getTime(),
+        isFlagged,
+      }
+    })
+
+    const filtered =
+      status === 'flagged'
+        ? mapped.filter((entry) => entry.isFlagged)
+        : status === 'clean'
+          ? mapped.filter((entry) => !entry.isFlagged)
+          : mapped
+
+    set.headers ??= {}
+    set.headers['Cache-Control'] = 'no-store'
+    return { data: filtered }
+  })
+  .delete('/api/admin/reviews/:reviewId', async ({ request, params, set }) => {
+    const authUser = await ensureAdmin(request, set)
+    if (!authUser) return { error: 'Forbidden.' }
+
+    const reviewId = String(params?.reviewId ?? '').trim()
+    if (!reviewId) {
+      set.status = 400
+      return { error: 'Missing review id.' }
+    }
+
+    const [existing] = await db
+      .select({
+        id: userReview.id,
+        userId: userReview.userId,
+        albumId: userReview.albumId,
+        albumName: userReview.albumName,
+      })
+      .from(userReview)
+      .where(eq(userReview.id, reviewId))
+      .limit(1)
+
+    if (!existing) {
+      set.status = 404
+      return { error: 'Review not found.' }
+    }
+
+    await db.delete(userReview).where(eq(userReview.id, reviewId))
+
+    recordActivity({
+      userId: authUser.id,
+      type: 'reviewed',
+      albumId: existing.albumId,
+      albumName: existing.albumName,
+      metadata: {
+        action: 'admin_review_delete',
+        removedReviewId: reviewId,
+        removedUserId: existing.userId,
+      },
+    })
+
+    set.headers ??= {}
+    set.headers['Cache-Control'] = 'no-store'
+    return { data: { deleted: true, reviewId } }
   })
 
   // ── Public profile routes ──

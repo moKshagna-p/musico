@@ -10,6 +10,17 @@ export const fetchMyRatings = async () => {
   return response.data && typeof response.data === 'object' ? response.data : {}
 }
 
+export const fetchMyRatingsHistory = async ({ limit = 20, cursor } = {}) => {
+  const params = { limit }
+  if (cursor) params.cursor = cursor
+
+  const response = await api.get('/api/me/ratings/history', { params })
+  return {
+    items: Array.isArray(response.data) ? response.data : [],
+    nextCursor: response.nextCursor ?? null,
+  }
+}
+
 export const saveMyRating = async (albumId, rating, meta = {}) => {
   const payload = { rating }
   if (meta.albumName) payload.albumName = meta.albumName
