@@ -20,17 +20,19 @@ const Stats = ({ ratedAlbums, totalRated, averageRating }) => {
 
   return (
     <section className="my-16">
-      <div className="grid grid-cols-1 gap-8 text-center md:grid-cols-3">
-        <div>
+      <div className="grid grid-cols-1 gap-8 md:grid-cols-3">
+        <div className="flex min-h-[9rem] flex-col items-center justify-center text-center">
           <p className="font-display text-4xl font-bold tablet:text-6xl">{safeTotal}</p>
           <p className="mt-2 text-base text-muted tablet:text-lg">Albums Rated</p>
         </div>
-        <div>
+        <div className="flex min-h-[9rem] flex-col items-center justify-center text-center">
           <p className="font-display text-4xl font-bold tablet:text-6xl">{avg.toFixed(2)}</p>
           <p className="mt-2 text-base text-muted tablet:text-lg">Average Rating</p>
         </div>
-        <div>
-          <p className="break-words font-display text-3xl font-bold tablet:text-5xl">{topArtistName}</p>
+        <div className="flex min-h-[9rem] flex-col items-center justify-center text-center">
+          <p className="max-w-[14ch] text-balance break-words font-display text-3xl font-bold leading-[1.05] tablet:text-5xl">
+            {topArtistName}
+          </p>
           <p className="mt-2 text-base text-muted tablet:text-lg">Recent Top Artist</p>
         </div>
       </div>

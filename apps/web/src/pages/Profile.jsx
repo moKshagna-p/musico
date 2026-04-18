@@ -244,6 +244,8 @@ const Profile = () => {
               timestamp: Number(item?.timestamp ?? 0),
               name: String(item?.albumName ?? '').trim(),
               cover: String(item?.albumCover ?? '').trim(),
+              artists: Array.isArray(item?.albumArtists) ? item.albumArtists.filter(Boolean).map(String) : [],
+              genres: Array.isArray(item?.genres) ? item.genres.filter(Boolean).map(String) : [],
             }))
             .filter((item) => item.albumId && Number.isFinite(item.rating) && item.rating > 0)
         : [],
@@ -259,7 +261,8 @@ const Profile = () => {
         timestamp: entry.timestamp,
         name: 'Recently rated',
         cover: '',
-        artist: 'Unknown artist',
+        artists: [],
+        genres: [],
       }))
     },
     [ratedItems, recentRatingPreviews],
@@ -282,8 +285,8 @@ const Profile = () => {
       recentRatingPreviews.map((item) => ({
         ...item,
         name: item.name || 'Recently rated',
-        artist: item.artist || 'Unknown artist',
-        artists: item.artist ? [item.artist] : [],
+        artists: item.artists,
+        genres: item.genres,
       })),
     [recentRatingPreviews],
   )
@@ -542,7 +545,7 @@ const Profile = () => {
                         <div>
                         <h3 className="line-clamp-1 text-base font-semibold text-white">{album.name || 'Untitled album'}</h3>
                         <p className="line-clamp-1 text-sm text-muted">
-                          {album.artist ?? album.artists?.[0] ?? 'Recently rated'}
+                          {album.artists?.[0] ?? 'Unknown artist'}
                         </p>
                         </div>
                       <p className="text-right text-[11px] uppercase tracking-[0.2em] text-muted/80">

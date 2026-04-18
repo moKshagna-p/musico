@@ -156,7 +156,7 @@ const isMissingAdminTableError = (error: unknown) => {
 const getReleasePreviewMap = async (albumIds: unknown[]) => {
   const uniqueAlbumIds = [...new Set(albumIds.map(normalizeAlbumId).filter(Boolean))].slice(0, MAX_RELEASE_PREVIEW_LOOKUPS)
   if (!uniqueAlbumIds.length) {
-    return new Map<string, { name: string; cover: string; artists: string[]; releaseYear: number | null }>()
+    return new Map<string, { name: string; cover: string; artists: string[]; genres: string[]; releaseYear: number | null }>()
   }
 
   const previews = await Promise.allSettled(
@@ -168,6 +168,7 @@ const getReleasePreviewMap = async (albumIds: unknown[]) => {
           name: String(details.name ?? '').trim(),
           cover: String(details.cover ?? '').trim(),
           artists: Array.isArray(details.artists) ? details.artists.filter(Boolean).map(String) : [],
+          genres: Array.isArray(details.genres) ? details.genres.filter(Boolean).map(String) : [],
           releaseYear: Number.isFinite(Number(details.releaseYear)) ? Number(details.releaseYear) : null,
         },
       ] as const
@@ -180,10 +181,51 @@ const getReleasePreviewMap = async (albumIds: unknown[]) => {
         (
           entry,
         ): entry is PromiseFulfilledResult<
-          readonly [string, { name: string; cover: string; artists: string[]; releaseYear: number | null }]
+          readonly [string, { name: string; cover: string; artists: string[]; genres: string[]; releaseYear: number | null }]
         > => entry.status === 'fulfilled',
       )
       .map((entry) => entry.value),
+  )
+}
+
+const getCachedReleasePreviewMap = async (albumIds: unknown[]) => {
+  const uniqueAlbumIds = [...new Set(albumIds.map(normalizeAlbumId).filter(Boolean))].slice(0, MAX_RELEASE_PREVIEW_LOOKUPS)
+  if (!uniqueAlbumIds.length) {
+    return new Map<string, { name: string; cover: string; artists: string[]; genres: string[]; releaseYear: number | null }>()
+  }
+
+  const rows = await db
+    .select({
+      releaseId: releaseCache.releaseId,
+      payload: releaseCache.payload,
+      expiresAt: releaseCache.expiresAt,
+    })
+    .from(releaseCache)
+    .where(inArray(releaseCache.releaseId, uniqueAlbumIds))
+
+  return new Map(
+    rows
+      .filter((row) => row.expiresAt instanceof Date && row.expiresAt.getTime() > Date.now())
+      .map((row) => {
+        const payload = (row.payload ?? {}) as {
+          name?: unknown
+          cover?: unknown
+          artists?: unknown
+          genres?: unknown
+          releaseYear?: unknown
+        }
+
+        return [
+          row.releaseId,
+          {
+            name: String(payload.name ?? '').trim(),
+            cover: String(payload.cover ?? '').trim(),
+            artists: Array.isArray(payload.artists) ? payload.artists.filter(Boolean).map(String) : [],
+            genres: Array.isArray(payload.genres) ? payload.genres.filter(Boolean).map(String) : [],
+            releaseYear: Number.isFinite(Number(payload.releaseYear)) ? Number(payload.releaseYear) : null,
+          },
+        ] as const
+      }),
   )
 }
 
@@ -1087,15 +1129,27 @@ const app = new Elysia()
       })
     }
 
+    const recentRatingAlbumIds = recentRatingsRows.map((row) => row.albumId)
+    const releasePreviewMap = await getCachedReleasePreviewMap(recentRatingAlbumIds)
+    const missingPreviewAlbumIds = recentRatingAlbumIds.filter((albumId) => !releasePreviewMap.has(String(albumId)))
+    if (missingPreviewAlbumIds.length) {
+      void getReleasePreviewMap(missingPreviewAlbumIds).catch(() => {
+        // Missing cache entries should not slow down the profile response.
+      })
+    }
+
     const recentRatings = recentRatingsRows.map((row) => {
       const activityMeta = latestActivityByAlbum.get(String(row.albumId))
       const reviewMeta = latestReviewByAlbum.get(String(row.albumId))
+      const releaseMeta = releasePreviewMap.get(String(row.albumId))
       return {
         albumId: row.albumId,
         rating: row.rating,
         timestamp: row.updatedAt.getTime(),
-        albumName: activityMeta?.albumName || reviewMeta?.albumName || '',
-        albumCover: activityMeta?.albumCover || reviewMeta?.albumCover || '',
+        albumName: activityMeta?.albumName || reviewMeta?.albumName || releaseMeta?.name || '',
+        albumCover: activityMeta?.albumCover || reviewMeta?.albumCover || releaseMeta?.cover || '',
+        albumArtists: releaseMeta?.artists ?? [],
+        genres: releaseMeta?.genres ?? [],
       }
     })
 

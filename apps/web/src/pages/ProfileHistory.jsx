@@ -120,9 +120,9 @@ const ProfileHistory = () => {
             <Link
               key={album.albumId}
               to={`/album/${album.albumId}`}
-              className="group overflow-hidden rounded-3xl border border-outline/70 bg-panel/55 transition duration-200 hover:-translate-y-1 hover:border-white/25"
+              className="group block overflow-hidden rounded-3xl border border-outline/70 bg-panel/55 transition duration-200 hover:-translate-y-1 hover:border-white/25"
             >
-              <div className="relative">
+              <div className="relative overflow-hidden bg-black">
                 <CoverImage
                   src={album.cover}
                   alt={album.name}
@@ -134,7 +134,7 @@ const ProfileHistory = () => {
                 </div>
               </div>
 
-              <div className="space-y-2 px-4 py-4">
+              <div className="relative z-10 -mt-px space-y-2 bg-panel px-4 py-4">
                 <div>
                   <h2 className="line-clamp-1 text-base font-semibold text-white">{album.name}</h2>
                   <p className="line-clamp-1 text-sm text-muted">{album.artists?.[0] ?? 'Unknown artist'}</p>
