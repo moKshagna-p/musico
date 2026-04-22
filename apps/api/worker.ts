@@ -1,5 +1,3 @@
-import { CloudflareAdapter } from 'elysia/adapter/cloudflare-worker'
-
 type CloudflareEnv = Record<string, string | undefined>
 
 type WorkerApp = {
@@ -16,7 +14,7 @@ export default {
       if (!app) {
         const { createApp } = await import('./index')
         app = createApp({
-          adapter: CloudflareAdapter,
+          aot: false,
         }).compile()
       }
 
