@@ -8,16 +8,9 @@ type WorkerApp = {
 
 let app: WorkerApp | null = null
 
-const applyBindingsToProcessEnv = (bindings: CloudflareEnv) => {
-  const processEnv = process.env as Record<string, string | undefined>
-  Object.entries(bindings).forEach(([key, value]) => {
-    if (typeof value === 'string') processEnv[key] = value
-  })
-}
-
 export default {
   async fetch(request: Request, env: CloudflareEnv, context: ExecutionContext) {
-    applyBindingsToProcessEnv(env)
+    ;(globalThis as unknown as { __MUSICO_WORKER_ENV__?: CloudflareEnv }).__MUSICO_WORKER_ENV__ = env
 
     if (!app) {
       const { createApp } = await import('./index')

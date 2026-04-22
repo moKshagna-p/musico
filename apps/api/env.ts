@@ -1,6 +1,9 @@
-const rawEnv = ((globalThis as unknown as { Bun?: { env: Record<string, string | undefined> } }).Bun?.env ??
-  process.env ??
-  {}) as Record<string, string | undefined>
+const globalEnv = globalThis as unknown as {
+  Bun?: { env: Record<string, string | undefined> }
+  __MUSICO_WORKER_ENV__?: Record<string, string | undefined>
+}
+
+const rawEnv = (globalEnv.__MUSICO_WORKER_ENV__ ?? globalEnv.Bun?.env ?? process.env ?? {}) as Record<string, string | undefined>
 
 const readEnv = (key: string) => rawEnv[key]?.trim()
 
