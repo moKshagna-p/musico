@@ -4,9 +4,11 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "bun --env-file=../../.env run --watch index.ts",
-    "start": "bun run db:migrate && bun run index.ts",
-    "start:local": "bun --env-file=../../.env run db:migrate:local && bun --env-file=../../.env run index.ts",
+    "dev": "bun --env-file=../../.env run --watch server.ts",
+    "start": "bun run db:migrate && bun run server.ts",
+    "start:local": "bun --env-file=../../.env run db:migrate:local && bun --env-file=../../.env run server.ts",
+    "worker:dev": "wrangler dev",
+    "worker:deploy": "wrangler deploy",
     "db:generate": "bun --env-file=../../.env drizzle-kit generate --config=drizzle.config.ts",
     "db:migrate": "drizzle-kit migrate --config=drizzle.config.ts",
     "db:migrate:local": "bun --env-file=../../.env drizzle-kit migrate --config=drizzle.config.ts",
@@ -22,6 +24,7 @@
     "lru-cache": "^11.3.1"
   },
   "devDependencies": {
-    "@types/node": "^25.2.1"
+    "@types/node": "^25.2.1",
+    "wrangler": "^4.45.0"
   }
 }

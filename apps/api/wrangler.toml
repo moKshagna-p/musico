@@ -1,0 +1,11 @@
+name = "musico-api"
+main = "worker.ts"
+compatibility_date = "2026-04-22"
+compatibility_flags = ["nodejs_compat"]
+
+[observability]
+enabled = true
+
+[vars]
+ALLOWED_ORIGIN = "https://musico-web.vercel.app"
+DISCOGS_USER_AGENT = "musico/1.0 (+https://musico-web.vercel.app)"

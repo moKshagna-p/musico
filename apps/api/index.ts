@@ -31,8 +31,6 @@ import {
 
 validateProductionEnv()
 
-const PORT = env.PORT
-
 const RATE_LIMIT_WINDOW = 1000 * 60 * 60 // 1 hour
 const RATE_LIMIT_MAX = 100
 const RATE_LIMIT_MAX_TRACKED_IPS = 10000
@@ -434,7 +432,7 @@ const ensureUserProfile = async (userId: string) => {
   return refetched[0] ?? created
 }
 
-const app = new Elysia()
+export const createApp = (options?: ConstructorParameters<typeof Elysia>[0]) => new Elysia(options)
   .derive(({ request, set }) => {
     const requestId = crypto.randomUUID()
     set.headers ??= {}
@@ -2796,27 +2794,7 @@ const app = new Elysia()
     set.status = 500
     return { error: 'Unexpected server error.' }
   })
-  .listen(PORT)
 
-log('info', 'server.started', {
-  port: app.server?.port ?? PORT,
-  url: env.BETTER_AUTH_URL,
-})
+export { env, log }
 
-const shutdown = async (signal: string) => {
-  log('warn', 'server.shutdown_started', { signal })
-  try {
-    await app.stop()
-    log('info', 'server.shutdown_completed', { signal })
-    process.exit(0)
-  } catch (error) {
-    log('error', 'server.shutdown_failed', {
-      signal,
-      message: error instanceof Error ? error.message : 'Unknown shutdown error',
-    })
-    process.exit(1)
-  }
-}
-
-process.on('SIGINT', () => void shutdown('SIGINT'))
-process.on('SIGTERM', () => void shutdown('SIGTERM'))
+export const app = createApp()
