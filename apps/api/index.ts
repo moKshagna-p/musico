@@ -5,7 +5,7 @@ import { and, desc, eq, ilike, inArray, lt, or, sql } from 'drizzle-orm'
 import { auth } from './auth'
 import { db } from './db'
 import { getReleaseDetails, searchReleases } from './discogs'
-import { env, validateProductionEnv } from './env'
+import { env, hasEnv, validateProductionEnv } from './env'
 import { recordSearchQuery } from './searchSignals'
 import {
   activity,
@@ -2679,6 +2679,19 @@ export const createApp = (options?: ConstructorParameters<typeof Elysia>[0]) => 
       console.error('[featured] error', error)
       set.status = 502
       return { error: 'Unable to load featured releases right now.' }
+    }
+  })
+  .get('/api/debug/env-presence', async ({ set }) => {
+    set.headers ??= {}
+    set.headers['Cache-Control'] = 'no-store'
+    return {
+      DATABASE_URL: hasEnv('DATABASE_URL'),
+      BETTER_AUTH_URL: hasEnv('BETTER_AUTH_URL'),
+      BETTER_AUTH_SECRET: hasEnv('BETTER_AUTH_SECRET'),
+      DISCOGS_TOKEN: hasEnv('DISCOGS_TOKEN'),
+      CRON_SECRET: hasEnv('CRON_SECRET'),
+      ALLOWED_ORIGIN: hasEnv('ALLOWED_ORIGIN'),
+      DISCOGS_USER_AGENT: hasEnv('DISCOGS_USER_AGENT'),
     }
   })
   .get('/api/home', async ({ query, set }) => {

@@ -58,6 +58,8 @@ export const env = {
   CRON_SECRET: sanitizeOptionalSecret(readEnv('CRON_SECRET')),
 } as const
 
+export const hasEnv = (key: string) => Boolean(sanitizeOptionalSecret(readEnv(key)))
+
 export const validateProductionEnv = () => {
   if (!env.ALLOWED_ORIGINS.length) {
     throw new Error('Missing required environment variable: ALLOWED_ORIGIN')
