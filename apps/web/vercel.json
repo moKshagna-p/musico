@@ -1,16 +1,16 @@
 {
   "rewrites": [
-    {
-      "source": "/api/:path*",
-      "destination": "https://musicoapi-production.up.railway.app/api/:path*"
-    },
-    {
-      "source": "/api",
-      "destination": "https://musicoapi-production.up.railway.app/api"
-    },
-    {
-      "source": "/((?!api).*)",
-      "destination": "/index.html"
-    }
-  ]
+      {
+        "source": "/api/:path*",
+        "destination": "https://musico.mokshagnareddy45.workers.dev/api/:path*"
+      },
+      {
+        "source": "/api",
+        "destination": "https://musico.mokshagnareddy45.workers.dev/api"
+      },
+      {
+        "source": "/((?!api).*)",
+        "destination": "/index.html"
+      }
+    ]
 }
