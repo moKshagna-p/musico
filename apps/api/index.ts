@@ -307,10 +307,10 @@ const ensureAdmin = async (request: Request, set: { status?: number }) => {
 }
 
 const authorizeCron = (request: Request, set: { status?: number }) => {
-  const cronSecret = readOptionalSecret('CRON_SECRET')
+  const cronSecret = readOptionalSecret('CRON_SECRET') ?? readOptionalSecret('BETTER_AUTH_SECRET')
   if (!cronSecret) {
     set.status = 500
-    return { error: 'CRON_SECRET is not configured.' }
+    return { error: 'Cron secret is not configured.' }
   }
 
   const authorization = request.headers.get('authorization') ?? ''
