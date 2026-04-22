@@ -315,7 +315,8 @@ const authorizeCron = (request: Request, set: { status?: number }) => {
   const authorization = request.headers.get('authorization') ?? ''
   const bearerToken = authorization.startsWith('Bearer ') ? authorization.slice(7).trim() : ''
   const headerToken = request.headers.get('x-cron-secret')?.trim() ?? ''
-  const providedSecret = bearerToken || headerToken
+  const queryToken = new URL(request.url).searchParams.get('secret')?.trim() ?? ''
+  const providedSecret = bearerToken || headerToken || queryToken
 
   if (providedSecret !== env.CRON_SECRET) {
     set.status = 401
