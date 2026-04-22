@@ -5,7 +5,7 @@ import { and, desc, eq, ilike, inArray, lt, or, sql } from 'drizzle-orm'
 import { auth } from './auth'
 import { db } from './db'
 import { getReleaseDetails, searchReleases } from './discogs'
-import { env, hasEnv, validateProductionEnv } from './env'
+import { env, hasEnv, readOptionalSecret, validateProductionEnv } from './env'
 import { recordSearchQuery } from './searchSignals'
 import {
   activity,
@@ -307,7 +307,8 @@ const ensureAdmin = async (request: Request, set: { status?: number }) => {
 }
 
 const authorizeCron = (request: Request, set: { status?: number }) => {
-  if (!env.CRON_SECRET) {
+  const cronSecret = readOptionalSecret('CRON_SECRET')
+  if (!cronSecret) {
     set.status = 500
     return { error: 'CRON_SECRET is not configured.' }
   }
@@ -318,7 +319,7 @@ const authorizeCron = (request: Request, set: { status?: number }) => {
   const queryToken = new URL(request.url).searchParams.get('secret')?.trim() ?? ''
   const providedSecret = bearerToken || headerToken || queryToken
 
-  if (providedSecret !== env.CRON_SECRET) {
+  if (providedSecret !== cronSecret) {
     set.status = 401
     return { error: 'Unauthorized cron request.' }
   }

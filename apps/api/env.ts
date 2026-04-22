@@ -3,9 +3,10 @@ const globalEnv = globalThis as unknown as {
   __MUSICO_WORKER_ENV__?: Record<string, string | undefined>
 }
 
-const rawEnv = (globalEnv.__MUSICO_WORKER_ENV__ ?? globalEnv.Bun?.env ?? process.env ?? {}) as Record<string, string | undefined>
+const getRawEnv = () =>
+  (globalEnv.__MUSICO_WORKER_ENV__ ?? globalEnv.Bun?.env ?? process.env ?? {}) as Record<string, string | undefined>
 
-const readEnv = (key: string) => rawEnv[key]?.trim()
+const readEnv = (key: string) => getRawEnv()[key]?.trim()
 
 const isPlaceholder = (value: string) => /^(your_|replace_|example|changeme|token_here|key_here|secret_here)/i.test(value)
 
@@ -59,6 +60,8 @@ export const env = {
 } as const
 
 export const hasEnv = (key: string) => Boolean(sanitizeOptionalSecret(readEnv(key)))
+
+export const readOptionalSecret = (key: string) => sanitizeOptionalSecret(readEnv(key))
 
 export const validateProductionEnv = () => {
   if (!env.ALLOWED_ORIGINS.length) {
