@@ -33,7 +33,6 @@ Turbo monorepo for a React/Vite frontend and a Bun/Elysia API proxy.
 - `npm run build` - build all apps that expose `build` (requires Bun).
 - `npm run lint` - lint the frontend app.
 - `npm run test` - run frontend unit tests.
-- `npm run preview` - preview the frontend build.
 - `npm run dev:web` - run frontend only.
 - `npm run dev:api` - run backend only (requires Bun).
 - `npm run start:api` - start backend once.
