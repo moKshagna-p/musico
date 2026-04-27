@@ -6,7 +6,6 @@ Turbo monorepo for a React/Vite frontend and a Bun/Elysia API proxy.
 
 - `apps/web` - React + Vite frontend.
 - `apps/api` - Bun + Elysia backend.
-- `packages/*` - shared packages (empty scaffold for now).
 
 ## Requirements
 
