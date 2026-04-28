@@ -21,6 +21,7 @@ const DEFAULT_MODE: StoredMode = 'featured'
 const MAX_LIMIT = 50
 const DEFAULT_SNAPSHOT_LIMIT = 24
 const MINIMAL_SNAPSHOT_LIMIT = 6
+const MAX_STORED_SNAPSHOT_SIZE = 24
 const STORED_TRENDING_REFRESH_WINDOW_MS = env.FEATURED_CACHE_TTL_MS
 const HOME_RELEASE_DETAILS_PREWARM_LIMIT = env.HOME_RELEASE_DETAILS_PREWARM_LIMIT
 const storedRefreshInFlight = new Map<StoredMode, Promise<{ refreshedAt: Date; insertedOrUpdated: number; data: ReleaseSummary[] }>>()
@@ -291,6 +292,20 @@ const upsertStoredSnapshot = async (mode: StoredMode, snapshot: ReleaseSummary[]
   return { refreshedAt, insertedOrUpdated: snapshot.length, data: snapshot }
 }
 
+const mergeStoredSnapshot = async (mode: StoredMode, incoming: ReleaseSummary[], maxSize = MAX_STORED_SNAPSHOT_SIZE) => {
+  const existing = await getStoredTrendingAlbums(maxSize, mode)
+  const merged = Array.from(
+    new Map(
+      [...incoming, ...existing]
+        .map(normalizeRelease)
+        .filter((release) => release.id)
+        .map((release) => [release.id, release] as const),
+    ).values(),
+  ).slice(0, maxSize)
+
+  return upsertStoredSnapshot(mode, merged)
+}
+
 export const getStoredTrendingAlbums = async (limit = 24, mode: StoredMode = DEFAULT_MODE) => {
   const safeLimit = clampLimit(limit)
   const latestSnapshot = await db
@@ -351,7 +366,9 @@ export const refreshStoredTrendingAlbums = async (mode: StoredMode = DEFAULT_MOD
   const targetLimit = getSnapshotTargetLimit(limit)
   const refreshPromise = (async () => {
     const snapshot = await getSourceSnapshotByMode(mode, targetLimit)
-    const result = await upsertStoredSnapshot(mode, snapshot)
+    const result = env.HOMEPAGE_REFRESH_MINIMAL
+      ? await mergeStoredSnapshot(mode, snapshot)
+      : await upsertStoredSnapshot(mode, snapshot)
     if (!env.HOMEPAGE_REFRESH_MINIMAL) {
       void prewarmReleaseDetails(result.data).catch(() => {
         // Ignore detail prewarm failures so snapshot refresh still succeeds.
