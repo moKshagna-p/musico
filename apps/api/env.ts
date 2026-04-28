@@ -55,6 +55,7 @@ export const env = {
   DISCOGS_MIN_REQUEST_INTERVAL_MS: parsePositiveInteger(readEnv('DISCOGS_MIN_REQUEST_INTERVAL_MS'), 1100),
   DISCOGS_MAX_RETRIES: parsePositiveInteger(readEnv('DISCOGS_MAX_RETRIES'), 4),
   HOME_RELEASE_DETAILS_PREWARM_LIMIT: parsePositiveInteger(readEnv('HOME_RELEASE_DETAILS_PREWARM_LIMIT'), 6),
+  HOMEPAGE_REFRESH_MINIMAL: readEnv('HOMEPAGE_REFRESH_MINIMAL') !== 'false',
   RELEASE_CACHE_MAX_ENTRIES: parsePositiveInteger(readEnv('RELEASE_CACHE_MAX_ENTRIES'), 1500),
   CRON_SECRET: sanitizeOptionalSecret(readEnv('CRON_SECRET')),
 } as const

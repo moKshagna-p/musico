@@ -2610,8 +2610,26 @@ export const createApp = (options?: ConstructorParameters<typeof Elysia>[0]) => 
     try {
       const happeningLimitParam = Number(query?.happeningLimit)
       const recentLimitParam = Number(query?.recentLimit)
-      const happeningLimit = Number.isFinite(happeningLimitParam) ? Math.min(Math.max(happeningLimitParam, 1), 50) : 12
-      const recentLimit = Number.isFinite(recentLimitParam) ? Math.min(Math.max(recentLimitParam, 1), 50) : 24
+      const mode = String(query?.mode ?? 'all').toLowerCase()
+      const defaultLimit = env.HOMEPAGE_REFRESH_MINIMAL ? 6 : 24
+      const happeningLimit = Number.isFinite(happeningLimitParam) ? Math.min(Math.max(happeningLimitParam, 1), 50) : defaultLimit
+      const recentLimit = Number.isFinite(recentLimitParam) ? Math.min(Math.max(recentLimitParam, 1), 50) : defaultLimit
+
+      if (mode === 'featured' || mode === 'recent-popular') {
+        const limit = mode === 'featured' ? happeningLimit : recentLimit
+        const result = await refreshStoredTrendingAlbums(mode, limit)
+        set.headers ??= {}
+        set.headers['Cache-Control'] = 'no-store'
+        return {
+          ok: true,
+          refreshedAt: new Date().toISOString(),
+          mode,
+          insertedOrUpdated: result.insertedOrUpdated,
+          snapshotSize: result.data.length,
+          snapshotRefreshedAt: result.refreshedAt.toISOString(),
+        }
+      }
+
       const result = await refreshStoredHomeAlbums({ happeningLimit, recentLimit })
       set.headers ??= {}
       set.headers['Cache-Control'] = 'no-store'

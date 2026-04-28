@@ -20,6 +20,7 @@ type StoredMode = 'featured' | 'recent-popular'
 const DEFAULT_MODE: StoredMode = 'featured'
 const MAX_LIMIT = 50
 const DEFAULT_SNAPSHOT_LIMIT = 24
+const MINIMAL_SNAPSHOT_LIMIT = 6
 const STORED_TRENDING_REFRESH_WINDOW_MS = env.FEATURED_CACHE_TTL_MS
 const HOME_RELEASE_DETAILS_PREWARM_LIMIT = env.HOME_RELEASE_DETAILS_PREWARM_LIMIT
 const storedRefreshInFlight = new Map<StoredMode, Promise<{ refreshedAt: Date; insertedOrUpdated: number; data: ReleaseSummary[] }>>()
@@ -44,7 +45,10 @@ const toDateOrNull = (value: unknown) => {
   return null
 }
 
-const getSnapshotTargetLimit = (requestedLimit: number) => Math.max(clampLimit(requestedLimit), DEFAULT_SNAPSHOT_LIMIT)
+const getSnapshotTargetLimit = (requestedLimit: number) =>
+  env.HOMEPAGE_REFRESH_MINIMAL
+    ? clampLimit(requestedLimit, MINIMAL_SNAPSHOT_LIMIT)
+    : Math.max(clampLimit(requestedLimit), DEFAULT_SNAPSHOT_LIMIT)
 
 const prewarmReleaseDetails = async (releases: ReleaseSummary[], limit = HOME_RELEASE_DETAILS_PREWARM_LIMIT) => {
   const targetSize = Math.max(0, Math.round(limit))
@@ -160,8 +164,9 @@ const getStoredAlbumIds = async (mode: StoredMode) => {
 }
 
 const selectSearchDrivenRecentReleases = async (limit: number) => {
+  const queryLimit = env.HOMEPAGE_REFRESH_MINIMAL ? limit : Math.max(limit, 12)
   const [topQueries, existingAlbumIds] = await Promise.all([
-    getTopSearchQueries(Math.max(limit, 12)),
+    getTopSearchQueries(queryLimit),
     getStoredAlbumIds('recent-popular'),
   ])
 
@@ -211,7 +216,8 @@ const selectRecentReleaseSnapshot = async (limit: number) => {
   if (searchDriven.length >= limit) return searchDriven
 
   const existingIds = new Set(searchDriven.map((release) => release.id))
-  const fallbackCandidates = await fetchRecentReleaseCandidatesFromDiscogs(Math.max(limit * 4, 48))
+  const fallbackTargetSize = env.HOMEPAGE_REFRESH_MINIMAL ? Math.max(limit * 2, 12) : Math.max(limit * 4, 48)
+  const fallbackCandidates = await fetchRecentReleaseCandidatesFromDiscogs(fallbackTargetSize)
   const fallback = fallbackCandidates.filter((release) => !existingIds.has(release.id))
   return [...searchDriven, ...fallback].slice(0, limit)
 }
@@ -346,9 +352,11 @@ export const refreshStoredTrendingAlbums = async (mode: StoredMode = DEFAULT_MOD
   const refreshPromise = (async () => {
     const snapshot = await getSourceSnapshotByMode(mode, targetLimit)
     const result = await upsertStoredSnapshot(mode, snapshot)
-    void prewarmReleaseDetails(result.data).catch(() => {
-      // Ignore detail prewarm failures so snapshot refresh still succeeds.
-    })
+    if (!env.HOMEPAGE_REFRESH_MINIMAL) {
+      void prewarmReleaseDetails(result.data).catch(() => {
+        // Ignore detail prewarm failures so snapshot refresh still succeeds.
+      })
+    }
     return result
   })()
 
@@ -378,13 +386,12 @@ export const getStoredTrendingAlbumsEnsuringFresh = async (limit = 24, mode: Sto
 }
 
 export const refreshStoredHomeAlbums = async (params?: { happeningLimit?: number; recentLimit?: number }) => {
-  const happeningLimit = clampLimit(params?.happeningLimit ?? 24, 24)
-  const recentLimit = clampLimit(params?.recentLimit ?? 24, 24)
+  const defaultLimit = env.HOMEPAGE_REFRESH_MINIMAL ? MINIMAL_SNAPSHOT_LIMIT : 24
+  const happeningLimit = clampLimit(params?.happeningLimit ?? defaultLimit, defaultLimit)
+  const recentLimit = clampLimit(params?.recentLimit ?? defaultLimit, defaultLimit)
 
-  const [mostHappening, recentReleases] = await Promise.all([
-    refreshStoredTrendingAlbums('featured', happeningLimit),
-    refreshStoredTrendingAlbums('recent-popular', recentLimit),
-  ])
+  const mostHappening = await refreshStoredTrendingAlbums('featured', happeningLimit)
+  const recentReleases = await refreshStoredTrendingAlbums('recent-popular', recentLimit)
 
   return {
     mostHappening,
