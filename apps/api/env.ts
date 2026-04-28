@@ -60,8 +60,6 @@ export const env = {
   CRON_SECRET: sanitizeOptionalSecret(readEnv('CRON_SECRET')),
 } as const
 
-export const hasEnv = (key: string) => Boolean(sanitizeOptionalSecret(readEnv(key)))
-
 export const readOptionalSecret = (key: string) => sanitizeOptionalSecret(readEnv(key))
 
 export const validateProductionEnv = () => {
