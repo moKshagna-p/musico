@@ -1,6 +1,7 @@
 import { betterAuth } from 'better-auth'
 import { drizzleAdapter } from 'better-auth/adapters/drizzle'
 
+import { multiSession } from 'better-auth/plugins'
 import { db } from './db'
 import { env } from './env'
 import { authSchema } from './schema'
@@ -15,6 +16,11 @@ export const auth = betterAuth({
   baseURL: env.BETTER_AUTH_URL,
   secret: env.BETTER_AUTH_SECRET,
   trustedOrigins: env.ALLOWED_ORIGINS,
+  plugins: [
+    multiSession({
+      maximumSessions: 1,
+    }),
+  ],
   advanced: {
     // Vercel Proxy -> Railway API flow.
     useSecureCookies: isHttpsAuthUrl,

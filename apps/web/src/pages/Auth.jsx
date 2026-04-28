@@ -48,7 +48,11 @@ const Auth = () => {
             })
 
       if (result?.error) {
-        setError(result.error.message ?? 'Unable to authenticate. Please try again.')
+        if (result.error.code === 'MAXIMUM_SESSIONS_REACHED') {
+          setError('Try logging out in other account.')
+        } else {
+          setError(result.error.message ?? 'Unable to authenticate. Please try again.')
+        }
         return
       }
 
