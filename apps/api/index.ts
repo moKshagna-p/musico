@@ -307,7 +307,10 @@ const ensureAdmin = async (request: Request, set: { status?: number }) => {
 }
 
 const authorizeCron = (request: Request, set: { status?: number }) => {
-  const cronSecret = readOptionalSecret('CRON_SECRET') ?? readOptionalSecret('BETTER_AUTH_SECRET')
+  const cronSecret =
+    readOptionalSecret('HOME_REFRESH_SECRET') ??
+    readOptionalSecret('CRON_SECRET') ??
+    readOptionalSecret('BETTER_AUTH_SECRET')
   if (!cronSecret) {
     set.status = 500
     return { error: 'Cron secret is not configured.' }
@@ -2690,6 +2693,7 @@ export const createApp = (options?: ConstructorParameters<typeof Elysia>[0]) => 
       BETTER_AUTH_URL: hasEnv('BETTER_AUTH_URL'),
       BETTER_AUTH_SECRET: hasEnv('BETTER_AUTH_SECRET'),
       DISCOGS_TOKEN: hasEnv('DISCOGS_TOKEN'),
+      HOME_REFRESH_SECRET: hasEnv('HOME_REFRESH_SECRET'),
       CRON_SECRET: hasEnv('CRON_SECRET'),
       ALLOWED_ORIGIN: hasEnv('ALLOWED_ORIGIN'),
       DISCOGS_USER_AGENT: hasEnv('DISCOGS_USER_AGENT'),
