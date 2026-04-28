@@ -21,9 +21,7 @@ import {
   userSearchTrend,
 } from './schema'
 import {
-  getFeaturedFallbackReleases,
-  getRecentPopularFallbackReleases,
-  getStoredTrendingAlbumsEnsuringFresh,
+  getStoredTrendingAlbums,
   isStoredTrendingTableMissingError,
   refreshStoredTrendingAlbums,
   refreshStoredHomeAlbums,
@@ -368,20 +366,12 @@ const attachMusicoCommunityStats = async <T extends { id: string; communityRatin
 
 const loadStoredFeaturedSection = async (mode: 'featured' | 'recent-popular', limit: number) => {
   try {
-    const data = await getStoredTrendingAlbumsEnsuringFresh(limit, mode)
-    if (data.length) return data
-
-    console.warn('[featured] stored snapshot empty, falling back to Discogs cache', { mode, limit })
-    return mode === 'recent-popular'
-      ? await getRecentPopularFallbackReleases(limit)
-      : await getFeaturedFallbackReleases(limit)
+    return await getStoredTrendingAlbums(limit, mode)
   } catch (error) {
     if (!isStoredTrendingTableMissingError(error)) throw error
 
-    console.warn('[featured] stored_trending_album missing, falling back to Discogs cache', { mode, limit })
-    return mode === 'recent-popular'
-      ? await getRecentPopularFallbackReleases(limit)
-      : await getFeaturedFallbackReleases(limit)
+    console.warn('[featured] stored_trending_album missing', { mode, limit })
+    return []
   }
 }
 

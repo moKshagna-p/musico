@@ -9,6 +9,7 @@
     "start:local": "bun --env-file=../../.env run db:migrate:local && bun --env-file=../../.env run server.ts",
     "worker:dev": "wrangler dev",
     "worker:deploy": "wrangler deploy",
+    "home:refresh": "bun --env-file=../../.env run scripts/refresh-home.ts",
     "db:generate": "bun --env-file=../../.env drizzle-kit generate --config=drizzle.config.ts",
     "db:migrate": "drizzle-kit migrate --config=drizzle.config.ts",
     "db:migrate:local": "bun --env-file=../../.env drizzle-kit migrate --config=drizzle.config.ts",

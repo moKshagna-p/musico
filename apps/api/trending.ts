@@ -138,10 +138,12 @@ const parseReleaseTimestamp = (release: ReleaseSummary) => {
 }
 
 const getMostHappeningAlbums = async (limit = 12) => {
-  const chartAlbums = await fetchBillboard200Albums(limit)
+  const chartAlbums = await fetchBillboard200Albums(Math.min(Math.max(limit * 2, limit), 50))
   const matches: ReleaseSummary[] = []
 
   for (const chartAlbum of chartAlbums) {
+    if (matches.length >= limit) break
+
     const query = `${chartAlbum.artist} ${chartAlbum.name}`.trim()
     try {
       const result = await searchReleases(query)
@@ -152,7 +154,16 @@ const getMostHappeningAlbums = async (limit = 12) => {
     }
   }
 
-  return Array.from(new Map(matches.map((release) => [release.id, release])).values()).slice(0, limit)
+  const uniqueMatches = Array.from(new Map(matches.map((release) => [release.id, release])).values())
+  if (uniqueMatches.length >= limit) return uniqueMatches.slice(0, limit)
+
+  try {
+    const fallback = await getFeaturedReleases(limit)
+    const merged = Array.from(new Map([...uniqueMatches, ...fallback].map((release) => [release.id, release])).values())
+    return merged.slice(0, limit)
+  } catch {
+    return uniqueMatches.slice(0, limit)
+  }
 }
 
 const getStoredAlbumIds = async (mode: StoredMode) => {
