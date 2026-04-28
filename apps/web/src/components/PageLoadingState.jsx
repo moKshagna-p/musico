@@ -76,7 +76,7 @@ export const HomePageSkeleton = () => {
             </div>
             <div className="h-3 w-20 rounded-full bg-outline/50" />
           </div>
-          <div className="grid grid-cols-1 gap-6 tablet:grid-cols-2 laptop:grid-cols-3">
+          <div className="grid gap-6 tablet:grid-cols-2 laptop:grid-cols-3">
             {Array.from({ length: 6 }).map((_, index) => (
               <div key={index} className="space-y-4 rounded-3xl border border-outline/50 bg-panel/60 p-4">
                 <div className="aspect-square rounded-2xl bg-gradient-to-r from-black via-neutral-800 to-black bg-[length:400px_100%] animate-shimmer" />
