@@ -7,6 +7,7 @@ import { ProfilePageSkeleton, UserListLoadingState } from '../components/PageLoa
 import Stats from '../components/Stats.jsx'
 import TopGenres from '../components/TopGenres.jsx'
 import ListCard from '../components/ListCard.jsx'
+import AlbumSlotMachine from '../components/AlbumSlotMachine.jsx'
 import CoverImage from '../components/CoverImage.jsx'
 import UsernameSetup from '../components/UsernameSetup.jsx'
 import { useAuth } from '../hooks/useAuth.js'
@@ -74,7 +75,7 @@ const formatReviewedAt = (timestamp) => {
 const Profile = () => {
   const navigate = useNavigate()
   const { user, isPending, signOutCurrentUser } = useAuth()
-  const { lists } = useLists()
+  const { lists, listenLaterList } = useLists()
   const { ratings } = useRatings()
 
   // Social profile state
@@ -557,6 +558,8 @@ const Profile = () => {
               ))}
             </div>
           </section>
+
+          <AlbumSlotMachine albums={listenLaterList?.albums ?? []} />
 
           <section className="mt-20">
             <div className="mb-12 text-center">
