@@ -3,26 +3,35 @@ name: Release
 on:
   push:
     tags:
-      - 'v*' # Triggers on tags starting with 'v', e.g., v1.0.0
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag_name:
+        description: 'Tag name (e.g. v0.0.1)'
+        required: true
+      release_body:
+        description: 'Custom release notes (leave empty to auto-generate)'
+        required: false
 
 permissions:
   contents: write
 
 jobs:
-  build-release:
-    name: Create GitHub Release
+  release:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout Repository
+      - name: Checkout
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0 # Required to generate meaningful release notes
+          fetch-depth: 0
 
-      - name: Generate Release
+      - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
-          name: Release ${{ github.ref_name }}
-          generate_release_notes: true
+          tag_name: ${{ github.event.inputs.tag_name || github.ref_name }}
+          name: ${{ github.event.inputs.tag_name || github.ref_name }}
+          body: ${{ github.event.inputs.release_body }}
+          generate_release_notes: ${{ github.event.inputs.release_body == '' }}
           draft: false
           prerelease: false
         env:
