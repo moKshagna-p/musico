@@ -10,7 +10,7 @@ export const useDashboard = () => {
     queryKey: ['dashboard'],
     queryFn: async () => {
       const response = await validatedRequest({ url: '/api/me/dashboard' })
-      return response?.data ?? response ?? {}
+      return response ?? {}
     },
     staleTime: 1000 * 60 * 5, // 5 minutes
     gcTime: 1000 * 60 * 30, // 30 minutes

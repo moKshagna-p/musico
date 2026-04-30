@@ -33,7 +33,7 @@ const FollowListModal = ({ title, users, loading, onClose }) => (
         ) : users.length ? (
           users.map((person) => (
             <Link
-              key={person.userId}
+              key={person.id}
               to={person.username ? `/profile/${person.username}` : '#'}
               onClick={person.username ? onClose : undefined}
               className="flex items-center gap-3 rounded-xl border border-outline/60 bg-canvas/30 px-4 py-3 transition hover:border-outline hover:bg-canvas/40"
@@ -106,12 +106,15 @@ const Profile = () => {
         userId: dashboard.profile?.userId,
         username: dashboard.profile?.username,
         bio: dashboard.profile?.bio,
+        name: dashboard.profile?.name,
+        image: dashboard.profile?.image,
         followerCount: dashboard.profile?.followerCount ?? 0,
         followingCount: dashboard.profile?.followingCount ?? 0,
         recentRatings: dashboard.recentRatings ?? [],
       }
       setSocialProfile(profile)
       setEditBio(profile.bio ?? '')
+      setEditImage(profile.image ?? '')
       if (!profile.username) {
         setShowUsernameSetup(true)
       }
