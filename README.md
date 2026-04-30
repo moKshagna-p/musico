@@ -1,78 +1,82 @@
-# Musico
+# Musico 🎵
 
-Turbo monorepo for a React/Vite frontend and a Bun/Elysia API proxy.
+A professional, high-performance open-source music discovery platform and social network for audiophiles, inspired by Letterboxd. Built with a modern TypeScript monorepo architecture, Musico provides a seamless experience for exploring, rating, and sharing music.
 
-## Monorepo Layout
+[![CI](https://github.com/moKshagna-p/musico/actions/workflows/ci.yml/badge.svg)](https://github.com/moKshagna-p/musico/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-- `apps/web` - React + Vite frontend.
-- `apps/api` - Bun + Elysia backend.
+## 🌟 Key Features
 
-## Requirements
+- **Dynamic Music Discovery:** Deep integration with the Discogs API for comprehensive release metadata and search.
+- **Social Engagement:** Rate albums, write reviews, and follow other users to see their activity.
+- **Personal Collections:** Create and manage custom lists (e.g., "Listen Later", "All-Time Favorites").
+- **Smart Caching:** Multi-layer caching strategy using PostgreSQL (SHA-256 query hashing) and in-memory TTLs to minimize upstream latency.
+- **Robust Security:** Full-stack authentication powered by Better Auth with session management and account isolation.
+- **Performance Optimized:** Blur-up image loading, infinite scroll, and batched API endpoints for a sub-second perceived load time.
+- **Rate Limiting & Protection:** Built-in IP-based abuse protection and automated health monitoring.
 
-- Node.js 18+ for workspace tooling and frontend.
-- [Bun](https://bun.sh) 1.0+ for the backend runtime.
+## 🏗️ Architecture
 
-## Setup
+Musico is structured as a **Turbo Monorepo**, ensuring fast builds and clear separation of concerns:
 
-1. Install dependencies:
-   - `npm install` (or `bun install`)
-2. Copy `.env.example` to `.env` at the repo root and fill:
-   - `VITE_API_BASE_URL` - backend origin (defaults to `http://localhost:4000`).
-   - `PORT`, `ALLOWED_ORIGIN`, `DISCOGS_TOKEN` (+ optional `DISCOGS_KEY`/`DISCOGS_SECRET`).
-   - Optional cache TTL overrides: `FEATURED_CACHE_TTL_MS`, `SEARCH_CACHE_TTL_MS`.
-   - `DATABASE_URL` for Neon Postgres.
-   - `BETTER_AUTH_URL` and `BETTER_AUTH_SECRET` for authentication.
-3. Start everything:
-   - `bun run dev` (or `npm run dev`)
+- **`apps/web`**: A modern React frontend built with Vite, TailwindCSS, and TanStack Query.
+- **`apps/api`**: A high-performance Bun/Elysia backend acting as an intelligent proxy and data orchestrator.
+- **Database**: PostgreSQL (via Neon) managed by Drizzle ORM for type-safe migrations and queries.
 
-## Scripts
+## 🛠️ Tech Stack
 
-- `npm run check:bun` - verify Bun is installed before backend/monorepo tasks.
-- `npm run dev` - run `apps/web` and `apps/api` in parallel via Turbo (requires Bun).
-- `npm run build` - build all apps that expose `build` (requires Bun).
-- `npm run lint` - lint the frontend app.
-- `npm run test` - run frontend unit tests.
-- `npm run dev:web` - run frontend only.
-- `npm run dev:api` - run backend only (requires Bun).
-- `npm run start:api` - start backend once.
-- `npm run start:api:local` - start backend once using the root `.env`.
-- `npm run db:migrate:api` - apply backend migrations using process environment variables.
-- `npm run build:web` - build the frontend app only.
-- `npm run start:web` - serve the built frontend in a Railway-friendly way.
+| Frontend | Backend | Infrastructure |
+| :--- | :--- | :--- |
+| React 18+ (Vite) | Bun + Elysia | PostgreSQL (Neon) |
+| TailwindCSS | Drizzle ORM | Redis (Optional Cache) |
+| TanStack Query | Better Auth | Turbo (Build System) |
 
-## Auth
+## 🚀 Getting Started
 
-- Better Auth is mounted in the API at `/api/auth/*`.
-- Email/password auth is enabled.
-- Auth data is stored in Neon Postgres via Drizzle ORM.
-- Web auth page is available at `/auth`.
-- Better Auth Drizzle schema is defined in `apps/api/schema.ts`.
+### Prerequisites
 
-## Database
+- [Node.js](https://nodejs.org/) 18+
+- [Bun](https://bun.sh) 1.0+ (required for backend)
+- A PostgreSQL database (e.g., [Neon](https://neon.tech))
 
-- Drizzle config: `apps/api/drizzle.config.ts`
-- Migration files: `apps/api/drizzle/*`
-- Generate migration: `bun run --cwd apps/api db:generate`
-- Apply migration: `bun run --cwd apps/api db:migrate`
-- Open Drizzle Studio: `bun run --cwd apps/api db:studio`
-- Production API start applies pending Drizzle migrations before boot.
+### Installation
 
-## Backend behavior
+1. **Clone and Install:**
+   ```bash
+   git clone https://github.com/moKshagna-p/musico.git
+   cd musico
+   bun install
+   ```
 
-- Proxies Discogs search/release endpoints while normalizing payloads for UI use.
-- Stores most happening and recent release snapshots in Postgres, prewarms top release details, and refreshes them weekly.
-- Stores search results in Postgres using SHA-256 query hashes to reuse repeated searches and reduce upstream API calls.
-- Stores ratings and lists in Postgres per authenticated user (`/api/me/*`) so profile data is isolated by account.
-- Keeps release detail caching in memory for 1 hour.
-- Applies IP-based abuse protection (100 requests/hour) and returns `429` with `Retry-After` headers when exceeded.
+2. **Environment Setup:**
+   Copy `.env.example` to `.env` in the root and configure your variables (`DATABASE_URL`, `DISCOGS_TOKEN`, `BETTER_AUTH_SECRET`).
 
-## Production deployment
+3. **Database Migrations:**
+   ```bash
+   bun run db:migrate:api
+   ```
 
-- The API exposes:
-  - `GET /health` for process health
-  - `GET /ready` for readiness including database connectivity
-- For weekly snapshot refresh, schedule `GET /api/cron/home-refresh` with `Authorization: Bearer <CRON_SECRET>` from Railway/Vercel Cron or another scheduler.
-- Production startup requires runtime env vars and does not read from the root `.env` file automatically.
-- Recommended production split:
-  - deploy `apps/api` as a backend service
-  - deploy `apps/web` as a separate frontend service
+4. **Run Development Server:**
+   ```bash
+   bun run dev
+   ```
+   The frontend will be at `http://localhost:5173` and the API at `http://localhost:4000`.
+
+## 🧪 Testing & Quality
+
+We maintain high standards for code quality and reliability:
+
+- **Linting:** `bun run lint`
+- **Unit Tests:** `bun run test`
+- **E2E Tests:** `npx playwright test`
+
+## 🤝 Contributing
+
+We welcome contributions from the community! Feel free to open an issue or submit a pull request with your improvements.
+
+## 📜 License
+
+Distributed under the MIT License. See `LICENSE` for more information.
+
+---
+*Built with ❤️ for the music community.*
