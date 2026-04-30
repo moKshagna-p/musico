@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { memo, useMemo } from 'react'
 
 const TopGenres = ({ ratedAlbums }) => {
   const topGenres = useMemo(() => {
@@ -29,4 +29,4 @@ const TopGenres = ({ ratedAlbums }) => {
   )
 }
 
-export default TopGenres
+export default memo(TopGenres)

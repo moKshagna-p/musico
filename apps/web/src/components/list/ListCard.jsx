@@ -1,3 +1,4 @@
+import { memo } from 'react'
 import { motion } from 'framer-motion'
 import { Link } from 'react-router-dom'
 import { FiChevronRight } from 'react-icons/fi'
@@ -81,4 +82,4 @@ const ListCard = ({ list }) => {
   )
 }
 
-export default ListCard
+export default memo(ListCard)

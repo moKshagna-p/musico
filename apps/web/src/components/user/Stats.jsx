@@ -1,22 +1,32 @@
+import { memo, useMemo } from 'react'
+
 const Stats = ({ ratedAlbums, totalRated, averageRating }) => {
   const safeTotal = totalRated ?? ratedAlbums.length
-  const avg = averageRating ?? (
-    safeTotal > 0
-      ? ratedAlbums.reduce((acc, album) => acc + Number(album?.rating || 0), 0) / safeTotal
-      : 0
-  )
-  const topArtist = ratedAlbums.reduce(
-    (acc, album) => {
-      const artist = String(album?.artist ?? album?.artists?.[0] ?? '').trim()
-      if (!artist) return acc
-      acc[artist] = (acc[artist] || 0) + 1
-      return acc
-    },
-    {},
-  )
-  const topArtistName = Object.keys(topArtist).length
-    ? Object.keys(topArtist).reduce((a, b) => (topArtist[a] > topArtist[b] ? a : b))
-    : 'N/A'
+  
+  // Memoize expensive calculations
+  const { avg, topArtistName } = useMemo(() => {
+    const calculatedAvg = averageRating ?? (
+      safeTotal > 0
+        ? ratedAlbums.reduce((acc, album) => acc + Number(album?.rating || 0), 0) / safeTotal
+        : 0
+    )
+    
+    const topArtist = ratedAlbums.reduce(
+      (acc, album) => {
+        const artist = String(album?.artist ?? album?.artists?.[0] ?? '').trim()
+        if (!artist) return acc
+        acc[artist] = (acc[artist] || 0) + 1
+        return acc
+      },
+      {},
+    )
+    
+    const calculatedTopArtistName = Object.keys(topArtist).length
+      ? Object.keys(topArtist).reduce((a, b) => (topArtist[a] > topArtist[b] ? a : b))
+      : 'N/A'
+    
+    return { avg: calculatedAvg, topArtistName: calculatedTopArtistName }
+  }, [ratedAlbums, safeTotal, averageRating])
 
   return (
     <section className="my-16">
@@ -40,4 +50,4 @@ const Stats = ({ ratedAlbums, totalRated, averageRating }) => {
   )
 }
 
-export default Stats
+export default memo(Stats)

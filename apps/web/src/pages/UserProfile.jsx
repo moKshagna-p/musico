@@ -45,6 +45,10 @@ const UserProfile = () => {
     name: item?.albumName || 'Untitled',
     cover: item?.albumCover || '',
   })) ?? []
+  
+  // Limit display to 12 items for better performance
+  const displayedRatings = ratedAlbumDetails.slice(0, 12)
+  const hasMoreRatings = ratedAlbumDetails.length > 12
 
   if (loading) {
     return (
@@ -130,7 +134,7 @@ const UserProfile = () => {
               <div>
                 <h2 className="mb-8 text-center font-display text-3xl font-bold tablet:text-4xl">Recently Rated</h2>
                 <div className="grid grid-cols-1 gap-4 tablet:grid-cols-2 laptop:grid-cols-3">
-                  {ratedAlbumDetails.map((album) => (
+                  {displayedRatings.map((album) => (
                     <Link to={`/album/${album.albumId}`} key={album.albumId}>
                       <div className="group relative overflow-hidden rounded-lg">
                         <CoverImage src={album.cover} alt={album.name} className="aspect-square w-full object-cover transition-transform duration-300 group-hover:scale-[1.03]" />
@@ -149,6 +153,16 @@ const UserProfile = () => {
                     </Link>
                   ))}
                 </div>
+                {hasMoreRatings && (
+                  <div className="mt-6 text-center">
+                    <Link
+                      to={`/${profile.username}/history`}
+                      className="inline-block rounded-full border border-outline px-6 py-2 text-xs uppercase tracking-[0.2em] text-muted transition hover:text-white hover:border-white"
+                    >
+                      View All {ratedAlbumDetails.length} Ratings
+                    </Link>
+                  </div>
+                )}
               </div>
             )}
 

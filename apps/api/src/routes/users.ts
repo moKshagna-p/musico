@@ -864,12 +864,202 @@ export const userRoutes = new Elysia({ prefix: '/api' })
       const u = userMap.get(f.followerId)
       const p = profileMap.get(f.followerId)
       return {
-        id: f.followerId,
-        username: p?.username ?? null,
-        name: u?.name ?? null,
-        image: u?.image ?? null,
-      }
-    })
+       id: f.followerId,
+         username: p?.username ?? null,
+         name: u?.name ?? null,
+         image: u?.image ?? null,
+       }
+     })
 
-    return { data }
-  })
+     return { data }
+   })
+   .get('/me/dashboard', async ({ request, set }) => {
+     // Batched endpoint that combines /me/ratings, /me/lists, and /me/profile in a single call
+     // Reduces initial load from 3 HTTP requests to 1
+     const authUser = await ensureAuthenticated(request, set)
+     if (!authUser) return { error: 'Unauthorized.' }
+
+     try {
+       const profile = await ensureUserProfile(authUser.id)
+
+       // Fetch all data in parallel
+       const [
+         ratingsRows,
+         ratingSummaryRows,
+         recentRatingsRows,
+         ratingActivityRows,
+         recentReviewMetaRows,
+         followerCountRows,
+         followingCountRows,
+         listsRows,
+       ] = await Promise.all([
+         // Ratings
+         db.select().from(userRating).where(eq(userRating.userId, authUser.id)),
+         // Rating summary
+         db
+           .select({
+             totalRated: sql<number>`count(*)`,
+             averageRating: sql<number>`coalesce(avg(${userRating.rating}), 0)`,
+           })
+           .from(userRating)
+           .where(eq(userRating.userId, authUser.id)),
+         // Recent ratings (for display)
+         db
+           .select({
+             albumId: userRating.albumId,
+             rating: userRating.rating,
+             updatedAt: userRating.updatedAt,
+           })
+           .from(userRating)
+           .where(eq(userRating.userId, authUser.id))
+           .orderBy(desc(userRating.updatedAt))
+           .limit(10),
+         // Rating activity metadata
+         db
+           .select({
+             albumId: activity.albumId,
+             albumName: activity.albumName,
+             albumCover: activity.albumCover,
+             createdAt: activity.createdAt,
+           })
+           .from(activity)
+           .where(and(eq(activity.userId, authUser.id), eq(activity.type, 'rated')))
+           .orderBy(desc(activity.createdAt))
+           .limit(50),
+         // Review metadata
+         db
+           .select({
+             albumId: userReview.albumId,
+             albumName: userReview.albumName,
+             albumCover: userReview.albumCover,
+           })
+           .from(userReview)
+           .where(eq(userReview.userId, authUser.id))
+           .orderBy(desc(userReview.updatedAt))
+           .limit(50),
+         // Follower count
+         db.select({ count: sql<number>`count(*)` }).from(userFollow).where(eq(userFollow.followingId, authUser.id)),
+         // Following count
+         db.select({ count: sql<number>`count(*)` }).from(userFollow).where(eq(userFollow.followerId, authUser.id)),
+         // Lists
+         db.select().from(userList).where(eq(userList.userId, authUser.id)),
+       ])
+
+       const followerCount = Number(followerCountRows[0]?.count ?? 0)
+       const followingCount = Number(followingCountRows[0]?.count ?? 0)
+       const ratingSummary = ratingSummaryRows[0]
+
+       // Build ratings map
+       const ratingsMap = ratingsRows.reduce(
+         (acc, row) => {
+           acc[row.albumId] = {
+             rating: row.rating,
+             timestamp: row.updatedAt.getTime(),
+           }
+           return acc
+         },
+         {} as Record<string, { rating: number; timestamp: number }>,
+       )
+
+       // Build activity/review metadata maps
+       const latestActivityByAlbum = new Map<string, { albumName: string | null; albumCover: string | null }>()
+       for (const row of ratingActivityRows) {
+         const albumId = String(row.albumId ?? '').trim()
+         if (!albumId || latestActivityByAlbum.has(albumId)) continue
+         latestActivityByAlbum.set(albumId, {
+           albumName: row.albumName ? String(row.albumName) : null,
+           albumCover: row.albumCover ? String(row.albumCover) : null,
+         })
+       }
+
+       const latestReviewByAlbum = new Map<string, { albumName: string | null; albumCover: string | null }>()
+       for (const row of recentReviewMetaRows) {
+         const albumId = String(row.albumId ?? '').trim()
+         if (!albumId || latestReviewByAlbum.has(albumId)) continue
+         latestReviewByAlbum.set(albumId, {
+           albumName: row.albumName ? String(row.albumName) : null,
+           albumCover: row.albumCover ? String(row.albumCover) : null,
+         })
+       }
+
+       // Get release previews for recent ratings
+       const recentRatingAlbumIds = recentRatingsRows.map((row) => row.albumId)
+       const releasePreviewMap = await getCachedReleasePreviewMap(recentRatingAlbumIds)
+
+       // Build recent ratings with album details
+       const recentRatings = recentRatingsRows.map((row) => {
+         const activityMeta = latestActivityByAlbum.get(String(row.albumId))
+         const reviewMeta = latestReviewByAlbum.get(String(row.albumId))
+         const releaseMeta = releasePreviewMap.get(String(row.albumId))
+         return {
+           albumId: row.albumId,
+           rating: row.rating,
+           timestamp: row.updatedAt.getTime(),
+           albumName: activityMeta?.albumName || reviewMeta?.albumName || releaseMeta?.name || '',
+           albumCover: activityMeta?.albumCover || reviewMeta?.albumCover || releaseMeta?.cover || '',
+           albumArtists: releaseMeta?.artists ?? [],
+           genres: releaseMeta?.genres ?? [],
+         }
+       })
+
+       // Process lists
+       let lists = []
+       if (listsRows.length) {
+         const listIds = listsRows.map((entry) => entry.id)
+         const listAlbums = await db.select().from(userListAlbum).where(inArray(userListAlbum.listId, listIds))
+         const albumsByList = new Map<string, typeof listAlbums>()
+
+         listAlbums.forEach((entry) => {
+           const group = albumsByList.get(entry.listId) ?? []
+           group.push(entry)
+           albumsByList.set(entry.listId, group)
+         })
+
+         lists = listsRows
+           .sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime())
+           .map((list) => {
+             const albums = (albumsByList.get(list.id) ?? [])
+               .sort((a, b) => b.addedAt.getTime() - a.addedAt.getTime())
+               .slice(0, 4)
+               .map((album) => ({
+                 id: album.albumId,
+                 name: album.name,
+                 cover: album.cover,
+                 artists: album.artists ?? [],
+               }))
+
+             return {
+               id: list.id,
+               name: list.name,
+               description: list.description,
+               albumCount: list.albumCount,
+               albums,
+             }
+           })
+       }
+
+       set.headers ??= {}
+       set.headers['Cache-Control'] = 'no-store'
+       return {
+         ratings: ratingsMap,
+         ratingSummary: {
+           totalRated: ratingSummary?.totalRated ?? 0,
+           averageRating: ratingSummary?.averageRating ?? 0,
+         },
+         recentRatings,
+         profile: {
+           id: profile.id,
+           userId: profile.userId,
+           username: profile.username,
+           bio: profile.bio,
+           followerCount,
+           followingCount,
+         },
+         lists,
+       }
+     } catch (error) {
+       console.error('[dashboard] error', error)
+       set.status = 502
+       return { error: 'Unable to load dashboard.' }
+     }
+   })

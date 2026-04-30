@@ -11,9 +11,8 @@ import AlbumSlotMachine from '../components/album/AlbumSlotMachine.jsx'
 import CoverImage from '../components/ui/CoverImage.jsx'
 import UsernameSetup from '../components/user/UsernameSetup.jsx'
 import { useAuth } from '../hooks/useAuth.js'
-import { useLists } from '../hooks/useLists.js'
-import { useRatings } from '../hooks/useRatings.js'
-import { fetchMyFollowers, fetchMyFollowing, fetchMyProfile, updateMyProfile } from '../services/socialService.js'
+import { useDashboard } from '../hooks/useDashboard.js'
+import { fetchMyFollowers, fetchMyFollowing, updateMyProfile } from '../services/socialService.js'
 
 const FollowListModal = ({ title, users, loading, onClose }) => (
   <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm">
@@ -75,12 +74,10 @@ const formatReviewedAt = (timestamp) => {
 const Profile = () => {
   const navigate = useNavigate()
   const { user, isPending, signOutCurrentUser } = useAuth()
-  const { lists, listenLaterList } = useLists()
-  const { ratings } = useRatings()
+  const { dashboard, isLoading: dashboardLoading } = useDashboard()
 
   // Social profile state
   const [socialProfile, setSocialProfile] = useState(null)
-  const [profileLoading, setProfileLoading] = useState(true)
   const [showUsernameSetup, setShowUsernameSetup] = useState(false)
   const [showEditModal, setShowEditModal] = useState(false)
   const [editBio, setEditBio] = useState('')
@@ -101,35 +98,25 @@ const Profile = () => {
     }
   }, [isPending, user, navigate])
 
-  // Load social profile
+  // Use batched dashboard data instead of separate API calls
   useEffect(() => {
-    if (!user?.id) return
-    let cancelled = false
-
-    const loadProfile = async () => {
-      setProfileLoading(true)
-      try {
-        const data = await fetchMyProfile()
-        if (!cancelled && data) {
-          setSocialProfile(data)
-          setEditBio(data.bio ?? '')
-          setEditImage(data.image ?? '')
-          if (!data.username) {
-            setShowUsernameSetup(true)
-          }
-        }
-      } catch {
-        if (!cancelled) {
-          setShowUsernameSetup(true)
-        }
-      } finally {
-        if (!cancelled) setProfileLoading(false)
+    if (dashboard) {
+      const profile = {
+        id: dashboard.profile?.id,
+        userId: dashboard.profile?.userId,
+        username: dashboard.profile?.username,
+        bio: dashboard.profile?.bio,
+        followerCount: dashboard.profile?.followerCount ?? 0,
+        followingCount: dashboard.profile?.followingCount ?? 0,
+        recentRatings: dashboard.recentRatings ?? [],
+      }
+      setSocialProfile(profile)
+      setEditBio(profile.bio ?? '')
+      if (!profile.username) {
+        setShowUsernameSetup(true)
       }
     }
-
-    void loadProfile()
-    return () => { cancelled = true }
-  }, [user?.id])
+  }, [dashboard])
 
   const openEditModal = useCallback(() => {
     setEditBio(socialProfile?.bio ?? '')
@@ -179,16 +166,6 @@ const Profile = () => {
 
   const handleUsernameComplete = useCallback(async () => {
     setShowUsernameSetup(false)
-    try {
-      const data = await fetchMyProfile()
-      if (data) {
-        setSocialProfile(data)
-        setEditBio(data.bio ?? '')
-        setEditImage(data.image ?? '')
-      }
-    } catch {
-      // ignore
-    }
   }, [])
 
   const handleImageFileChange = useCallback((event) => {
@@ -224,7 +201,7 @@ const Profile = () => {
 
   const ratedItems = useMemo(
     () =>
-      Object.entries(ratings ?? {})
+      Object.entries(dashboard?.ratings ?? {})
         .map(([albumId, value]) => ({
           albumId,
           rating: Number(value?.rating ?? 0),
@@ -232,7 +209,7 @@ const Profile = () => {
         }))
         .filter((entry) => Number.isFinite(entry.rating) && entry.rating > 0)
         .sort((a, b) => b.timestamp - a.timestamp),
-    [ratings],
+    [dashboard?.ratings],
   )
 
   const recentRatingPreviews = useMemo(
@@ -274,9 +251,9 @@ const Profile = () => {
     navigate('/auth')
   }
 
-  const totalRated = Number(socialProfile?.stats?.totalRated ?? ratedItems.length)
-  const averageRating = Number.isFinite(Number(socialProfile?.stats?.averageRating))
-    ? Number(socialProfile?.stats?.averageRating)
+  const totalRated = Number(dashboard?.ratingSummary?.totalRated ?? ratedItems.length)
+  const averageRating = Number.isFinite(Number(dashboard?.ratingSummary?.averageRating))
+    ? Number(dashboard?.ratingSummary?.averageRating)
     : totalRated > 0
       ? ratedItems.reduce((acc, item) => acc + item.rating, 0) / totalRated
       : 0
@@ -486,7 +463,7 @@ const Profile = () => {
               Edit Profile
             </button>
 
-            {!socialProfile?.username && !profileLoading && (
+            {!socialProfile?.username && !dashboardLoading && (
               <button
                 type="button"
                 onClick={() => setShowUsernameSetup(true)}
@@ -568,8 +545,8 @@ const Profile = () => {
             </div>
             
             <div className="grid grid-cols-1 gap-8 tablet:grid-cols-2 lg:grid-cols-2">
-              {lists.length ? (
-                lists.map((list) => (
+              {dashboard?.lists?.length ? (
+                dashboard.lists.map((list) => (
                   <ListCard key={list.id} list={list} />
                 ))
               ) : (
