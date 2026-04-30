@@ -2,9 +2,9 @@ import { betterAuth } from 'better-auth'
 import { drizzleAdapter } from 'better-auth/adapters/drizzle'
 
 import { multiSession } from 'better-auth/plugins'
-import { db } from './db'
-import { env } from './env'
-import { authSchema } from './schema'
+import { db } from './core/db'
+import { env } from './core/env'
+import { authSchema } from './core/schema'
 
 const isHttpsAuthUrl = env.BETTER_AUTH_URL.startsWith('https://')
 

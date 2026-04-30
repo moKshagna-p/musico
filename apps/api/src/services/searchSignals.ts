@@ -1,7 +1,7 @@
 import { desc, eq, gte, sql } from 'drizzle-orm'
 
-import { db } from './db'
-import { userSearchTrend } from './schema'
+import { db } from '../core/db'
+import { userSearchTrend } from '../core/schema'
 
 const SEARCH_WINDOW_DAYS = 45
 const MAX_TOP_SEARCH_QUERIES = 18

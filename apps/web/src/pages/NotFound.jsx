@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom'
 
-import PageTransition from '../components/PageTransition.jsx'
+import PageTransition from '../components/ui/PageTransition.jsx'
 
 const NotFound = () => (
   <PageTransition>

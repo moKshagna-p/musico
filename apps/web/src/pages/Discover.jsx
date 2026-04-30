@@ -1,10 +1,10 @@
 import { useQuery } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 
-import AlbumGrid from '../components/AlbumGrid.jsx'
-import { DiscoverPageSkeleton } from '../components/PageLoadingState.jsx'
-import PageTransition from '../components/PageTransition.jsx'
-import SearchBar from '../components/SearchBar.jsx'
+import AlbumGrid from '../components/album/AlbumGrid.jsx'
+import { DiscoverPageSkeleton } from '../components/ui/PageLoadingState.jsx'
+import PageTransition from '../components/ui/PageTransition.jsx'
+import SearchBar from '../components/search/SearchBar.jsx'
 import { useAuth } from '../hooks/useAuth.js'
 import { getRecentPopularReleases } from '../services/discogsService.js'
 

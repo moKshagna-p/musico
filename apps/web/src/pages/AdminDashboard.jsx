@@ -3,7 +3,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { FiActivity, FiAlertTriangle, FiBarChart2, FiClock, FiSearch, FiShield, FiTrash2, FiUserCheck, FiUserX, FiUsers } from 'react-icons/fi'
 import { Navigate } from 'react-router-dom'
 
-import PageTransition from '../components/PageTransition.jsx'
+import PageTransition from '../components/ui/PageTransition.jsx'
 import { useAdminAccess } from '../hooks/useAdminAccess.js'
 import { deleteAdminReview, fetchAdminOverview, fetchAdminReviews, fetchAdminUsers, setUserAdminRole } from '../services/adminService.js'
 

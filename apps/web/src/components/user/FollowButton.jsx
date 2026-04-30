@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 
-import { toggleFollow } from '../services/socialService.js'
+import { toggleFollow } from '../../services/socialService.js'
 
 const FollowButton = ({ username, initialFollowing = false, onToggle }) => {
   const [following, setFollowing] = useState(initialFollowing)

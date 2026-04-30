@@ -1,6 +1,6 @@
 process.env.HOMEPAGE_REFRESH_MINIMAL ??= 'false'
 
-const { refreshStoredHomeAlbums, refreshStoredTrendingAlbums } = await import('../trending')
+const { refreshStoredHomeAlbums, refreshStoredTrendingAlbums } = await import('../src/services/trending')
 
 const parseLimit = (value: string | undefined, fallback: number) => {
   const parsed = Number.parseInt(value ?? '', 10)

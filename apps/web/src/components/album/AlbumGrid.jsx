@@ -1,5 +1,5 @@
 import AlbumCard from './AlbumCard.jsx'
-import LoadingSkeleton from './LoadingSkeleton.jsx'
+import LoadingSkeleton from '../ui/LoadingSkeleton.jsx'
 
 const AlbumGrid = ({ albums = [], loading, error, onSelect, correctedQuery }) => {
   if (error) {

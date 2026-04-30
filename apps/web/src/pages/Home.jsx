@@ -2,10 +2,10 @@ import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 
-import AlbumGrid from '../components/AlbumGrid.jsx'
-import Hero from '../components/Hero.jsx'
-import PageTransition from '../components/PageTransition.jsx'
-import { HomePageSkeleton } from '../components/PageLoadingState.jsx'
+import AlbumGrid from '../components/album/AlbumGrid.jsx'
+import Hero from '../components/ui/Hero.jsx'
+import PageTransition from '../components/ui/PageTransition.jsx'
+import { HomePageSkeleton } from '../components/ui/PageLoadingState.jsx'
 import { getHomeSections } from '../services/discogsService.js'
 
 const HOME_SECTION_LIMIT = 24

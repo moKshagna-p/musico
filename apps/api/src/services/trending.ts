@@ -1,9 +1,9 @@
 import { and, asc, eq, sql } from 'drizzle-orm'
 
-import type { ReleaseSummary } from './types'
+import type { ReleaseSummary } from '../core/types'
 
 import { fetchBillboard200Albums } from './charts'
-import { db } from './db'
+import { db } from '../core/db'
 import {
   fetchRecentReleaseCandidatesFromDiscogs,
   getFeaturedReleases,
@@ -11,9 +11,9 @@ import {
   getRecentPopularReleases,
   searchReleases,
 } from './discogs'
-import { env } from './env'
+import { env } from '../core/env'
 import { getTopSearchQueries } from './searchSignals'
-import { storedTrendingAlbum } from './schema'
+import { storedTrendingAlbum } from '../core/schema'
 
 type StoredMode = 'featured' | 'recent-popular'
 
@@ -30,6 +30,17 @@ export const isStoredTrendingTableMissingError = (error: unknown) => {
   const code = typeof error === 'object' && error && 'code' in error ? String(error.code) : ''
   const message = error instanceof Error ? error.message : String(error ?? '')
   return code === '42P01' || message.includes('relation "stored_trending_album" does not exist')
+}
+
+export const loadStoredFeaturedSection = async (mode: 'featured' | 'recent-popular', limit: number) => {
+  try {
+    return await getStoredTrendingAlbums(limit, mode)
+  } catch (error) {
+    if (!isStoredTrendingTableMissingError(error)) throw error
+
+    console.warn('[featured] stored_trending_album missing', { mode, limit })
+    return []
+  }
 }
 
 const clampLimit = (value: number, fallback = 24) => {

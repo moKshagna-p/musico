@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom'
-import CoverImage from './CoverImage.jsx'
-import RatingStars from './RatingStars.jsx'
+import CoverImage from '../ui/CoverImage.jsx'
+import RatingStars from '../ui/RatingStars.jsx'
 
 const ActivityCard = ({ item }) => {
   const { type, user: actor, albumId, albumName, albumCover, targetUser, metadata, createdAt } = item

@@ -1,9 +1,9 @@
 import { memo, useRef } from 'react'
 import { motion } from 'framer-motion'
-import { prefetchReleaseDetails } from '../services/discogsService.js'
-import { useRatings } from '../hooks/useRatings.js'
-import { formatReleaseDate } from '../utils/helpers.js'
-import RatingStars from './RatingStars.jsx'
+import { prefetchReleaseDetails } from '../../services/discogsService.js'
+import { useRatings } from '../../hooks/useRatings.js'
+import { formatReleaseDate } from '../../utils/helpers.js'
+import RatingStars from '../ui/RatingStars.jsx'
 
 const AlbumCard = ({ album, onSelect }) => {
   const MotionArticle = motion.article

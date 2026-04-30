@@ -1,4 +1,4 @@
-import RatingStars from './RatingStars.jsx'
+import RatingStars from '../ui/RatingStars.jsx'
 
 const ReviewCard = ({ review }) => {
   const { content, user: reviewer, rating, createdAt } = review

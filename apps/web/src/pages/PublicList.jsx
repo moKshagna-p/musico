@@ -2,9 +2,9 @@ import { useEffect, useState } from 'react'
 import { FiShare2 } from 'react-icons/fi'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 
-import CoverImage from '../components/CoverImage.jsx'
-import PageTransition from '../components/PageTransition.jsx'
-import PageLoadingState from '../components/PageLoadingState.jsx'
+import CoverImage from '../components/ui/CoverImage.jsx'
+import PageTransition from '../components/ui/PageTransition.jsx'
+import PageLoadingState from '../components/ui/PageLoadingState.jsx'
 import { fetchPublicList } from '../services/socialService.js'
 
 const PublicList = () => {

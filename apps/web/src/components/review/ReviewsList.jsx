@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { FiRefreshCw } from 'react-icons/fi'
 
 import ReviewCard from './ReviewCard.jsx'
-import { fetchAlbumReviews } from '../services/socialService.js'
+import { fetchAlbumReviews } from '../../services/socialService.js'
 
 const ReviewsList = ({ albumId }) => {
   const [reviews, setReviews] = useState([])

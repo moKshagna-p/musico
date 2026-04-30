@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 
-import PageTransition from '../components/PageTransition.jsx'
-import PageLoadingState from '../components/PageLoadingState.jsx'
+import PageTransition from '../components/ui/PageTransition.jsx'
+import PageLoadingState from '../components/ui/PageLoadingState.jsx'
 import { useAuth } from '../hooks/useAuth.js'
 
 const Auth = () => {

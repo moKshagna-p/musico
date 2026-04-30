@@ -2,8 +2,8 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { FiArrowLeft, FiClock } from 'react-icons/fi'
 import { Link, useNavigate } from 'react-router-dom'
 
-import CoverImage from '../components/CoverImage.jsx'
-import PageTransition from '../components/PageTransition.jsx'
+import CoverImage from '../components/ui/CoverImage.jsx'
+import PageTransition from '../components/ui/PageTransition.jsx'
 import { useAuth } from '../hooks/useAuth.js'
 import { fetchMyRatingsHistory } from '../services/profileDataService.js'
 

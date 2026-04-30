@@ -3,13 +3,13 @@ import { FiSearch, FiX, FiCommand, FiClock, FiCornerDownLeft } from 'react-icons
 import { AnimatePresence, motion } from 'framer-motion'
 import { useNavigate } from 'react-router-dom'
 
-import { useSearch } from '../hooks/useSearch.js'
+import { useSearch } from '../../hooks/useSearch.js'
 import {
   addToSearchHistory,
   clearSearchHistory,
   getSearchHistory,
   removeFromSearchHistory,
-} from '../services/searchHistoryService.js'
+} from '../../services/searchHistoryService.js'
 
 const HighlightMatch = ({ text, match }) => {
   if (!match || !text) return <>{text}</>

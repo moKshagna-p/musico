@@ -1,7 +1,7 @@
 import { NavLink, useNavigate } from 'react-router-dom'
 
-import { useAuth } from '../hooks/useAuth.js'
-import { useAdminAccess } from '../hooks/useAdminAccess.js'
+import { useAuth } from '../../hooks/useAuth.js'
+import { useAdminAccess } from '../../hooks/useAdminAccess.js'
 
 const Navigation = () => {
   const navigate = useNavigate()

@@ -1,0 +1,10 @@
+export const RATE_LIMIT_WINDOW = 1000 * 60 * 60 // 1 hour
+export const RATE_LIMIT_MAX = 100
+export const RATE_LIMIT_MAX_TRACKED_IPS = 10000
+export const MAX_LISTS_PER_USER = 30
+export const MAX_ALBUMS_PER_LIST = 200
+export const MAX_REVIEW_LENGTH = 280
+export const MAX_BIO_LENGTH = 160
+export const MAX_RELEASE_PREVIEW_LOOKUPS = 36
+export const USERNAME_REGEX = /^[a-z0-9][a-z0-9-]{1,22}[a-z0-9]$/
+export const BOOTSTRAP_ADMIN_EMAIL = 'mokshagnareddy45@gmail.com'

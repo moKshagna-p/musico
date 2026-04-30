@@ -12,7 +12,7 @@ export default {
       ;(globalThis as unknown as { __MUSICO_WORKER_ENV__?: CloudflareEnv }).__MUSICO_WORKER_ENV__ = env
 
       if (!app) {
-        const { createApp } = await import('./index')
+        const { createApp } = await import('./src/index')
         app = createApp({
           aot: false,
         }).compile()

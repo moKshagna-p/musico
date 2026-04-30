@@ -2,9 +2,9 @@ import { lazy, Suspense, useEffect } from 'react'
 import { AnimatePresence } from 'framer-motion'
 import { Route, Routes, useLocation, useNavigate } from 'react-router-dom'
 
-import Footer from './components/Footer.jsx'
-import Navigation from './components/Navigation.jsx'
-import PageTransition from './components/PageTransition.jsx'
+import Footer from './components/ui/Footer.jsx'
+import Navigation from './components/ui/Navigation.jsx'
+import PageTransition from './components/ui/PageTransition.jsx'
 import {
   AlbumDetailsPageSkeleton,
   AdminDashboardPageSkeleton,
@@ -17,8 +17,8 @@ import {
   ProfilePageSkeleton,
   PublicListPageSkeleton,
   SearchResultsPageSkeleton,
-} from './components/PageLoadingState.jsx'
-import RouteErrorBoundary from './components/RouteErrorBoundary.jsx'
+} from './components/ui/PageLoadingState.jsx'
+import RouteErrorBoundary from './components/ui/RouteErrorBoundary.jsx'
 import { useAuth } from './hooks/useAuth.js'
 
 const Home = lazy(() => import('./pages/Home.jsx'))

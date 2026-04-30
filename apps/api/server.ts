@@ -1,4 +1,4 @@
-import { app, env, log } from './index'
+import { app, env, log } from './src/index'
 
 app.listen(env.PORT)
 

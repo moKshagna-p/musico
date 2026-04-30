@@ -3,11 +3,11 @@ import { createHash } from 'node:crypto'
 import { eq } from 'drizzle-orm'
 import { LRUCache } from 'lru-cache'
 
-import type { ReleaseDetails, ReleaseSummary } from './types'
+import type { ReleaseDetails, ReleaseSummary } from '../core/types'
 
-import { db } from './db'
-import { env } from './env'
-import { featuredCache as featuredCacheTable, releaseCache as releaseCacheTable, searchCache as searchCacheTable } from './schema'
+import { db } from '../core/db'
+import { env } from '../core/env'
+import { featuredCache as featuredCacheTable, releaseCache as releaseCacheTable, searchCache as searchCacheTable } from '../core/schema'
 
 const DISCOGS_BASE = 'https://api.discogs.com'
 const sanitizeDiscogsCredential = (value?: string) => {

@@ -1,4 +1,4 @@
-import { createSkeletonArray } from '../utils/helpers.js'
+import { createSkeletonArray } from '../../utils/helpers.js'
 
 const LoadingSkeleton = ({ count = 8 }) => {
   return (

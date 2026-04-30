@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { FiCheck, FiX } from 'react-icons/fi'
 
-import { checkUsernameAvailability, updateMyProfile } from '../services/socialService.js'
+import { checkUsernameAvailability, updateMyProfile } from '../../services/socialService.js'
 
 const USERNAME_REGEX = /^[a-z0-9][a-z0-9-]{1,22}[a-z0-9]$/
 

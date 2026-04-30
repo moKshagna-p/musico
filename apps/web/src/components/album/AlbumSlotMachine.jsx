@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { FiArrowRight, FiShuffle } from 'react-icons/fi'
 import { useNavigate } from 'react-router-dom'
 
-import CoverImage from './CoverImage.jsx'
+import CoverImage from '../ui/CoverImage.jsx'
 
 const VISIBLE_ALBUM_COUNT = 8
 

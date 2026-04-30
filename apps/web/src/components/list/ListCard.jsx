@@ -1,7 +1,7 @@
 import { motion } from 'framer-motion'
 import { Link } from 'react-router-dom'
 import { FiChevronRight } from 'react-icons/fi'
-import CoverImage from './CoverImage.jsx'
+import CoverImage from '../ui/CoverImage.jsx'
 
 const ListCard = ({ list }) => {
   const MotionDiv = motion.div
