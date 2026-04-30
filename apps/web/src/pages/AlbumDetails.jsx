@@ -8,6 +8,7 @@ import RatingStars from '../components/ui/RatingStars.jsx'
 import ReviewInput from '../components/review/ReviewInput.jsx'
 import ReviewsList from '../components/review/ReviewsList.jsx'
 import StreamingLinks from '../components/album/StreamingLinks.jsx'
+import CoverImage from '../components/ui/CoverImage.jsx'
 import { useAuth } from '../hooks/useAuth.js'
 import { useLists } from '../hooks/useLists.js'
 import { useRatings } from '../hooks/useRatings.js'
@@ -264,11 +265,11 @@ const AlbumDetails = () => {
       <div className="grid gap-10 tablet:grid-cols-[360px,1fr]">
         <aside className="space-y-6 tablet:sticky tablet:top-28 tablet:self-start">
           <div className="relative overflow-hidden rounded-2xl border border-white/10 bg-panel p-2 shadow-panel">
-            <img
+            <CoverImage
               src={album.cover}
               alt={album.name}
-              width="640"
-              height="640"
+              width={640}
+              height={640}
               className="aspect-square w-full rounded-xl bg-black/40 object-contain p-1"
             />
           </div>

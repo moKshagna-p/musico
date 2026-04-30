@@ -4,6 +4,7 @@ import { prefetchReleaseDetails } from '../../services/discogsService.js'
 import { useRatings } from '../../hooks/useRatings.js'
 import { formatReleaseDate } from '../../utils/helpers.js'
 import RatingStars from '../ui/RatingStars.jsx'
+import CoverImage from '../ui/CoverImage.jsx'
 
 const AlbumCard = ({ album, onSelect }) => {
   const MotionArticle = motion.article
@@ -42,11 +43,12 @@ const AlbumCard = ({ album, onSelect }) => {
       className="group relative flex cursor-pointer flex-col gap-4 rounded-3xl border border-outline bg-panel p-4 text-white transition hover:border-white/40"
     >
       <div className="relative aspect-square overflow-hidden rounded-2xl bg-black/40">
-        <img
+        <CoverImage
           src={album.cover}
           alt={album.name}
-          width="320"
-          height="320"
+          width={320}
+          height={320}
+          sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
           loading="lazy"
           className="h-full w-full rounded-2xl object-contain p-2 transition duration-500 group-hover:scale-[1.02]"
         />

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useCallback } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 
@@ -7,19 +7,26 @@ import Hero from '../components/ui/Hero.jsx'
 import PageTransition from '../components/ui/PageTransition.jsx'
 import { HomePageSkeleton } from '../components/ui/PageLoadingState.jsx'
 import { getHomeSections } from '../services/discogsService.js'
+import { useInfiniteScroll } from '../hooks/useInfiniteScroll.js'
 
-const HOME_SECTION_LIMIT = 24
+// Initial load: 12 albums per section (reduced from 24)
+const HOME_SECTION_INITIAL_LIMIT = 12
+// Load 12 more albums when user scrolls to the bottom
+const HOME_SECTION_PAGE_SIZE = 12
 
 const Home = () => {
   const navigate = useNavigate()
   const [showAllHappeningAlbums, setShowAllHappeningAlbums] = useState(false)
+  const [displayRecentCount, setDisplayRecentCount] = useState(HOME_SECTION_INITIAL_LIMIT)
 
+  // Query fetches a larger set than we initially display
+  // This allows pagination without additional API calls
   const homeSectionsQuery = useQuery({
-    queryKey: ['home-sections', HOME_SECTION_LIMIT, HOME_SECTION_LIMIT],
+    queryKey: ['home-sections', HOME_SECTION_INITIAL_LIMIT, HOME_SECTION_INITIAL_LIMIT],
     queryFn: () =>
       getHomeSections({
-        happeningLimit: HOME_SECTION_LIMIT,
-        recentLimit: HOME_SECTION_LIMIT,
+        happeningLimit: HOME_SECTION_INITIAL_LIMIT,
+        recentLimit: HOME_SECTION_INITIAL_LIMIT,
       }),
     staleTime: 1000 * 60 * 5,
   })
@@ -34,6 +41,16 @@ const Home = () => {
   const happeningError = requestErrorMessage ?? homeSectionsQuery.data?.mostHappening?.error ?? null
   const recentError = requestErrorMessage ?? homeSectionsQuery.data?.recentReleases?.error ?? null
 
+  // Lazy load handler: fetches more recent albums when user scrolls to bottom
+  const handleLoadMoreRecent = useCallback(async () => {
+    setDisplayRecentCount((prev) => Math.min(prev + HOME_SECTION_PAGE_SIZE, recentAlbums.length))
+  }, [recentAlbums.length])
+
+  const { observerTarget: recentLoadMoreTarget, isLoading: isLoadingMore } = useInfiniteScroll(
+    handleLoadMoreRecent,
+    { rootMargin: '200px' }
+  )
+
   if (homeSectionsQuery.isLoading && !homeSectionsQuery.data) {
     return (
       <PageTransition>
@@ -47,6 +64,8 @@ const Home = () => {
   }
 
   const visibleMostHappeningAlbums = showAllHappeningAlbums ? mostHappeningAlbums : mostHappeningAlbums.slice(0, 6)
+  const visibleRecentAlbums = recentAlbums.slice(0, displayRecentCount)
+  const hasMoreRecent = displayRecentCount < recentAlbums.length
 
   return (
     <PageTransition>
@@ -83,11 +102,20 @@ const Home = () => {
             </div>
           </div>
           <AlbumGrid
-            albums={recentAlbums}
+            albums={visibleRecentAlbums}
             loading={false}
             error={recentError}
             onSelect={handleAlbumSelect}
           />
+          
+          {/* Lazy load trigger: appears when user scrolls near the bottom */}
+          {hasMoreRecent && (
+            <div ref={recentLoadMoreTarget} className="flex justify-center py-8">
+              <div className="text-sm text-muted">
+                {isLoadingMore ? 'Loading more albums...' : 'Scroll for more'}
+              </div>
+            </div>
+          )}
         </section>
       </div>
     </PageTransition>

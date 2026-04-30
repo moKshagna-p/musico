@@ -67,20 +67,20 @@ export const albumRoutes = new Elysia({ prefix: '/api' })
       return { error: 'Unable to load homepage data right now.' }
     }
   })
-  .get('/releases/:id', async ({ params, set }) => {
-    if (!params?.id) {
-      set.status = 400
-      return { error: 'Missing release id.' }
-    }
-    try {
-      const data = await getReleaseDetails(params.id)
-      const [hydrated] = await attachMusicoCommunityStats([data])
-      set.headers ??= {}
-      set.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
-      return hydrated
-    } catch (error) {
-      console.error('[release] error', error)
-      set.status = 502
-      return { error: 'Unable to load release details.' }
-    }
-  })
+   .get('/releases/:id', async ({ params, set }) => {
+     if (!params?.id) {
+       set.status = 400
+       return { error: 'Missing release id.' }
+     }
+     try {
+       const data = await getReleaseDetails(params.id)
+       const [hydrated] = await attachMusicoCommunityStats([data])
+       set.headers ??= {}
+       set.headers['Cache-Control'] = 'public, max-age=3600, immutable'
+       return hydrated
+     } catch (error) {
+       console.error('[release] error', error)
+       set.status = 502
+       return { error: 'Unable to load release details.' }
+     }
+   })

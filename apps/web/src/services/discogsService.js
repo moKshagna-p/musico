@@ -31,11 +31,16 @@ const storage = {
   set: (key, value) => {
     try {
       localStorage.setItem(key, JSON.stringify(value))
+      // Track this cache key for faster updates later
+      recentCacheKeys.add(key)
     } catch {
       // Ignore quota errors
     }
   },
 }
+
+// Track recently accessed cache keys to avoid iterating through entire localStorage
+const recentCacheKeys = new Set()
 
 const isFresh = (timestamp, ttl = CACHE_WINDOW) => Date.now() - timestamp < ttl
 
@@ -77,9 +82,16 @@ export const updateAlbumCommunityStatsInCache = ({ albumId, communityRating, rev
   )
 
   try {
-    for (let index = 0; index < localStorage.length; index += 1) {
-      const key = localStorage.key(index)
-      if (!key) continue
+    // Iterate through tracked cache keys instead of entire localStorage
+    // This is O(n) where n = tracked keys, not O(localStorage.length)
+    const keysToDelete = []
+    
+    for (const key of recentCacheKeys) {
+      // Clean up deleted keys
+      if (!localStorage.getItem(key)) {
+        keysToDelete.push(key)
+        continue
+      }
 
       if (key === `${RELEASE_CACHE_PREFIX}${normalizedAlbumId}`) {
         const cachedRelease = storage.get(key)
@@ -107,6 +119,9 @@ export const updateAlbumCommunityStatsInCache = ({ albumId, communityRating, rev
         ),
       })
     }
+    
+    // Clean up deleted keys from tracking set
+    keysToDelete.forEach((key) => recentCacheKeys.delete(key))
   } catch {
     // Ignore storage access failures.
   }
