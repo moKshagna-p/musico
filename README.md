@@ -67,11 +67,6 @@ We maintain reliability through comprehensive testing and linting:
 - **Unit Testing**: `bun run test`
 - **E2E Testing**: `npx playwright test`
 
-## Releases and Automation
-
-- **Manual Releases**: Releases are triggered manually via the GitHub Actions "Release" workflow. This allows for controlled deployment of new features and version tagging.
-- **Dependency Management**: Dependabot is configured to check for weekly updates to our dependencies, ensuring the platform remains secure and up-to-date.
-
 ## Contributing
 
 Contributions are welcome. If you have improvements or bug fixes, please open an issue or submit a pull request for review.
