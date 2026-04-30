@@ -1,82 +1,76 @@
-# Musico 🎵
+# Musico
 
-A professional, high-performance open-source music discovery platform and social network for audiophiles, inspired by Letterboxd. Built with a modern TypeScript monorepo architecture, Musico provides a seamless experience for exploring, rating, and sharing music.
+Musico is a high-performance open-source platform for music discovery and social interaction. Inspired by the community-centric model of Letterboxd, it provides a dedicated space for users to explore, rate, and review albums while maintaining personal collections.
 
-[![CI](https://github.com/moKshagna-p/musico/actions/workflows/ci.yml/badge.svg)](https://github.com/moKshagna-p/musico/actions/workflows/ci.yml)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+## Core Capabilities
 
-## 🌟 Key Features
+- **Discovery and Search**: Deep integration with the Discogs API provides comprehensive access to global music metadata.
+- **Social Interaction**: Users can rate releases, share written reviews, and follow others to stay updated on community activity.
+- **Collection Management**: Support for custom lists, such as "Listen Later" or personal favorites, to help users organize their musical journey.
+- **Engineered for Speed**: A multi-layered caching strategy using PostgreSQL and in-memory TTLs ensures minimal latency and reduced overhead on upstream APIs.
+- **Security and Privacy**: Built on Better Auth, providing robust session management and complete data isolation between accounts.
+- **Optimization**: Features like blur-up image loading, infinite scroll, and batched API responses prioritize a smooth user experience.
 
-- **Dynamic Music Discovery:** Deep integration with the Discogs API for comprehensive release metadata and search.
-- **Social Engagement:** Rate albums, write reviews, and follow other users to see their activity.
-- **Personal Collections:** Create and manage custom lists (e.g., "Listen Later", "All-Time Favorites").
-- **Smart Caching:** Multi-layer caching strategy using PostgreSQL (SHA-256 query hashing) and in-memory TTLs to minimize upstream latency.
-- **Robust Security:** Full-stack authentication powered by Better Auth with session management and account isolation.
-- **Performance Optimized:** Blur-up image loading, infinite scroll, and batched API endpoints for a sub-second perceived load time.
-- **Rate Limiting & Protection:** Built-in IP-based abuse protection and automated health monitoring.
+## System Architecture
 
-## 🏗️ Architecture
+Musico is built as a TypeScript monorepo managed by Turbo, ensuring a clean separation of concerns and efficient build cycles.
 
-Musico is structured as a **Turbo Monorepo**, ensuring fast builds and clear separation of concerns:
+- **Frontend**: A modern React application utilizing Vite, TailwindCSS, and TanStack Query for a responsive interface.
+- **API Service**: A backend built with Bun and Elysia that serves as a high-performance orchestrator and API proxy.
+- **Persistence**: PostgreSQL (via Neon) managed by Drizzle ORM for type-safe database operations.
 
-- **`apps/web`**: A modern React frontend built with Vite, TailwindCSS, and TanStack Query.
-- **`apps/api`**: A high-performance Bun/Elysia backend acting as an intelligent proxy and data orchestrator.
-- **Database**: PostgreSQL (via Neon) managed by Drizzle ORM for type-safe migrations and queries.
+## Technology Stack
 
-## 🛠️ Tech Stack
+| Layer | Technologies |
+| :--- | :--- |
+| **Frontend** | React 18+, Vite, TailwindCSS, TanStack Query |
+| **Backend** | Bun, Elysia, Better Auth |
+| **Data** | PostgreSQL, Drizzle ORM |
+| **Tooling** | Turbo, Playwright, Vitest |
 
-| Frontend | Backend | Infrastructure |
-| :--- | :--- | :--- |
-| React 18+ (Vite) | Bun + Elysia | PostgreSQL (Neon) |
-| TailwindCSS | Drizzle ORM | Redis (Optional Cache) |
-| TanStack Query | Better Auth | Turbo (Build System) |
-
-## 🚀 Getting Started
+## Getting Started
 
 ### Prerequisites
 
-- [Node.js](https://nodejs.org/) 18+
-- [Bun](https://bun.sh) 1.0+ (required for backend)
-- A PostgreSQL database (e.g., [Neon](https://neon.tech))
+- Node.js 18+
+- Bun 1.0+
+- A PostgreSQL instance (e.g., Neon)
 
-### Installation
+### Setup
 
-1. **Clone and Install:**
+1. **Initialize**:
    ```bash
    git clone https://github.com/moKshagna-p/musico.git
    cd musico
    bun install
    ```
 
-2. **Environment Setup:**
-   Copy `.env.example` to `.env` in the root and configure your variables (`DATABASE_URL`, `DISCOGS_TOKEN`, `BETTER_AUTH_SECRET`).
+2. **Configuration**:
+   Copy `.env.example` to `.env` and provide values for `DATABASE_URL`, `DISCOGS_TOKEN`, and `BETTER_AUTH_SECRET`.
 
-3. **Database Migrations:**
+3. **Database**:
    ```bash
    bun run db:migrate:api
    ```
 
-4. **Run Development Server:**
+4. **Development**:
    ```bash
    bun run dev
    ```
-   The frontend will be at `http://localhost:5173` and the API at `http://localhost:4000`.
+   The application will be available at `http://localhost:5173` with the API service at `http://localhost:4000`.
 
-## 🧪 Testing & Quality
+## Quality Standards
 
-We maintain high standards for code quality and reliability:
+We maintain reliability through comprehensive testing and linting:
 
-- **Linting:** `bun run lint`
-- **Unit Tests:** `bun run test`
-- **E2E Tests:** `npx playwright test`
+- **Linting**: `bun run lint`
+- **Unit Testing**: `bun run test`
+- **E2E Testing**: `npx playwright test`
 
-## 🤝 Contributing
+## Contributing
 
-We welcome contributions from the community! Feel free to open an issue or submit a pull request with your improvements.
+Contributions are welcome. If you have improvements or bug fixes, please open an issue or submit a pull request for review.
 
-## 📜 License
+## License
 
-Distributed under the MIT License. See `LICENSE` for more information.
-
----
-*Built with ❤️ for the music community.*
+Distributed under the MIT License. See `LICENSE` for details.
