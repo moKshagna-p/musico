@@ -1,41 +1,29 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import { FiShare2 } from 'react-icons/fi'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 
 import CoverImage from '../components/ui/CoverImage.jsx'
 import PageTransition from '../components/ui/PageTransition.jsx'
-import PageLoadingState from '../components/ui/PageLoadingState.jsx'
+import { PublicListPageSkeleton } from '../components/ui/PageLoadingState.jsx'
 import { fetchPublicList } from '../services/socialService.js'
 
 const PublicList = () => {
   const { listId } = useParams()
   const navigate = useNavigate()
-  const [list, setList] = useState(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState(null)
   const [copied, setCopied] = useState(false)
 
-  useEffect(() => {
-    let cancelled = false
+  const publicListQuery = useQuery({
+    queryKey: ['public-list', listId],
+    queryFn: () => fetchPublicList(listId),
+    enabled: Boolean(listId),
+    staleTime: 1000 * 60 * 5,
+    gcTime: 1000 * 60 * 30,
+    retry: false,
+    refetchOnWindowFocus: false,
+  })
 
-    const load = async () => {
-      setLoading(true)
-      setError(null)
-      try {
-        const data = await fetchPublicList(listId)
-        if (!cancelled) setList(data)
-      } catch (err) {
-        if (!cancelled) setError(err?.message ?? 'List not found.')
-      } finally {
-        if (!cancelled) setLoading(false)
-      }
-    }
-
-    void load()
-    return () => {
-      cancelled = true
-    }
-  }, [listId])
+  const list = publicListQuery.data
 
   const handleShare = async () => {
     try {
@@ -47,20 +35,20 @@ const PublicList = () => {
     }
   }
 
-  if (loading) {
+  if (publicListQuery.isLoading) {
     return (
       <PageTransition>
-        <PageLoadingState title="Loading list" cards={4} />
+        <PublicListPageSkeleton />
       </PageTransition>
     )
   }
 
-  if (error || !list) {
+  if (publicListQuery.isError || !list) {
     return (
       <PageTransition>
         <div className="mx-auto max-w-5xl py-16 text-center">
           <h1 className="font-display text-3xl font-bold">List not found</h1>
-          <p className="mt-3 text-muted">{error ?? "This list doesn't exist or is private."}</p>
+          <p className="mt-3 text-muted">This list doesn't exist or is private.</p>
           <button
             type="button"
             onClick={() => navigate('/discover')}

@@ -667,7 +667,18 @@ export const userRoutes = new Elysia({ prefix: '/api' })
 
     const listIds = listsRows.map((l) => l.id)
     const listAlbumsRows = listIds.length
-      ? await db.select().from(userListAlbum).where(inArray(userListAlbum.listId, listIds))
+      ? await db
+          .select({
+            listId: userListAlbum.listId,
+            albumId: userListAlbum.albumId,
+            name: userListAlbum.name,
+            cover: userListAlbum.cover,
+            artists: userListAlbum.artists,
+            releaseYear: userListAlbum.releaseYear,
+            addedAt: userListAlbum.addedAt,
+          })
+          .from(userListAlbum)
+          .where(inArray(userListAlbum.listId, listIds))
       : []
 
     const albumsByList = new Map<string, typeof listAlbumsRows>()
@@ -703,17 +714,14 @@ export const userRoutes = new Elysia({ prefix: '/api' })
     }
 
     const recentRatingAlbumIds = recentRatingsRows.map((row) => row.albumId)
-    let releasePreviewMap = await getCachedReleasePreviewMap(recentRatingAlbumIds)
-    
-    // Fallback: if cache misses, fetch from Discogs API for missing albums
+    const releasePreviewMap = await getCachedReleasePreviewMap(recentRatingAlbumIds)
     const missingAlbumIds = recentRatingAlbumIds.filter(
-      (id) => !releasePreviewMap.has(String(id ?? '').trim())
+      (id) => !releasePreviewMap.has(String(id ?? '').trim()),
     )
     if (missingAlbumIds.length > 0) {
-      const freshReleaseMap = await getReleasePreviewMap(missingAlbumIds)
-      for (const [key, value] of freshReleaseMap) {
-        releasePreviewMap.set(key, value)
-      }
+      void getReleasePreviewMap(missingAlbumIds).catch(() => {
+        // Keep profile reads fast; cache misses are warmed in the background.
+      })
     }
 
     const recentRatings = recentRatingsRows.map((row) => {
@@ -1000,17 +1008,14 @@ export const userRoutes = new Elysia({ prefix: '/api' })
 
         // Get release previews for recent ratings
         const recentRatingAlbumIds = recentRatingsRows.map((row) => row.albumId)
-        let releasePreviewMap = await getCachedReleasePreviewMap(recentRatingAlbumIds)
-        
-        // Fallback: if cache misses, fetch from Discogs API for missing albums
+        const releasePreviewMap = await getCachedReleasePreviewMap(recentRatingAlbumIds)
         const missingAlbumIds = recentRatingAlbumIds.filter(
-          (id) => !releasePreviewMap.has(String(id ?? '').trim())
+          (id) => !releasePreviewMap.has(String(id ?? '').trim()),
         )
         if (missingAlbumIds.length > 0) {
-          const freshReleaseMap = await getReleasePreviewMap(missingAlbumIds)
-          for (const [key, value] of freshReleaseMap) {
-            releasePreviewMap.set(key, value)
-          }
+          void getReleasePreviewMap(missingAlbumIds).catch(() => {
+            // Keep dashboard reads fast; cache misses are warmed in the background.
+          })
         }
 
         // Build recent ratings with album details
@@ -1033,7 +1038,17 @@ export const userRoutes = new Elysia({ prefix: '/api' })
        let lists = []
        if (listsRows.length) {
          const listIds = listsRows.map((entry) => entry.id)
-         const listAlbums = await db.select().from(userListAlbum).where(inArray(userListAlbum.listId, listIds))
+         const listAlbums = await db
+           .select({
+             listId: userListAlbum.listId,
+             albumId: userListAlbum.albumId,
+             name: userListAlbum.name,
+             cover: userListAlbum.cover,
+             artists: userListAlbum.artists,
+             addedAt: userListAlbum.addedAt,
+           })
+           .from(userListAlbum)
+           .where(inArray(userListAlbum.listId, listIds))
          const albumsByList = new Map<string, typeof listAlbums>()
 
          listAlbums.forEach((entry) => {

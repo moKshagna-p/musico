@@ -176,6 +176,7 @@ export const userRating = pgTable(
   (table) => [
     uniqueIndex('user_rating_user_album_unique').on(table.userId, table.albumId),
     index('user_rating_user_id_idx').on(table.userId),
+    index('user_rating_user_updated_at_idx').on(table.userId, table.updatedAt),
     index('user_rating_album_id_idx').on(table.albumId),
   ],
 )
@@ -193,6 +194,7 @@ export const userList = pgTable(
   },
   (table) => [
     index('user_list_user_id_idx').on(table.userId),
+    index('user_list_user_updated_at_idx').on(table.userId, table.updatedAt),
     uniqueIndex('user_list_user_name_unique').on(table.userId, table.name),
   ],
 )
@@ -213,6 +215,7 @@ export const userListAlbum = pgTable(
   },
   (table) => [
     index('user_list_album_list_id_idx').on(table.listId),
+    index('user_list_album_list_added_at_idx').on(table.listId, table.addedAt),
     uniqueIndex('user_list_album_unique').on(table.listId, table.albumId),
   ],
 )
@@ -287,6 +290,7 @@ export const userReview = pgTable(
   (table) => [
     uniqueIndex('user_review_user_album_unique').on(table.userId, table.albumId),
     index('user_review_user_id_idx').on(table.userId),
+    index('user_review_user_updated_at_idx').on(table.userId, table.updatedAt),
     index('user_review_album_id_idx').on(table.albumId),
   ],
 )
@@ -312,6 +316,7 @@ export const activity = pgTable(
   },
   (table) => [
     index('activity_user_id_created_at_idx').on(table.userId, table.createdAt),
+    index('activity_user_type_created_at_idx').on(table.userId, table.type, table.createdAt),
     index('activity_created_at_idx').on(table.createdAt),
   ],
 )

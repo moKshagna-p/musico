@@ -287,17 +287,21 @@ export const AlbumDetailsPageSkeleton = () => {
 
 export const PublicListPageSkeleton = () => {
   return (
-    <section aria-busy="true" aria-label="Loading list" className="mx-auto w-full max-w-6xl py-4 tablet:py-8">
+    <section
+      aria-busy="true"
+      aria-label="Loading list"
+      className="mx-auto w-full max-w-6xl py-4 motion-safe:animate-pulse tablet:py-8"
+    >
       <header className="py-8 text-center tablet:py-14">
         <div className="mx-auto h-3 w-12 rounded-full bg-outline/70" />
-        <div className="mx-auto mt-4 h-12 w-80 max-w-[80%] rounded-[1rem] bg-gradient-to-r from-white/10 via-white/5 to-white/10 bg-[length:260px_100%] animate-shimmer tablet:h-16" />
+        <div className="mx-auto mt-4 h-12 w-80 max-w-[80%] rounded-[1rem] bg-white/10 tablet:h-16" />
         <div className="mx-auto mt-4 h-4 w-56 rounded-full bg-outline/60" />
         <div className="mx-auto mt-6 h-10 w-32 rounded-full bg-outline/45" />
       </header>
       <div className="grid grid-cols-2 gap-4 tablet:grid-cols-3 laptop:grid-cols-4">
         {Array.from({ length: 8 }).map((_, index) => (
-          <div key={index} className="overflow-hidden rounded-lg">
-            <div className="aspect-square w-full bg-gradient-to-r from-black via-neutral-800 to-black bg-[length:360px_100%] animate-shimmer" />
+          <div key={index} className="overflow-hidden rounded-lg border border-outline/40 bg-panel/70">
+            <div className="aspect-square w-full bg-white/[0.06]" />
           </div>
         ))}
       </div>

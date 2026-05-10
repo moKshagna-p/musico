@@ -40,15 +40,19 @@ const Home = () => {
   const requestErrorMessage = homeSectionsQuery.error?.message ?? null
   const happeningError = requestErrorMessage ?? homeSectionsQuery.data?.mostHappening?.error ?? null
   const recentError = requestErrorMessage ?? homeSectionsQuery.data?.recentReleases?.error ?? null
+  const visibleMostHappeningAlbums = showAllHappeningAlbums ? mostHappeningAlbums : mostHappeningAlbums.slice(0, 6)
+  const visibleRecentAlbums = recentAlbums.slice(0, displayRecentCount)
+  const hasMoreRecent = displayRecentCount < recentAlbums.length
 
   // Lazy load handler: fetches more recent albums when user scrolls to bottom
   const handleLoadMoreRecent = useCallback(async () => {
+    if (!hasMoreRecent) return
     setDisplayRecentCount((prev) => Math.min(prev + HOME_SECTION_PAGE_SIZE, recentAlbums.length))
-  }, [recentAlbums.length])
+  }, [hasMoreRecent, recentAlbums.length])
 
   const { observerTarget: recentLoadMoreTarget, isLoading: isLoadingMore } = useInfiniteScroll(
     handleLoadMoreRecent,
-    { rootMargin: '200px' }
+    { enabled: hasMoreRecent, rootMargin: '200px' }
   )
 
   if (homeSectionsQuery.isLoading && !homeSectionsQuery.data) {
@@ -62,10 +66,6 @@ const Home = () => {
   const handleAlbumSelect = (id) => {
     navigate(`/album/${id}`, { state: { from: '/', query: '' } })
   }
-
-  const visibleMostHappeningAlbums = showAllHappeningAlbums ? mostHappeningAlbums : mostHappeningAlbums.slice(0, 6)
-  const visibleRecentAlbums = recentAlbums.slice(0, displayRecentCount)
-  const hasMoreRecent = displayRecentCount < recentAlbums.length
 
   return (
     <PageTransition>

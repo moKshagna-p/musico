@@ -133,10 +133,8 @@ export const fetchAlbumReviews = async (albumId, { cursor, limit = 10 } = {}) =>
 // ── Public lists ──
 
 export const fetchPublicList = async (listId) => {
-  try {
-    const response = await api.get(`/api/lists/${encodeURIComponent(listId)}`)
-    return response.data ?? null
-  } catch {
-    return null
-  }
+  if (!listId) return null
+
+  const response = await api.get(`/api/lists/${encodeURIComponent(listId)}`)
+  return response.data ?? null
 }
