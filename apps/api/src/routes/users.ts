@@ -10,6 +10,7 @@ import {
   userListAlbum,
   userFollow,
   activity,
+  releaseCache,
 } from '../core/schema'
 import {
   ensureAuthenticated,
