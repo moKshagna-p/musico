@@ -9,6 +9,13 @@ on:
       tag_name:
         description: 'Tag name (e.g. v0.0.1)'
         required: true
+      target_ref:
+        description: 'Branch, tag, or SHA to release'
+        required: false
+        default: 'main'
+      base_ref:
+        description: 'Optional base tag/SHA for generated notes'
+        required: false
       release_body:
         description: 'Custom release notes (leave empty to auto-generate)'
         required: false
@@ -19,19 +26,62 @@ permissions:
 jobs:
   release:
     runs-on: ubuntu-latest
+    env:
+      RELEASE_TAG: ${{ inputs.tag_name || github.ref_name }}
+      TARGET_REF: ${{ inputs.target_ref || github.sha }}
+      BASE_REF: ${{ inputs.base_ref }}
+      CUSTOM_RELEASE_BODY: ${{ inputs.release_body }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
+          ref: ${{ env.TARGET_REF }}
           fetch-depth: 0
+
+      - name: Resolve Release Range
+        id: range
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [ -n "$BASE_REF" ]; then
+            echo "base=$BASE_REF" >> "$GITHUB_OUTPUT"
+            echo "Release notes will compare $BASE_REF..HEAD"
+          else
+            previous_tag="$(git tag --sort=-creatordate | grep -v "^${RELEASE_TAG}$" | head -n 1 || true)"
+            if [ -n "$previous_tag" ]; then
+              echo "base=$previous_tag" >> "$GITHUB_OUTPUT"
+              echo "Release notes will compare $previous_tag..HEAD"
+            else
+              echo "base=" >> "$GITHUB_OUTPUT"
+              echo "No previous release tag found. Release notes will compare HEAD^..HEAD."
+            fi
+          fi
+
+      - name: Generate Release Notes
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [ -n "$CUSTOM_RELEASE_BODY" ]; then
+            printf '%s\n' "$CUSTOM_RELEASE_BODY" > release-notes.md
+          else
+            node scripts/generate-release-notes.mjs \
+              --base "${{ steps.range.outputs.base }}" \
+              --head HEAD \
+              --out release-notes.md
+          fi
+
+      - name: Show Release Notes
+        run: cat release-notes.md
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ github.event.inputs.tag_name || github.ref_name }}
-          name: ${{ github.event.inputs.tag_name || github.ref_name }}
-          body: ${{ github.event.inputs.release_body }}
-          generate_release_notes: ${{ github.event.inputs.release_body == '' }}
+          tag_name: ${{ env.RELEASE_TAG }}
+          target_commitish: ${{ env.TARGET_REF }}
+          name: ${{ env.RELEASE_TAG }}
+          body_path: release-notes.md
           draft: false
           prerelease: false
         env:

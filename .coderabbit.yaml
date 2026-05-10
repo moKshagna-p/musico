@@ -1,0 +1,25 @@
+# yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
+language: "en-US"
+early_access: false
+reviews:
+  profile: "chill"
+  request_changes_workflow: false
+  high_level_summary: true
+  review_status: true
+  collapse_walkthrough: false
+  auto_review:
+    enabled: true
+    drafts: false
+  path_filters:
+    - "!apps/web/dist/**"
+    - "!node_modules/**"
+    - "!**/*.lockb"
+  path_instructions:
+    - path: ".github/workflows/**"
+      instructions: "Review GitHub Actions for least-privilege permissions, safe shell usage, and reliable release/deploy behavior."
+    - path: "apps/api/**"
+      instructions: "Review API changes for Cloudflare Workers compatibility, database query efficiency, authentication correctness, and secret handling."
+    - path: "apps/web/src/**"
+      instructions: "Review React changes for unnecessary re-renders, duplicate network requests, loading-state flicker, accessibility, and production bundle impact."
+chat:
+  auto_reply: true
