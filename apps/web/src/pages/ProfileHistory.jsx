@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo } from 'react'
+import { useInfiniteQuery } from '@tanstack/react-query'
 import { FiArrowLeft, FiClock } from 'react-icons/fi'
 import { Link, useNavigate } from 'react-router-dom'
 
@@ -6,6 +7,8 @@ import CoverImage from '../components/ui/CoverImage.jsx'
 import PageTransition from '../components/ui/PageTransition.jsx'
 import { useAuth } from '../hooks/useAuth.js'
 import { fetchMyRatingsHistory } from '../services/profileDataService.js'
+
+const HISTORY_PAGE_SIZE = 36
 
 const formatReviewedAt = (timestamp) => {
   if (!timestamp) return ''
@@ -30,11 +33,6 @@ const normalizeHistoryEntry = (item) => ({
 const ProfileHistory = () => {
   const navigate = useNavigate()
   const { user, isPending } = useAuth()
-  const [history, setHistory] = useState([])
-  const [nextCursor, setNextCursor] = useState(null)
-  const [historyLoading, setHistoryLoading] = useState(false)
-  const [historyLoaded, setHistoryLoaded] = useState(false)
-  const [historyError, setHistoryError] = useState('')
 
   useEffect(() => {
     if (!isPending && !user) {
@@ -42,53 +40,39 @@ const ProfileHistory = () => {
     }
   }, [isPending, navigate, user])
 
-  const loadHistoryPage = useCallback(
-    async (cursor) => {
-      if (historyLoading || !user?.id) return
-      setHistoryLoading(true)
-      setHistoryError('')
+  const historyQuery = useInfiniteQuery({
+    queryKey: ['profile-history', user?.id],
+    queryFn: ({ pageParam }) =>
+      fetchMyRatingsHistory({
+        limit: HISTORY_PAGE_SIZE,
+        cursor: pageParam,
+      }),
+    enabled: Boolean(user?.id),
+    initialPageParam: undefined,
+    getNextPageParam: (lastPage) => lastPage.nextCursor || undefined,
+    staleTime: 1000 * 60 * 10,
+    gcTime: 1000 * 60 * 30,
+    retry: false,
+    refetchOnMount: false,
+    refetchOnReconnect: false,
+    refetchOnWindowFocus: false,
+  })
 
-      try {
-        const result = await fetchMyRatingsHistory({
-          limit: 36,
-          cursor,
-        })
+  const sortedHistory = useMemo(() => {
+    const seen = new Set()
+    const entries = []
 
-        setHistory((prev) => {
-          const seen = new Set(prev.map((entry) => entry.albumId))
-          const next = [...prev]
+    for (const rawItem of historyQuery.data?.pages.flatMap((page) => page.items ?? []) ?? []) {
+      const normalized = normalizeHistoryEntry(rawItem)
+      if (!normalized.albumId || !Number.isFinite(normalized.rating) || normalized.rating <= 0) continue
+      if (seen.has(normalized.albumId)) continue
 
-          for (const rawItem of result.items ?? []) {
-            const normalized = normalizeHistoryEntry(rawItem)
-            if (!normalized.albumId || !Number.isFinite(normalized.rating) || normalized.rating <= 0) continue
-            if (seen.has(normalized.albumId)) continue
-            seen.add(normalized.albumId)
-            next.push(normalized)
-          }
+      seen.add(normalized.albumId)
+      entries.push(normalized)
+    }
 
-          return next
-        })
-
-        setNextCursor(result.nextCursor ?? null)
-        setHistoryLoaded(true)
-      } catch (error) {
-        setHistoryError(error?.message ?? 'Unable to load your listening history right now.')
-      } finally {
-        setHistoryLoading(false)
-      }
-    },
-    [historyLoading, user?.id],
-  )
-
-  useEffect(() => {
-    if (!user?.id || historyLoaded || historyLoading) return
-    void loadHistoryPage(undefined)
-  }, [historyLoaded, historyLoading, loadHistoryPage, user?.id])
-
-  const sortedHistory = useMemo(
-    () => [...history].sort((a, b) => Number(b.timestamp ?? 0) - Number(a.timestamp ?? 0)),
-    [history],
-  )
+    return entries.sort((a, b) => Number(b.timestamp ?? 0) - Number(a.timestamp ?? 0))
+  }, [historyQuery.data])
 
   if (isPending || !user) {
     return null
@@ -111,8 +95,10 @@ const ProfileHistory = () => {
           <p className="mt-3 text-sm text-white/70">A complete record of your ratings, newest to oldest.</p>
         </header>
 
-        {historyError ? (
-          <p className="rounded-2xl border border-outline/60 bg-panel/35 px-4 py-4 text-sm text-muted">{historyError}</p>
+        {historyQuery.isError ? (
+          <p className="rounded-2xl border border-outline/60 bg-panel/35 px-4 py-4 text-sm text-muted">
+            {historyQuery.error?.message ?? 'Unable to load your listening history right now.'}
+          </p>
         ) : null}
 
         <section className="grid gap-5 tablet:grid-cols-2 laptop:grid-cols-3">
@@ -147,17 +133,17 @@ const ProfileHistory = () => {
           ))}
         </section>
 
-        {!historyLoading && !sortedHistory.length && !historyError ? (
+        {!historyQuery.isLoading && !sortedHistory.length && !historyQuery.isError ? (
           <div className="rounded-2xl border border-dashed border-outline/60 bg-panel/20 px-6 py-10 text-center text-xs uppercase tracking-[0.24em] text-muted/80">
             No ratings yet.
           </div>
         ) : null}
 
-        {historyLoading ? (
-          <div className="grid gap-5 tablet:grid-cols-2 laptop:grid-cols-3" aria-busy="true" aria-label="Loading more rated albums">
+        {historyQuery.isLoading ? (
+          <div className="grid gap-5 tablet:grid-cols-2 laptop:grid-cols-3" aria-busy="true" aria-label="Loading rated albums">
             {Array.from({ length: 6 }).map((_, index) => (
-              <div key={index} className="space-y-4 rounded-3xl border border-outline/60 bg-panel/45 p-4">
-                <div className="aspect-square rounded-2xl bg-gradient-to-r from-black via-neutral-800 to-black bg-[length:320px_100%] animate-shimmer" />
+              <div key={index} className="space-y-4 rounded-3xl border border-outline/60 bg-panel/45 p-4 motion-safe:animate-pulse">
+                <div className="aspect-square rounded-2xl bg-white/[0.06]" />
                 <div className="h-5 w-3/4 rounded-full bg-outline/65" />
                 <div className="h-4 w-1/2 rounded-full bg-outline/50" />
               </div>
@@ -165,14 +151,15 @@ const ProfileHistory = () => {
           </div>
         ) : null}
 
-        {!historyLoading && nextCursor ? (
+        {historyQuery.hasNextPage ? (
           <div className="flex justify-center">
             <button
               type="button"
-              onClick={() => loadHistoryPage(nextCursor)}
-              className="inline-flex items-center gap-2 rounded-full border border-outline px-5 py-2 text-xs uppercase tracking-[0.2em] text-muted transition-colors hover:text-white"
+              disabled={historyQuery.isFetchingNextPage}
+              onClick={() => historyQuery.fetchNextPage()}
+              className="inline-flex items-center gap-2 rounded-full border border-outline px-5 py-2 text-xs uppercase tracking-[0.2em] text-muted transition-colors hover:text-white disabled:cursor-wait disabled:opacity-60"
             >
-              Load More
+              {historyQuery.isFetchingNextPage ? 'Loading' : 'Load More'}
             </button>
           </div>
         ) : null}
