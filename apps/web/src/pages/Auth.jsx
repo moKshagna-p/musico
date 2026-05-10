@@ -56,9 +56,10 @@ const Auth = () => {
         return
       }
 
-      const sessionResult = await refreshSession()
-      if (!sessionResult?.data?.user) {
-        setError('Authentication succeeded, but the session could not be restored. Try signing in once more.')
+      const authUser = result?.data?.user
+      const sessionResult = await refreshSession({ attempts: authUser ? 2 : 5, delayMs: 220 })
+      if (!authUser && !sessionResult?.data?.user) {
+        setError('Authentication succeeded, but the session is taking longer than expected. Refresh and try again.')
         return
       }
 

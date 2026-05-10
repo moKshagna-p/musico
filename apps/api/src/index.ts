@@ -74,7 +74,23 @@ export const createApp = (options?: ConstructorParameters<typeof Elysia>[0]) => 
     status: 'ok',
     uptimeSeconds: Math.floor(process.uptime()),
   }))
+  .get('/api/health', () => ({
+    status: 'ok',
+    uptimeSeconds: Math.floor(process.uptime()),
+  }))
   .get('/ready', async ({ set }) => {
+    try {
+      await db.execute(sql`select 1`)
+      return { status: 'ready' }
+    } catch (error) {
+      set.status = 503
+      return {
+        status: 'not_ready',
+        error: error instanceof Error ? error.message : 'Database unavailable.',
+      }
+    }
+  })
+  .get('/api/ready', async ({ set }) => {
     try {
       await db.execute(sql`select 1`)
       return { status: 'ready' }

@@ -17,8 +17,16 @@ export const useAuth = () => {
     })
 
   const signOutCurrentUser = async () => authClient.signOut()
-  const refreshSession = async () => {
-    await sessionState.refetch()
+  const refreshSession = async ({ attempts = 3, delayMs = 180 } = {}) => {
+    for (let attempt = 0; attempt < attempts; attempt += 1) {
+      await sessionState.refetch()
+      const sessionResult = await authClient.getSession()
+      if (sessionResult?.data?.user || attempt === attempts - 1) return sessionResult
+      await new Promise((resolve) => {
+        globalThis.setTimeout(resolve, delayMs)
+      })
+    }
+
     return authClient.getSession()
   }
 
