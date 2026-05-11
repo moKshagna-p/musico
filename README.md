@@ -71,6 +71,3 @@ We maintain reliability through comprehensive testing and linting:
 
 Contributions are welcome. If you have improvements or bug fixes, please open an issue or submit a pull request for review.
 
-## License
-
-Distributed under the MIT License. See `LICENSE` for details.
