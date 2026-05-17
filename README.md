@@ -26,7 +26,7 @@ Musico is built as a TypeScript monorepo managed by Turbo, ensuring a clean sepa
 | **Frontend** | React 18+, Vite, TailwindCSS, TanStack Query |
 | **Backend** | Bun, Elysia, Better Auth |
 | **Data** | PostgreSQL, Drizzle ORM |
-| **Tooling** | Turbo, Playwright, Vitest |
+| **Tooling** | Turbo, mprocs, Playwright, Vitest |
 
 ## Getting Started
 
@@ -57,7 +57,7 @@ Musico is built as a TypeScript monorepo managed by Turbo, ensuring a clean sepa
    ```bash
    bun run dev
    ```
-   The application will be available at `http://localhost:5173` with the API service at `http://localhost:4000`.
+   mprocs starts the web and API services in separate panes. The application will be available at `http://localhost:5173` with the API service at `http://localhost:4000`.
 
 ## Quality Standards
 
@@ -67,7 +67,18 @@ We maintain reliability through comprehensive testing and linting:
 - **Unit Testing**: `bun run test`
 - **E2E Testing**: `npx playwright test`
 
+## Release Workflow
+
+Normal pushes and pull requests run CI checks only. Production deployments run from the `Release` workflow when a `v*` tag is pushed or the workflow is started manually.
+
+Release deployments require these GitHub Actions secrets:
+
+- `CLOUDFLARE_API_TOKEN`
+- `CLOUDFLARE_ACCOUNT_ID`
+- `VERCEL_TOKEN`
+- `VERCEL_ORG_ID`
+- `VERCEL_PROJECT_ID`
+
 ## Contributing
 
 Contributions are welcome. If you have improvements or bug fixes, please open an issue or submit a pull request for review.
-

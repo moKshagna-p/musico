@@ -1,0 +1,8 @@
+procs:
+  web:
+    cwd: <CONFIG_DIR>/apps/web
+    shell: bun run dev
+  api:
+    cwd: <CONFIG_DIR>/apps/api
+    shell: bun run dev
+
