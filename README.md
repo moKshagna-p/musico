@@ -79,6 +79,20 @@ Release deployments require these GitHub Actions secrets:
 - `VERCEL_ORG_ID`
 - `VERCEL_PROJECT_ID`
 
+Store them as `production` environment secrets because the deploy jobs target the
+`production` GitHub Actions environment:
+
+```sh
+gh secret set CLOUDFLARE_API_TOKEN --env production
+gh secret set CLOUDFLARE_ACCOUNT_ID --env production
+gh secret set VERCEL_TOKEN --env production
+gh secret set VERCEL_ORG_ID --env production
+gh secret set VERCEL_PROJECT_ID --env production
+```
+
+If any of these are missing, the release workflow fails before attempting the
+Cloudflare Worker or Vercel deploy.
+
 ## Contributing
 
 Contributions are welcome. If you have improvements or bug fixes, please open an issue or submit a pull request for review.
