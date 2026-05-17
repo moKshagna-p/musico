@@ -9,15 +9,17 @@ import { attachMusicoCommunityStats } from '../core/utils'
 export const searchRoutes = new Elysia()
   .get('/api/search', async ({ query, set }) => {
     const q = String(query?.q ?? '').trim()
+    const limit = Number(query?.limit ?? 12)
+    const offset = Number(query?.offset ?? 0)
     if (!q) {
       set.status = 400
       return { error: 'Search query is required.' }
     }
 
     try {
-      const { data, correctedQuery } = await searchReleases(q)
+      const { data, correctedQuery, hasMore, nextOffset, total } = await searchReleases(q, { limit, offset })
       const withStats = await attachMusicoCommunityStats(data)
-      return { data: withStats, correctedQuery }
+      return { data: withStats, correctedQuery, hasMore, nextOffset, total }
     } catch (error) {
       set.status = 502
       return { error: 'Search service unavailable.' }

@@ -17,16 +17,19 @@ const SearchResults = () => {
   
   const initialQuery = searchParams.get('q') ?? ''
   const [query, setQuery] = useState(initialQuery)
+  const [resultLimit, setResultLimit] = useState(12)
   const lastLoggedQueryRef = useRef('')
 
   // Professional Fetching with TanStack Query
   const { 
     suggestions: albums, 
     isLoading: loading, 
+    isFetching,
     error, 
-    correctedQuery 
+    correctedQuery,
+    hasMore,
   } = useSearch(query, { 
-    limit: 12, // Smart engine result cap
+    limit: resultLimit,
     enabled: !!query 
   })
 
@@ -43,6 +46,7 @@ const SearchResults = () => {
   // Handle Search Submission
   const handleSearch = (newQuery) => {
     setQuery(newQuery)
+    setResultLimit(12)
     if (newQuery?.trim()) {
       addToSearchHistory(newQuery, user?.id ?? 'guest')
       logSearch(newQuery)
@@ -89,6 +93,18 @@ const SearchResults = () => {
               correctedQuery={correctedQuery}
               onSelect={(id) => navigate(`/album/${id}`, { state: { from: '/search', query } })}
             />
+            {!loading && !error && hasMore && (
+              <div className="mt-8 flex justify-center">
+                <button
+                  type="button"
+                  onClick={() => setResultLimit((current) => current + 12)}
+                  disabled={isFetching}
+                  className="rounded-full border border-outline px-6 py-3 text-xs font-bold uppercase tracking-[0.24em] text-white transition hover:border-white/40 hover:bg-white/10 disabled:cursor-wait disabled:opacity-60"
+                >
+                  {isFetching ? 'Loading' : 'Load More'}
+                </button>
+              </div>
+            )}
           </div>
         )}
       </div>

@@ -29,13 +29,14 @@ const FEATURED_RETRY_COOLDOWN_MS = env.FEATURED_RETRY_COOLDOWN_MS
 const SEARCH_RETRY_COOLDOWN_MS = env.SEARCH_RETRY_COOLDOWN_MS
 const FEATURED_REFRESH_SIZE = 50
 const FEATURED_DETAIL_HYDRATION_LIMIT = env.FEATURED_DETAIL_HYDRATION_LIMIT
-const SEARCH_CACHE_VERSION = 'v9'
+const SEARCH_CACHE_VERSION = 'v10'
 const SEARCH_RESULTS_PER_PAGE = 50
 const SEARCH_MAX_PAGES = env.SEARCH_MAX_PAGES
 const SEARCH_QUERY_PAGES = env.SEARCH_QUERY_PAGES
 const SEARCH_MIN_RESULTS_BEFORE_PAGING = env.SEARCH_MIN_RESULTS_BEFORE_PAGING
 const SEARCH_ARTIST_CANDIDATE_LIMIT = 3
 const SMART_SEARCH_RESULT_LIMIT = 12
+const EXPANDED_SEARCH_RESULT_LIMIT = 60
 const SMART_SEARCH_PRIMARY_LIMIT = 6
 const SMART_SEARCH_STRONG_MATCH_THRESHOLD = 0.72
 const SMART_SEARCH_CLOSE_MATCH_THRESHOLD = 0.56
@@ -56,6 +57,7 @@ const releaseRequestsInFlight = new Map<string, Promise<ReleaseDetails>>()
 type RankedSearchBatch = {
   data: ReleaseSummary[]
   bestMatchScore: number
+  total: number
 }
 
 const featuredRefreshInFlight = new Map<string, Promise<ReleaseSummary[]>>()
@@ -789,7 +791,12 @@ const scoreReleaseAgainstQuery = (release: ReleaseSummary, sourceQuery: string):
   }
 }
 
-const buildSmartSearchResults = (releases: ReleaseSummary[], sourceQuery: string): RankedSearchBatch => {
+const buildSmartSearchResults = (
+  releases: ReleaseSummary[],
+  sourceQuery: string,
+  limit = SMART_SEARCH_RESULT_LIMIT,
+): RankedSearchBatch => {
+  const safeLimit = Math.min(Math.max(Math.round(limit), 1), EXPANDED_SEARCH_RESULT_LIMIT)
   const ranked = dedupeByReleaseId(releases)
     .map((release) => scoreReleaseAgainstQuery(release, sourceQuery))
     .filter((entry) => entry.intentScore > 0)
@@ -804,10 +811,11 @@ const buildSmartSearchResults = (releases: ReleaseSummary[], sourceQuery: string
   const bestMatchScore = ranked[0]?.intentScore ?? 0
 
   const exactMatches = ranked.filter((entry) => entry.isExactNameMatch || entry.isExactArtistMatch)
-  if (exactMatches.length > SMART_SEARCH_RESULT_LIMIT) {
+  if (exactMatches.length > safeLimit) {
     return {
-      data: exactMatches.map((entry) => entry.release),
+      data: exactMatches.slice(0, safeLimit).map((entry) => entry.release),
       bestMatchScore,
+      total: exactMatches.length,
     }
   }
 
@@ -821,7 +829,7 @@ const buildSmartSearchResults = (releases: ReleaseSummary[], sourceQuery: string
   const strongPrimary = remainingRanked.filter((entry) => entry.intentScore >= SMART_SEARCH_STRONG_MATCH_THRESHOLD)
   const closePrimary = remainingRanked.filter((entry) => entry.intentScore >= SMART_SEARCH_CLOSE_MATCH_THRESHOLD)
   const primaryPool = strongPrimary.length ? strongPrimary : closePrimary.length ? closePrimary : remainingRanked
-  const primarySlots = Math.max(0, SMART_SEARCH_PRIMARY_LIMIT - selected.size)
+  const primarySlots = Math.max(0, Math.min(SMART_SEARCH_PRIMARY_LIMIT, safeLimit) - selected.size)
   const primary = primaryPool.slice(0, primarySlots)
   primary.forEach((entry) => {
     selected.set(entry.release.id, entry.release)
@@ -850,21 +858,22 @@ const buildSmartSearchResults = (releases: ReleaseSummary[], sourceQuery: string
     })
 
   for (const entry of similar) {
-    if (selected.size >= SMART_SEARCH_RESULT_LIMIT) break
+    if (selected.size >= safeLimit) break
     selected.set(entry.release.id, entry.release)
   }
 
-  if (selected.size < SMART_SEARCH_RESULT_LIMIT) {
+  if (selected.size < safeLimit) {
     for (const entry of remainingRanked) {
-      if (selected.size >= SMART_SEARCH_RESULT_LIMIT) break
+      if (selected.size >= safeLimit) break
       if (selected.has(entry.release.id)) continue
       selected.set(entry.release.id, entry.release)
     }
   }
 
   return {
-    data: Array.from(selected.values()).slice(0, SMART_SEARCH_RESULT_LIMIT),
+    data: Array.from(selected.values()).slice(0, safeLimit),
     bestMatchScore,
+    total: ranked.length,
   }
 }
 
@@ -1252,10 +1261,10 @@ const refreshSearchQuery = async (queryHash: string, normalizedQuery: string, so
     })
 
     const rankedChronological = dedupeByReleaseId(sortReleasedAlbumsChronologically(curated, artistCandidates))
-    const smart = buildSmartSearchResults(rankedChronological, sourceQuery)
+    const expanded = buildSmartSearchResults(rankedChronological, sourceQuery, EXPANDED_SEARCH_RESULT_LIMIT)
 
-    await upsertSearchCache(queryHash, normalizedQuery, smart.data)
-    return smart
+    await upsertSearchCache(queryHash, normalizedQuery, expanded.data)
+    return expanded
   })()
 
   searchRefreshInFlight.set(queryHash, refreshPromise)
@@ -1267,12 +1276,47 @@ const refreshSearchQuery = async (queryHash: string, normalizedQuery: string, so
 export interface SearchResult {
   data: ReleaseSummary[]
   correctedQuery?: string
+  hasMore?: boolean
+  nextOffset?: number | null
+  total?: number
 }
 
-export const searchReleases = async (query: string): Promise<SearchResult> => {
+type SearchOptions = {
+  limit?: number
+  offset?: number
+}
+
+const clampSearchLimit = (value: unknown) => {
+  const numeric = Number(value)
+  if (!Number.isFinite(numeric)) return SMART_SEARCH_RESULT_LIMIT
+  return Math.min(Math.max(Math.round(numeric), 1), EXPANDED_SEARCH_RESULT_LIMIT)
+}
+
+const clampSearchOffset = (value: unknown) => {
+  const numeric = Number(value)
+  if (!Number.isFinite(numeric)) return 0
+  return Math.min(Math.max(Math.round(numeric), 0), EXPANDED_SEARCH_RESULT_LIMIT - 1)
+}
+
+const pageSearchBatch = (batch: RankedSearchBatch, limit: number, offset: number): SearchResult => {
+  const total = batch.total || batch.data.length
+  const data = batch.data.slice(offset, offset + limit)
+  const nextOffset = offset + data.length
+
+  return {
+    data,
+    hasMore: nextOffset < total && nextOffset < EXPANDED_SEARCH_RESULT_LIMIT,
+    nextOffset: nextOffset < total && nextOffset < EXPANDED_SEARCH_RESULT_LIMIT ? nextOffset : null,
+    total,
+  }
+}
+
+export const searchReleases = async (query: string, options: SearchOptions = {}): Promise<SearchResult> => {
   const trimmed = query?.trim()
   if (!trimmed) return { data: [] }
 
+  const limit = clampSearchLimit(options.limit)
+  const offset = clampSearchOffset(options.offset)
   const normalizedQuery = normalizeCacheQuery(trimmed)
   const queryHash = createQueryHash(normalizedQuery)
   const cached = await getCachedSearch(queryHash)
@@ -1294,7 +1338,7 @@ export const searchReleases = async (query: string): Promise<SearchResult> => {
       isNotExpired(correctedCached?.expiresAt) &&
       (!shouldRefreshSummaryPayload(correctedPayload) || correctedRecentRefresh)
     ) {
-      return buildSmartSearchResults(correctedPayload, corrected)
+      return buildSmartSearchResults(correctedPayload, corrected, EXPANDED_SEARCH_RESULT_LIMIT)
     }
 
     return refreshSearchQuery(correctedHash, correctedNorm, corrected)
@@ -1305,9 +1349,9 @@ export const searchReleases = async (query: string): Promise<SearchResult> => {
     isNotExpired(cached?.expiresAt) &&
     (!shouldRefreshSummaryPayload(cachedPayload) || recentRefresh)
   ) {
-    const cachedSmart = buildSmartSearchResults(cachedPayload, trimmed)
+    const cachedSmart = buildSmartSearchResults(cachedPayload, trimmed, EXPANDED_SEARCH_RESULT_LIMIT)
     if (cachedSmart.bestMatchScore >= SMART_SEARCH_CORRECTION_TRIGGER_SCORE) {
-      return { data: cachedSmart.data }
+      return pageSearchBatch(cachedSmart, limit, offset)
     }
 
     try {
@@ -1315,25 +1359,25 @@ export const searchReleases = async (query: string): Promise<SearchResult> => {
       if (corrected && normalizeSearchValue(corrected) !== normalizeSearchValue(trimmed)) {
         const correctedSmart = await getCorrectedSearchResults(corrected)
         if (correctedSmart.bestMatchScore > cachedSmart.bestMatchScore) {
-          return { data: correctedSmart.data, correctedQuery: corrected }
+          return { ...pageSearchBatch(correctedSmart, limit, offset), correctedQuery: corrected }
         }
       }
     } catch {
       // Ignore correction lookup failures and fall back to cached results.
     }
 
-    return { data: cachedSmart.data }
+    return pageSearchBatch(cachedSmart, limit, offset)
   }
 
   try {
     const results = await refreshSearchQuery(queryHash, normalizedQuery, trimmed)
 
     if (results.data.length && results.bestMatchScore >= SMART_SEARCH_CORRECTION_TRIGGER_SCORE) {
-      return { data: results.data }
+      return pageSearchBatch(results, limit, offset)
     }
 
     if (results.data.length && results.bestMatchScore >= SMART_SEARCH_CLOSE_MATCH_THRESHOLD) {
-      return { data: results.data }
+      return pageSearchBatch(results, limit, offset)
     }
 
     // ─── Fuzzy fallback: try to find an approximate match ────────────
@@ -1341,15 +1385,15 @@ export const searchReleases = async (query: string): Promise<SearchResult> => {
     if (corrected && normalizeSearchValue(corrected) !== normalizeSearchValue(trimmed)) {
       const correctedResults = await getCorrectedSearchResults(corrected)
       if (correctedResults.data.length && correctedResults.bestMatchScore > results.bestMatchScore) {
-        return { data: correctedResults.data, correctedQuery: corrected }
+        return { ...pageSearchBatch(correctedResults, limit, offset), correctedQuery: corrected }
       }
     }
 
-    return { data: results.data }
+    return pageSearchBatch(results, limit, offset)
   } catch {
     if (cachedPayload.length) {
-      const cachedSmart = buildSmartSearchResults(cachedPayload, trimmed)
-      return { data: cachedSmart.data }
+      const cachedSmart = buildSmartSearchResults(cachedPayload, trimmed, EXPANDED_SEARCH_RESULT_LIMIT)
+      return pageSearchBatch(cachedSmart, limit, offset)
     }
     throw new Error('Search unavailable right now. Please try again shortly.')
   }

@@ -4,7 +4,7 @@ import { z } from 'zod'
 const CACHE_WINDOW = 1000 * 60 * 60 // 1 hour
 const FEATURED_CACHE_WINDOW = 1000 * 60 * 5 // 5 minutes
 const DETAILS_CACHE_WINDOW = 1000 * 60 * 60 * 24 // 24 hours
-const SEARCH_CACHE_VERSION = 'v4'
+const SEARCH_CACHE_VERSION = 'v5'
 
 const featuredCache = { timestamp: 0, data: [] }
 const recentPopularCache = { timestamp: 0, data: [] }
@@ -242,29 +242,40 @@ export const getHomeSections = async (options = {}) => {
 
 export const searchReleases = async (query, options = {}) => {
   const trimmed = query?.trim()
-  if (!trimmed) return { data: [], correctedQuery: null }
+  if (!trimmed) return { data: [], correctedQuery: null, hasMore: false, nextOffset: null, total: 0 }
 
-  const cacheKey = `musico:search:${SEARCH_CACHE_VERSION}:${trimmed.toLowerCase()}`
+  const limit = Number.isFinite(Number(options.limit)) ? Math.max(1, Math.round(Number(options.limit))) : 12
+  const offset = Number.isFinite(Number(options.offset)) ? Math.max(0, Math.round(Number(options.offset))) : 0
+  const cacheKey = `musico:search:${SEARCH_CACHE_VERSION}:${trimmed.toLowerCase()}:${limit}:${offset}`
   const cached = storage.get(cacheKey)
   if (cached && isFresh(cached.timestamp, CACHE_WINDOW)) {
-    return { data: cached.data, correctedQuery: cached.correctedQuery ?? null }
+    return {
+      data: cached.data,
+      correctedQuery: cached.correctedQuery ?? null,
+      hasMore: Boolean(cached.hasMore),
+      nextOffset: cached.nextOffset ?? null,
+      total: Number(cached.total ?? cached.data?.length ?? 0),
+    }
   }
 
   const response = await validatedRequest({ 
     url: '/api/search', 
-    params: { q: trimmed },
+    params: { q: trimmed, limit, offset },
     signal: options.signal 
   })
   const data = Array.isArray(response?.data) ? response.data : []
   const correctedQuery = response?.correctedQuery ?? null
+  const hasMore = Boolean(response?.hasMore)
+  const nextOffset = Number.isFinite(Number(response?.nextOffset)) ? Number(response.nextOffset) : null
+  const total = Number.isFinite(Number(response?.total)) ? Number(response.total) : data.length
   
   const result = AlbumArraySchema.safeParse(data)
   if (!result.success) {
     console.warn('[Validation Warning] Search results malformed:', result.error.format())
   }
 
-  storage.set(cacheKey, { data, correctedQuery, timestamp: Date.now() })
-  return { data, correctedQuery }
+  storage.set(cacheKey, { data, correctedQuery, hasMore, nextOffset, total, timestamp: Date.now() })
+  return { data, correctedQuery, hasMore, nextOffset, total }
 }
 
 export const getReleaseDetails = async (releaseId) => {

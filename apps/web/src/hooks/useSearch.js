@@ -6,7 +6,7 @@ import { useEffect, useState } from 'react'
  * Professional Search Hook
  * Handles: Debouncing, Request Cancellation, and Deduplication via TanStack Query.
  */
-export const useSearch = (query, { enabled = true, limit = 5 } = {}) => {
+export const useSearch = (query, { enabled = true, limit = 5, offset = 0 } = {}) => {
   const [debouncedQuery, setDebouncedQuery] = useState(query)
 
   // 1. Debounce the query locally to avoid firing requests on every keystroke
@@ -21,13 +21,13 @@ export const useSearch = (query, { enabled = true, limit = 5 } = {}) => {
   // It automatically handles request cancellation (if we use the signal) 
   // and deduplication.
   const queryResult = useQuery({
-    queryKey: ['search', debouncedQuery, limit],
+    queryKey: ['search', debouncedQuery, limit, offset],
     queryFn: async ({ signal }) => {
       if (!debouncedQuery || debouncedQuery.length < 3) {
-        return { data: [], correctedQuery: null }
+        return { data: [], correctedQuery: null, hasMore: false, nextOffset: null, total: 0 }
       }
       
-      return searchReleases(debouncedQuery, { signal })
+      return searchReleases(debouncedQuery, { signal, limit, offset })
     },
     enabled: enabled && debouncedQuery.length >= 3,
     staleTime: 1000 * 60 * 5, // Cache search results for 5 minutes
@@ -35,7 +35,10 @@ export const useSearch = (query, { enabled = true, limit = 5 } = {}) => {
 
   return {
     ...queryResult,
-    suggestions: queryResult.data?.data?.slice(0, limit) ?? [],
+    suggestions: queryResult.data?.data ?? [],
     correctedQuery: queryResult.data?.correctedQuery ?? null,
+    hasMore: Boolean(queryResult.data?.hasMore),
+    nextOffset: queryResult.data?.nextOffset ?? null,
+    total: queryResult.data?.total ?? 0,
   }
 }
