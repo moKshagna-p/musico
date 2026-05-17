@@ -13,6 +13,7 @@ import { useInfiniteScroll } from '../hooks/useInfiniteScroll.js'
 const HOME_SECTION_INITIAL_LIMIT = 12
 // Load 12 more albums when user scrolls to the bottom
 const HOME_SECTION_PAGE_SIZE = 12
+const HOME_SECTION_FETCH_LIMIT = 24
 
 const Home = () => {
   const navigate = useNavigate()
@@ -22,11 +23,11 @@ const Home = () => {
   // Query fetches a larger set than we initially display
   // This allows pagination without additional API calls
   const homeSectionsQuery = useQuery({
-    queryKey: ['home-sections', HOME_SECTION_INITIAL_LIMIT, HOME_SECTION_INITIAL_LIMIT],
+    queryKey: ['home-sections', HOME_SECTION_FETCH_LIMIT, HOME_SECTION_FETCH_LIMIT],
     queryFn: () =>
       getHomeSections({
-        happeningLimit: HOME_SECTION_INITIAL_LIMIT,
-        recentLimit: HOME_SECTION_INITIAL_LIMIT,
+        happeningLimit: HOME_SECTION_FETCH_LIMIT,
+        recentLimit: HOME_SECTION_FETCH_LIMIT,
       }),
     staleTime: 1000 * 60 * 5,
   })

@@ -30,4 +30,17 @@ export default {
       )
     }
   },
+
+  async scheduled(_controller: ScheduledController, env: CloudflareEnv, context: ExecutionContext) {
+    ;(globalThis as unknown as { __MUSICO_WORKER_ENV__?: CloudflareEnv }).__MUSICO_WORKER_ENV__ = env
+
+    context.waitUntil(
+      (async () => {
+        const { refreshStoredHomeAlbums } = await import('./src/services/trending')
+        await refreshStoredHomeAlbums({ happeningLimit: 24, recentLimit: 24 })
+      })().catch((error) => {
+        console.error('[worker.scheduled] homepage refresh failed', error)
+      }),
+    )
+  },
 }
