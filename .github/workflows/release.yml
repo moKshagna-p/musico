@@ -169,7 +169,7 @@ jobs:
 
       - name: Pull Vercel environment
         working-directory: apps/web
-        run: bunx vercel pull --yes --environment=production --token="${VERCEL_TOKEN}"
+        run: npx vercel pull --yes --environment=production --token="${VERCEL_TOKEN}"
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
@@ -177,7 +177,7 @@ jobs:
 
       - name: Build Vercel project
         working-directory: apps/web
-        run: bunx vercel build --prod --token="${VERCEL_TOKEN}"
+        run: npx vercel build --prod --token="${VERCEL_TOKEN}"
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
@@ -185,7 +185,7 @@ jobs:
 
       - name: Deploy Vercel project
         working-directory: apps/web
-        run: bunx vercel deploy --prebuilt --prod --token="${VERCEL_TOKEN}"
+        run: npx vercel deploy --prebuilt --prod --token="${VERCEL_TOKEN}"
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
