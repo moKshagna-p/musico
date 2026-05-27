@@ -2,11 +2,11 @@
   "rewrites": [
       {
         "source": "/api/:path*",
-        "destination": "https://musico.mokshagnareddy45.workers.dev/api/:path*"
+        "destination": "https://musico-api.mokshagnareddy45.workers.dev/api/:path*"
       },
       {
         "source": "/api",
-        "destination": "https://musico.mokshagnareddy45.workers.dev/api"
+        "destination": "https://musico-api.mokshagnareddy45.workers.dev/api"
       },
       {
         "source": "/((?!api).*)",
