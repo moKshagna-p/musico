@@ -9,12 +9,8 @@
       "dependsOn": ["^build"],
       "outputs": ["dist/**"]
     },
-    "lint": {
-      "dependsOn": ["^lint"]
-    },
-    "test": {
-      "dependsOn": ["^test"]
-    },
+    "lint": {},
+    "test": {},
     "preview": {
       "cache": false,
       "persistent": true

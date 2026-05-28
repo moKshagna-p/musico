@@ -15,8 +15,12 @@ dist-ssr
 *.local
 apps/api/auth.db
 .turbo/
+.dist/
+.vercel/
+.antigravitycli/
 playwright-report/
 test-results/
+release-summary.md
 
 # Editor directories and files
 .vscode/*
