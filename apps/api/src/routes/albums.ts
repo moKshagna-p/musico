@@ -43,7 +43,9 @@ export const albumRoutes = new Elysia({ prefix: '/api' })
         : []
 
       const allFailed = mostHappening.status === 'rejected' && recentReleases.status === 'rejected'
-      if (allFailed) set.status = 502
+      if (allFailed) {
+        console.warn('[home] both sections failed, returning empty data')
+      }
 
       set.headers ??= {}
       set.headers['Cache-Control'] = 'public, max-age=60'

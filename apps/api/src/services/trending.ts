@@ -329,53 +329,67 @@ const mergeStoredSnapshot = async (mode: StoredMode, incoming: ReleaseSummary[],
 }
 
 export const getStoredTrendingAlbums = async (limit = 24, mode: StoredMode = DEFAULT_MODE) => {
-  const safeLimit = clampLimit(limit)
-  const latestSnapshot = await db
-    .select({
-      lastSeenAt: sql<Date | null>`max(${storedTrendingAlbum.lastSeenAt})`,
-    })
-    .from(storedTrendingAlbum)
-    .where(eq(storedTrendingAlbum.mode, mode))
+  try {
+    const safeLimit = clampLimit(limit)
+    const latestSnapshot = await db
+      .select({
+        lastSeenAt: sql<Date | null>`max(${storedTrendingAlbum.lastSeenAt})`,
+      })
+      .from(storedTrendingAlbum)
+      .where(eq(storedTrendingAlbum.mode, mode))
 
-  const snapshotAt = toDateOrNull(latestSnapshot[0]?.lastSeenAt)
-  if (!snapshotAt) return []
+    const snapshotAt = toDateOrNull(latestSnapshot[0]?.lastSeenAt)
+    if (!snapshotAt) return []
 
-  const rows = await db
-    .select()
-    .from(storedTrendingAlbum)
-    .where(and(eq(storedTrendingAlbum.mode, mode), eq(storedTrendingAlbum.lastSeenAt, snapshotAt)))
-    .orderBy(asc(storedTrendingAlbum.rank))
-    .limit(safeLimit)
+    const rows = await db
+      .select()
+      .from(storedTrendingAlbum)
+      .where(and(eq(storedTrendingAlbum.mode, mode), eq(storedTrendingAlbum.lastSeenAt, snapshotAt)))
+      .orderBy(asc(storedTrendingAlbum.rank))
+      .limit(safeLimit)
 
-  return rows.map(
-    (row): ReleaseSummary => ({
-      id: row.albumId,
-      name: row.name,
-      artists: Array.isArray(row.artists) ? row.artists : [],
-      releaseDate: row.releaseDate ?? null,
-      releaseYear: row.releaseYear ?? null,
-      cover: row.cover,
-      totalTracks: row.totalTracks,
-      albumType: row.albumType,
-      label: row.label ?? undefined,
-      popularity: row.popularity,
-      external_urls: row.externalUrls ?? {},
-      genres: Array.isArray(row.genres) ? row.genres : [],
-      communityRating: Number(row.communityRating ?? 0),
-      reviewCount: row.reviewCount,
-    }),
-  )
+    return rows.map(
+      (row): ReleaseSummary => ({
+        id: row.albumId,
+        name: row.name,
+        artists: Array.isArray(row.artists) ? row.artists : [],
+        releaseDate: row.releaseDate ?? null,
+        releaseYear: row.releaseYear ?? null,
+        cover: row.cover,
+        totalTracks: row.totalTracks,
+        albumType: row.albumType,
+        label: row.label ?? undefined,
+        popularity: row.popularity,
+        external_urls: row.externalUrls ?? {},
+        genres: Array.isArray(row.genres) ? row.genres : [],
+        communityRating: Number(row.communityRating ?? 0),
+        reviewCount: row.reviewCount,
+      }),
+    )
+  } catch (error) {
+    if (isStoredTrendingTableMissingError(error)) {
+      return []
+    }
+    throw error
+  }
 }
 
 const getLatestStoredSnapshotAt = async (mode: StoredMode = DEFAULT_MODE) => {
-  const latestSnapshot = await db
-    .select({
-      lastSeenAt: sql<Date | null>`max(${storedTrendingAlbum.lastSeenAt})`,
-    })
-    .from(storedTrendingAlbum)
-    .where(eq(storedTrendingAlbum.mode, mode))
+  try {
+    const latestSnapshot = await db
+      .select({
+        lastSeenAt: sql<Date | null>`max(${storedTrendingAlbum.lastSeenAt})`,
+      })
+      .from(storedTrendingAlbum)
+      .where(eq(storedTrendingAlbum.mode, mode))
 
-  return toDateOrNull(latestSnapshot[0]?.lastSeenAt)
+    return toDateOrNull(latestSnapshot[0]?.lastSeenAt)
+  } catch (error) {
+    if (isStoredTrendingTableMissingError(error)) {
+      return null
+    }
+    throw error
+  }
 }
 
 const isStoredSnapshotFresh = (snapshotAt: Date | null) =>
@@ -407,7 +421,13 @@ export const refreshStoredTrendingAlbums = async (mode: StoredMode = DEFAULT_MOD
 
 export const getStoredTrendingAlbumsEnsuringFresh = async (limit = 24, mode: StoredMode = DEFAULT_MODE) => {
   const safeLimit = clampLimit(limit)
-  const latestSnapshotAt = await getLatestStoredSnapshotAt(mode)
+  let latestSnapshotAt: Date | null = null
+
+  try {
+    latestSnapshotAt = await getLatestStoredSnapshotAt(mode)
+  } catch {
+    // If the table doesn't exist, treat as no snapshot available.
+  }
 
   if (isStoredSnapshotFresh(latestSnapshotAt)) {
     return getStoredTrendingAlbums(safeLimit, mode)
@@ -420,7 +440,8 @@ export const getStoredTrendingAlbumsEnsuringFresh = async (limit = 24, mode: Sto
     if (latestSnapshotAt) {
       return getStoredTrendingAlbums(safeLimit, mode)
     }
-    throw error
+    console.warn('[trending] refresh failed, returning empty', { mode, limit: safeLimit, error: String(error) })
+    return []
   }
 }
 
