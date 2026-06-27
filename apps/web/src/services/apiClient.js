@@ -1,6 +1,6 @@
 import axios from 'axios'
 import { z } from 'zod'
-import { API_BASE_URL } from './authClient.js'
+import { API_BASE_URL } from './config.js'
 
 // ── Axios Instance ──
 const api = axios.create({
