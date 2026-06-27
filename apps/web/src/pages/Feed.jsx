@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { FiLock, FiRefreshCw, FiSearch, FiX, FiUsers, FiMusic } from 'react-icons/fi'
-import { motion, AnimatePresence, useReducedMotion } from 'framer-motion'
 
 import ActivityCard from '../components/user/ActivityCard.jsx'
 import FollowButton from '../components/user/FollowButton.jsx'
@@ -10,8 +9,6 @@ import PageTransition from '../components/ui/PageTransition.jsx'
 import { useAuth } from '../hooks/useAuth.js'
 import useFeed from '../hooks/useFeed.js'
 import { searchUsers } from '../services/socialService.js'
-
-const Motion = motion
 
 // ── User Search Panel ──
 
@@ -65,8 +62,6 @@ const UserSearchPanel = () => {
     return () => clearTimeout(debounceRef.current)
   }, [])
 
-  const shouldReduceMotion = useReducedMotion()
-
   return (
     <div className="relative">
       {/* Search Input */}
@@ -110,51 +105,40 @@ const UserSearchPanel = () => {
       </div>
 
       {/* Search Results */}
-      <AnimatePresence>
-        {(hasSearched || loading) && (
-          <Motion.div
-            initial={shouldReduceMotion ? false : { opacity: 0, y: -4 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={shouldReduceMotion ? { opacity: 0 } : { opacity: 0, y: -4 }}
-            transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
-            className="mt-3 overflow-hidden rounded-2xl border border-outline/60 bg-panel/60 backdrop-blur-sm"
-            role="region"
-            aria-label="Search results"
-            aria-live="polite"
-          >
-            {loading ? (
-              <div className="space-y-1 p-2">
-                {[1, 2, 3].map((i) => (
-                  <div key={i} className="flex items-center gap-3 rounded-xl px-3 py-3">
-                    <div className="h-10 w-10 animate-pulse rounded-full bg-white/5" />
-                    <div className="flex-1 space-y-2">
-                      <div className="h-3.5 w-24 animate-pulse rounded bg-white/5" />
-                      <div className="h-3 w-16 animate-pulse rounded bg-white/5" />
-                    </div>
+      {(hasSearched || loading) && (
+        <div
+          className="mt-3 overflow-hidden rounded-2xl border border-outline/60 bg-panel/60 backdrop-blur-sm animate-[fade-in_0.15s_ease-out]"
+          role="region"
+          aria-label="Search results"
+          aria-live="polite"
+        >
+          {loading ? (
+            <div className="space-y-1 p-2">
+              {[1, 2, 3].map((i) => (
+                <div key={i} className="flex items-center gap-3 rounded-xl px-3 py-3">
+                  <div className="h-10 w-10 animate-pulse rounded-full bg-white/5" />
+                  <div className="flex-1 space-y-2">
+                    <div className="h-3.5 w-24 animate-pulse rounded bg-white/5" />
+                    <div className="h-3 w-16 animate-pulse rounded bg-white/5" />
                   </div>
-                ))}
-              </div>
-            ) : results.length === 0 ? (
-              <div className="px-4 py-6 text-center">
-                <p className="text-sm text-muted/70">No users found for &ldquo;{query}&rdquo;</p>
-              </div>
-            ) : (
-              <div className="p-2">
-                {results.map((person, i) => (
-                  <Motion.div
-                    key={person.userId}
-                    initial={shouldReduceMotion ? false : { opacity: 0, x: -8 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: i * 0.04, duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
-                  >
-                    <UserSearchResult person={person} />
-                  </Motion.div>
-                ))}
-              </div>
-            )}
-          </Motion.div>
-        )}
-      </AnimatePresence>
+                </div>
+              ))}
+            </div>
+          ) : results.length === 0 ? (
+            <div className="px-4 py-6 text-center">
+              <p className="text-sm text-muted/70">No users found for &ldquo;{query}&rdquo;</p>
+            </div>
+          ) : (
+            <div className="p-2">
+              {results.map((person) => (
+                <div key={person.userId}>
+                  <UserSearchResult person={person} />
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   )
 }
@@ -205,68 +189,59 @@ const UserSearchResult = ({ person }) => {
 
 // ── Empty State ──
 
-const EmptyFeed = ({ navigate }) => {
-  const shouldReduceMotion = useReducedMotion()
+const EmptyFeed = ({ navigate }) => (
+  <div className="mt-4 overflow-hidden rounded-2xl border border-outline/40 animate-[fade-in_0.3s_ease-out]">
+    {/* Decorative header band */}
+    <div className="relative overflow-hidden bg-gradient-to-br from-white/[0.03] to-transparent px-8 pb-2 pt-10">
+      <div className="absolute -right-6 -top-6 h-32 w-32 rounded-full bg-white/[0.02] blur-2xl" aria-hidden="true" />
+      <div className="absolute -left-4 bottom-0 h-20 w-20 rounded-full bg-white/[0.015] blur-xl" aria-hidden="true" />
 
-  return (
-    <Motion.div
-      initial={shouldReduceMotion ? false : { opacity: 0, y: 12 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
-      className="mt-4 overflow-hidden rounded-2xl border border-outline/40"
-    >
-      {/* Decorative header band */}
-      <div className="relative overflow-hidden bg-gradient-to-br from-white/[0.03] to-transparent px-8 pb-2 pt-10">
-        <div className="absolute -right-6 -top-6 h-32 w-32 rounded-full bg-white/[0.02] blur-2xl" aria-hidden="true" />
-        <div className="absolute -left-4 bottom-0 h-20 w-20 rounded-full bg-white/[0.015] blur-xl" aria-hidden="true" />
-
-        <div className="relative flex items-center gap-4">
-          <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white/[0.06] ring-1 ring-white/10">
-            <FiMusic className="h-6 w-6 text-white/50" aria-hidden="true" />
-          </div>
-          <div>
-            <h2 className="font-display text-xl font-bold text-white" style={{ textWrap: 'balance' }}>
-              Your Feed Is Quiet
-            </h2>
-            <p className="mt-0.5 text-sm text-muted/70">
-              Follow music lovers to see what they&rsquo;re listening to
-            </p>
-          </div>
+      <div className="relative flex items-center gap-4">
+        <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white/[0.06] ring-1 ring-white/10">
+          <FiMusic className="h-6 w-6 text-white/50" aria-hidden="true" />
+        </div>
+        <div>
+          <h2 className="font-display text-xl font-bold text-white" style={{ textWrap: 'balance' }}>
+            Your Feed Is Quiet
+          </h2>
+          <p className="mt-0.5 text-sm text-muted/70">
+            Follow music lovers to see what they&rsquo;re listening to
+          </p>
         </div>
       </div>
+    </div>
 
-      {/* Steps */}
-      <div className="space-y-0 px-8 py-6">
-        <Step
-          number="1"
-          title="Find People"
-          description="Use the search bar above to discover other users"
-        />
-        <Step
-          number="2"
-          title="Follow Them"
-          description="Hit the follow button to see their activity"
-        />
-        <Step
-          number="3"
-          title="See Their Taste"
-          description="Ratings, reviews, and lists will appear right here"
-        />
-      </div>
+    {/* Steps */}
+    <div className="space-y-0 px-8 py-6">
+      <Step
+        number="1"
+        title="Find People"
+        description="Use the search bar above to discover other users"
+      />
+      <Step
+        number="2"
+        title="Follow Them"
+        description="Hit the follow button to see their activity"
+      />
+      <Step
+        number="3"
+        title="See Their Taste"
+        description="Ratings, reviews, and lists will appear right here"
+      />
+    </div>
 
-      <div className="border-t border-outline/40 px-8 py-5">
-        <button
-          type="button"
-          onClick={() => navigate('/discover')}
-          className="inline-flex items-center gap-2 rounded-full bg-white px-5 py-2.5 text-xs font-semibold uppercase tracking-[0.2em] text-canvas transition-all hover:opacity-90 hover:shadow-[0_0_20px_rgba(255,255,255,0.1)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
-        >
-          <FiUsers className="h-3.5 w-3.5" aria-hidden="true" />
-          Discover Music
-        </button>
-      </div>
-    </Motion.div>
-  )
-}
+    <div className="border-t border-outline/40 px-8 py-5">
+      <button
+        type="button"
+        onClick={() => navigate('/discover')}
+        className="inline-flex items-center gap-2 rounded-full bg-white px-5 py-2.5 text-xs font-semibold uppercase tracking-[0.2em] text-canvas transition-all hover:opacity-90 hover:shadow-[0_0_20px_rgba(255,255,255,0.1)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
+      >
+        <FiUsers className="h-3.5 w-3.5" aria-hidden="true" />
+        Discover Music
+      </button>
+    </div>
+  </div>
+)
 
 const Step = ({ number, title, description }) => (
   <div className="flex items-start gap-4 py-3">
@@ -309,7 +284,6 @@ const Feed = () => {
   const navigate = useNavigate()
   const { user, isPending } = useAuth()
   const { items, loading, loadingMore, error, hasMore, loadMore, refresh } = useFeed()
-  const shouldReduceMotion = useReducedMotion()
 
   useEffect(() => {
     if (!isPending && !user) {
@@ -363,12 +337,7 @@ const Feed = () => {
           {loading && !items.length ? (
             <FeedSkeleton />
           ) : error ? (
-            <Motion.div
-              initial={shouldReduceMotion ? false : { opacity: 0 }}
-              animate={{ opacity: 1 }}
-              className="rounded-2xl border border-outline/40 bg-panel/30 p-8 text-center"
-              role="alert"
-            >
+            <div className="rounded-2xl border border-outline/40 bg-panel/30 p-8 text-center" role="alert">
               <p className="text-sm text-muted/70">{error}</p>
               <button
                 type="button"
@@ -377,37 +346,22 @@ const Feed = () => {
               >
                 Try Again
               </button>
-            </Motion.div>
+            </div>
           ) : items.length === 0 ? (
             <EmptyFeed navigate={navigate} />
           ) : (
             <div className="space-y-3">
-              <AnimatePresence mode="popLayout">
-                {items.map((item, i) => (
-                  <Motion.div
-                    key={item.id}
-                    initial={shouldReduceMotion ? false : { opacity: 0, y: 8 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={shouldReduceMotion ? { opacity: 0 } : { opacity: 0, scale: 0.98 }}
-                    transition={{
-                      delay: Math.min(i * 0.03, 0.3),
-                      duration: 0.3,
-                      ease: [0.16, 1, 0.3, 1],
-                    }}
-                    layout={!shouldReduceMotion}
-                  >
-                    <ActivityCard item={item} />
-                  </Motion.div>
-                ))}
-              </AnimatePresence>
+              {items.map((item) => (
+                <div key={item.id}>
+                  <ActivityCard item={item} />
+                </div>
+              ))}
 
               {hasMore && (
-                <Motion.button
+                <button
                   type="button"
                   onClick={loadMore}
                   disabled={loadingMore}
-                  initial={shouldReduceMotion ? false : { opacity: 0 }}
-                  animate={{ opacity: 1 }}
                   className="w-full rounded-2xl border border-outline/40 py-4 text-xs uppercase tracking-[0.2em] text-muted/60 transition-all hover:border-white/20 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas disabled:opacity-40"
                 >
                   {loadingMore ? (
@@ -418,7 +372,7 @@ const Feed = () => {
                   ) : (
                     'Load More'
                   )}
-                </Motion.button>
+                </button>
               )}
             </div>
           )}

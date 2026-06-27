@@ -1,22 +1,16 @@
 import { memo } from 'react'
-import { motion } from 'framer-motion'
 import { Link } from 'react-router-dom'
 import { FiChevronRight } from 'react-icons/fi'
 import CoverImage from '../ui/CoverImage.jsx'
 
 const ListCard = ({ list }) => {
-  const MotionDiv = motion.div
   const albums = list.albums || []
   const displayAlbums = albums.slice(0, 4)
   const count = list.albumCount ?? albums.length
 
   return (
     <Link to={`/lists/${list.id}`} className="group block">
-      <MotionDiv
-        whileHover={{ y: -8 }}
-        transition={{ type: 'spring', stiffness: 300, damping: 20 }}
-        className="relative overflow-hidden rounded-[2rem] border border-outline/60 bg-panel/40 p-4 backdrop-blur-md transition-colors hover:border-white/30 tablet:rounded-[2.5rem] tablet:p-6"
-      >
+      <div className="relative overflow-hidden rounded-[2rem] border border-outline/60 bg-panel/40 p-4 backdrop-blur-md transition-all hover:-translate-y-2 hover:border-white/30 tablet:rounded-[2.5rem] tablet:p-6">
         {/* Background glow */}
         <div className="absolute -right-10 -top-10 h-32 w-32 rounded-full bg-white/5 blur-3xl transition-opacity group-hover:bg-white/10" />
 
@@ -41,15 +35,12 @@ const ListCard = ({ list }) => {
               {displayAlbums.map((album, index) => {
                 const rotations = [-6, -2, 2, 6]
                 const rotate = rotations[index % rotations.length]
-                
+
                 return (
-                  <MotionDiv
+                  <div
                     key={album.id || index}
-                    initial={{ opacity: 0, x: 20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: index * 0.1 }}
                     style={{ rotate: `${rotate}deg` }}
-                    className="relative aspect-square w-[4.7rem] shrink-0 overflow-hidden rounded-xl border border-white/10 bg-black/40 shadow-2xl transition-transform group-hover:scale-105 group-hover:rotate-0 tablet:w-24"
+                    className="relative aspect-square w-[4.7rem] shrink-0 overflow-hidden rounded-xl border border-white/10 bg-black/40 shadow-2xl transition-all group-hover:scale-105 group-hover:rotate-0 tablet:w-24"
                   >
                     <CoverImage
                       src={album.cover}
@@ -58,7 +49,7 @@ const ListCard = ({ list }) => {
                       loading="lazy"
                     />
                     <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent" />
-                  </MotionDiv>
+                  </div>
                 )
               })}
               </div>
@@ -68,7 +59,7 @@ const ListCard = ({ list }) => {
               <p className="text-[10px] font-bold uppercase tracking-[0.45em] text-muted/60">Empty</p>
             </div>
           )}
-          
+
           {count > 4 && (
             <div className="mb-1 shrink-0 tablet:mb-2">
               <span className="whitespace-nowrap rounded-full bg-white/10 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.2em] text-muted backdrop-blur-md tablet:tracking-[0.3em]">
@@ -77,7 +68,7 @@ const ListCard = ({ list }) => {
             </div>
           )}
         </div>
-      </MotionDiv>
+      </div>
     </Link>
   )
 }

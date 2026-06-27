@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
 import { FiSearch, FiX, FiCommand, FiClock, FiCornerDownLeft } from 'react-icons/fi'
-import { AnimatePresence, motion } from 'framer-motion'
 import { useNavigate } from 'react-router-dom'
 
 import { useSearch } from '../../hooks/useSearch.js'
@@ -38,17 +37,16 @@ const SearchBar = ({
   enableHistory = true,
 }) => {
   const navigate = useNavigate()
-  const MotionDiv = motion.div
   const [value, setValue] = useState(query)
   const [isFocused, setIsFocused] = useState(false)
   const [activeSuggestionIndex, setActiveSuggestionIndex] = useState(-1)
   const inputRef = useRef(null)
-  
+
   // 1. Professional Fetching with local debouncing & cancellation
   const { suggestions, isLoading, isFetching } = useSearch(value, {
     enabled: enablePredictive && isFocused,
   })
-  
+
   const [recentSearches, setRecentSearches] = useState([])
 
   // 2. Keyboard shortcut (Cmd + K)
@@ -95,7 +93,7 @@ const SearchBar = ({
 
   const handleKeyDown = (e) => {
     const totalCount = enablePredictive ? suggestions.length : 0
-    
+
     if (e.key === 'ArrowDown') {
       e.preventDefault()
       setActiveSuggestionIndex(prev => (prev < totalCount - 1 ? prev + 1 : 0))
@@ -131,7 +129,7 @@ const SearchBar = ({
         } p-4`}
       >
         <FiSearch className={`text-xl transition-colors ${isFocused ? 'text-white' : 'text-muted'}`} />
-        
+
         <input
           ref={inputRef}
           value={value}
@@ -163,101 +161,94 @@ const SearchBar = ({
         </div>
       </div>
 
-      <AnimatePresence>
-        {showDropdown && (
-          <MotionDiv
-            initial={{ opacity: 0, y: 10, scale: 0.98 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 10, scale: 0.98 }}
-            className="absolute left-0 right-0 top-[calc(100%+0.5rem)] overflow-hidden rounded-2xl border border-outline bg-panel/95 shadow-2xl backdrop-blur-xl"
-          >
-            {/* Quick Results */}
-            {showSuggestions && (
-              <div className="p-2">
-                <div className="flex items-center justify-between px-3 py-2">
-                  <p className="text-[10px] font-bold uppercase tracking-[0.3em] text-muted">Suggestions</p>
-                  {(isLoading || isFetching) && (
-                    <div className="h-3 w-3 animate-spin rounded-full border-2 border-white/20 border-t-white" />
-                  )}
-                </div>
-                
-                {suggestions.length > 0 ? (
-                  <div className="space-y-1">
-                    {suggestions.map((item, i) => (
-                      <button
-                        key={item.id}
-                        onClick={() => navigate(`/album/${item.id}`)}
-                        onMouseEnter={() => setActiveSuggestionIndex(i)}
-                        className={`flex w-full items-center gap-4 rounded-xl p-2 text-left transition-colors ${
-                          activeSuggestionIndex === i ? 'bg-white/10' : 'hover:bg-white/5'
-                        }`}
-                      >
-                        <img 
-                          src={item.cover} 
-                          alt="" 
-                          className="h-10 w-10 rounded-lg object-cover bg-black/40"
-                        />
-                        <div className="min-w-0 flex-1">
-                          <p className="truncate text-sm font-semibold text-white/90">
-                            <HighlightMatch text={item.name} match={value} />
-                          </p>
-                          <p className="truncate text-xs text-muted">
-                            <HighlightMatch text={item.artists?.join(', ')} match={value} /> • {item.releaseYear}
-                          </p>
-                        </div>
-                        {activeSuggestionIndex === i && (
-                          <FiCornerDownLeft className="text-muted opacity-50" />
-                        )}
-                      </button>
-                    ))}
-                  </div>
-                ) : !isLoading && (
-                  <p className="px-3 py-4 text-center text-sm text-muted">No matches found.</p>
+      {showDropdown && (
+        <div className="absolute left-0 right-0 top-[calc(100%+0.5rem)] overflow-hidden rounded-2xl border border-outline bg-panel/95 shadow-2xl backdrop-blur-xl animate-[fade-in_0.15s_ease-out]">
+          {/* Quick Results */}
+          {showSuggestions && (
+            <div className="p-2">
+              <div className="flex items-center justify-between px-3 py-2">
+                <p className="text-[10px] font-bold uppercase tracking-[0.3em] text-muted">Suggestions</p>
+                {(isLoading || isFetching) && (
+                  <div className="h-3 w-3 animate-spin rounded-full border-2 border-white/20 border-t-white" />
                 )}
               </div>
-            )}
 
-            {/* Recent Searches */}
-            {showRecentSearches && (
-              <div className="p-2">
-                <div className="flex items-center justify-between px-3 py-2">
-                  <p className="text-[10px] font-bold uppercase tracking-[0.3em] text-muted text-center">Recent Searches</p>
-                  <button 
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      clearSearchHistory(historyScope)
-                      setRecentSearches([])
-                    }}
-                    className="text-[10px] font-bold uppercase tracking-widest text-muted hover:text-white"
-                  >
-                    Clear
-                  </button>
-                </div>
-                <div className="mt-1 space-y-1">
-                  {recentSearches.map((term) => (
-                    <div key={term} className="group flex items-center justify-between rounded-xl px-3 py-2 hover:bg-white/5 transition-colors cursor-pointer" onClick={() => applyValue(term)}>
-                      <div className="flex items-center gap-3 min-w-0">
-                        <FiClock className="shrink-0 text-muted" />
-                        <span className="truncate text-sm text-white/80">{term}</span>
+              {suggestions.length > 0 ? (
+                <div className="space-y-1">
+                  {suggestions.map((item, i) => (
+                    <button
+                      key={item.id}
+                      onClick={() => navigate(`/album/${item.id}`)}
+                      onMouseEnter={() => setActiveSuggestionIndex(i)}
+                      className={`flex w-full items-center gap-4 rounded-xl p-2 text-left transition-colors ${
+                        activeSuggestionIndex === i ? 'bg-white/10' : 'hover:bg-white/5'
+                      }`}
+                    >
+                      <img 
+                        src={item.cover} 
+                        alt="" 
+                        className="h-10 w-10 rounded-lg object-cover bg-black/40"
+                      />
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-semibold text-white/90">
+                          <HighlightMatch text={item.name} match={value} />
+                        </p>
+                        <p className="truncate text-xs text-muted">
+                          <HighlightMatch text={item.artists?.join(', ')} match={value} /> • {item.releaseYear}
+                        </p>
                       </div>
-                      <button 
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          removeFromSearchHistory(term, historyScope)
-                          setRecentSearches(getSearchHistory(historyScope))
-                        }}
-                        className="opacity-0 group-hover:opacity-100 p-1 text-muted hover:text-red-400 transition-all"
-                      >
-                        <FiX />
-                      </button>
-                    </div>
+                      {activeSuggestionIndex === i && (
+                        <FiCornerDownLeft className="text-muted opacity-50" />
+                      )}
+                    </button>
                   ))}
                 </div>
+              ) : !isLoading && (
+                <p className="px-3 py-4 text-center text-sm text-muted">No matches found.</p>
+              )}
+            </div>
+          )}
+
+          {/* Recent Searches */}
+          {showRecentSearches && (
+            <div className="p-2">
+              <div className="flex items-center justify-between px-3 py-2">
+                <p className="text-[10px] font-bold uppercase tracking-[0.3em] text-muted text-center">Recent Searches</p>
+                <button 
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    clearSearchHistory(historyScope)
+                    setRecentSearches([])
+                  }}
+                  className="text-[10px] font-bold uppercase tracking-widest text-muted hover:text-white"
+                >
+                  Clear
+                </button>
               </div>
-            )}
-          </MotionDiv>
-        )}
-      </AnimatePresence>
+              <div className="mt-1 space-y-1">
+                {recentSearches.map((term) => (
+                  <div key={term} className="group flex items-center justify-between rounded-xl px-3 py-2 hover:bg-white/5 transition-colors cursor-pointer" onClick={() => applyValue(term)}>
+                    <div className="flex items-center gap-3 min-w-0">
+                      <FiClock className="shrink-0 text-muted" />
+                      <span className="truncate text-sm text-white/80">{term}</span>
+                    </div>
+                    <button 
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        removeFromSearchHistory(term, historyScope)
+                        setRecentSearches(getSearchHistory(historyScope))
+                      }}
+                      className="opacity-0 group-hover:opacity-100 p-1 text-muted hover:text-red-400 transition-all"
+                    >
+                      <FiX />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   )
 }
