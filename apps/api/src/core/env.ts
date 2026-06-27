@@ -34,33 +34,67 @@ const parseOrigins = (value: string | undefined, fallback: string) =>
     .map((origin) => origin.trim())
     .filter(Boolean)
 
-export const env = {
-  PORT: parsePositiveInteger(readEnv('PORT'), 4000),
-  DATABASE_URL: requireEnv('DATABASE_URL'),
-  BETTER_AUTH_URL: requireEnv('BETTER_AUTH_URL'),
-  BETTER_AUTH_SECRET: requireEnv('BETTER_AUTH_SECRET'),
-  ALLOWED_ORIGINS: parseOrigins(readEnv('ALLOWED_ORIGIN'), 'http://localhost:5173'),
-  DISCOGS_TOKEN: sanitizeOptionalSecret(readEnv('DISCOGS_TOKEN')),
-  DISCOGS_KEY: sanitizeOptionalSecret(readEnv('DISCOGS_KEY')),
-  DISCOGS_SECRET: sanitizeOptionalSecret(readEnv('DISCOGS_SECRET')),
-  DISCOGS_USER_AGENT: readEnv('DISCOGS_USER_AGENT') || 'musico/1.0 (+https://example.com)',
-  FEATURED_CACHE_TTL_MS: parsePositiveInteger(readEnv('FEATURED_CACHE_TTL_MS'), 1000 * 60 * 60 * 24 * 7),
-  SEARCH_CACHE_TTL_MS: parsePositiveInteger(readEnv('SEARCH_CACHE_TTL_MS'), 1000 * 60 * 60 * 24 * 7),
-  FEATURED_RETRY_COOLDOWN_MS: parsePositiveInteger(readEnv('FEATURED_RETRY_COOLDOWN_MS'), 1000 * 60 * 10),
-  SEARCH_RETRY_COOLDOWN_MS: parsePositiveInteger(readEnv('SEARCH_RETRY_COOLDOWN_MS'), 1000 * 60 * 10),
-  FEATURED_DETAIL_HYDRATION_LIMIT: parsePositiveInteger(readEnv('FEATURED_DETAIL_HYDRATION_LIMIT'), 12),
-  SEARCH_MAX_PAGES: parsePositiveInteger(readEnv('SEARCH_MAX_PAGES'), 4),
-  SEARCH_QUERY_PAGES: parsePositiveInteger(readEnv('SEARCH_QUERY_PAGES'), 3),
-  SEARCH_MIN_RESULTS_BEFORE_PAGING: parsePositiveInteger(readEnv('SEARCH_MIN_RESULTS_BEFORE_PAGING'), 60),
-  DISCOGS_MIN_REQUEST_INTERVAL_MS: parsePositiveInteger(readEnv('DISCOGS_MIN_REQUEST_INTERVAL_MS'), 1100),
-  DISCOGS_MAX_RETRIES: parsePositiveInteger(readEnv('DISCOGS_MAX_RETRIES'), 4),
-  HOME_RELEASE_DETAILS_PREWARM_LIMIT: parsePositiveInteger(readEnv('HOME_RELEASE_DETAILS_PREWARM_LIMIT'), 6),
-  HOMEPAGE_REFRESH_MINIMAL: readEnv('HOMEPAGE_REFRESH_MINIMAL') !== 'false',
-  RELEASE_CACHE_MAX_ENTRIES: parsePositiveInteger(readEnv('RELEASE_CACHE_MAX_ENTRIES'), 1500),
-  CRON_SECRET: sanitizeOptionalSecret(readEnv('CRON_SECRET')),
-} as const
+// ponytail: Proxy defers env validation to first property access
+// so the worker can serve health-check routes even if secrets
+// aren't configured yet. Add eager validation when startup profiling shows need.
+const get = (key: string): string | undefined => getRawEnv()[key]?.trim()
 
-export const readOptionalSecret = (key: string) => sanitizeOptionalSecret(readEnv(key))
+export const env = new Proxy({} as Record<string, unknown>, {
+  get(_, key: string) {
+    switch (key) {
+      case 'PORT': return parsePositiveInteger(get('PORT'), 4000)
+      case 'DATABASE_URL': return requireEnv('DATABASE_URL')
+      case 'BETTER_AUTH_URL': return requireEnv('BETTER_AUTH_URL')
+      case 'BETTER_AUTH_SECRET': return requireEnv('BETTER_AUTH_SECRET')
+      case 'ALLOWED_ORIGINS': return parseOrigins(get('ALLOWED_ORIGIN'), 'http://localhost:5173')
+      case 'DISCOGS_TOKEN': return sanitizeOptionalSecret(get('DISCOGS_TOKEN'))
+      case 'DISCOGS_KEY': return sanitizeOptionalSecret(get('DISCOGS_KEY'))
+      case 'DISCOGS_SECRET': return sanitizeOptionalSecret(get('DISCOGS_SECRET'))
+      case 'DISCOGS_USER_AGENT': return get('DISCOGS_USER_AGENT') || 'musico/1.0 (+https://example.com)'
+      case 'FEATURED_CACHE_TTL_MS': return parsePositiveInteger(get('FEATURED_CACHE_TTL_MS'), 1000 * 60 * 60 * 24 * 7)
+      case 'SEARCH_CACHE_TTL_MS': return parsePositiveInteger(get('SEARCH_CACHE_TTL_MS'), 1000 * 60 * 60 * 24 * 7)
+      case 'FEATURED_RETRY_COOLDOWN_MS': return parsePositiveInteger(get('FEATURED_RETRY_COOLDOWN_MS'), 1000 * 60 * 10)
+      case 'SEARCH_RETRY_COOLDOWN_MS': return parsePositiveInteger(get('SEARCH_RETRY_COOLDOWN_MS'), 1000 * 60 * 10)
+      case 'FEATURED_DETAIL_HYDRATION_LIMIT': return parsePositiveInteger(get('FEATURED_DETAIL_HYDRATION_LIMIT'), 12)
+      case 'SEARCH_MAX_PAGES': return parsePositiveInteger(get('SEARCH_MAX_PAGES'), 4)
+      case 'SEARCH_QUERY_PAGES': return parsePositiveInteger(get('SEARCH_QUERY_PAGES'), 3)
+      case 'SEARCH_MIN_RESULTS_BEFORE_PAGING': return parsePositiveInteger(get('SEARCH_MIN_RESULTS_BEFORE_PAGING'), 60)
+      case 'DISCOGS_MIN_REQUEST_INTERVAL_MS': return parsePositiveInteger(get('DISCOGS_MIN_REQUEST_INTERVAL_MS'), 1100)
+      case 'DISCOGS_MAX_RETRIES': return parsePositiveInteger(get('DISCOGS_MAX_RETRIES'), 4)
+      case 'HOME_RELEASE_DETAILS_PREWARM_LIMIT': return parsePositiveInteger(get('HOME_RELEASE_DETAILS_PREWARM_LIMIT'), 6)
+      case 'HOMEPAGE_REFRESH_MINIMAL': return get('HOMEPAGE_REFRESH_MINIMAL') !== 'false'
+      case 'RELEASE_CACHE_MAX_ENTRIES': return parsePositiveInteger(get('RELEASE_CACHE_MAX_ENTRIES'), 1500)
+      case 'CRON_SECRET': return sanitizeOptionalSecret(get('CRON_SECRET'))
+      default: return undefined
+    }
+  },
+}) as {
+  PORT: number
+  DATABASE_URL: string
+  BETTER_AUTH_URL: string
+  BETTER_AUTH_SECRET: string
+  ALLOWED_ORIGINS: string[]
+  DISCOGS_TOKEN: string | undefined
+  DISCOGS_KEY: string | undefined
+  DISCOGS_SECRET: string | undefined
+  DISCOGS_USER_AGENT: string
+  FEATURED_CACHE_TTL_MS: number
+  SEARCH_CACHE_TTL_MS: number
+  FEATURED_RETRY_COOLDOWN_MS: number
+  SEARCH_RETRY_COOLDOWN_MS: number
+  FEATURED_DETAIL_HYDRATION_LIMIT: number
+  SEARCH_MAX_PAGES: number
+  SEARCH_QUERY_PAGES: number
+  SEARCH_MIN_RESULTS_BEFORE_PAGING: number
+  DISCOGS_MIN_REQUEST_INTERVAL_MS: number
+  DISCOGS_MAX_RETRIES: number
+  HOME_RELEASE_DETAILS_PREWARM_LIMIT: number
+  HOMEPAGE_REFRESH_MINIMAL: boolean
+  RELEASE_CACHE_MAX_ENTRIES: number
+  CRON_SECRET: string | undefined
+}
+
+export const readOptionalSecret = (key: string) => sanitizeOptionalSecret(get(key))
 
 export const validateProductionEnv = () => {
   if (!env.ALLOWED_ORIGINS.length) {
