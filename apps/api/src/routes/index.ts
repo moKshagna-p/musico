@@ -17,14 +17,3 @@ export const apiRoutes = new Elysia()
   .use(reviewRoutes)
   .use(searchRoutes)
   .use(userRoutes)
-
-export {
-  activityRoutes,
-  adminRoutes,
-  albumRoutes,
-  cronRoutes,
-  listRoutes,
-  reviewRoutes,
-  searchRoutes,
-  userRoutes,
-}
