@@ -1,5 +1,4 @@
 import { memo, useState, useEffect } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
 import { FaStar } from 'react-icons/fa'
 
 const STAR_VALUES = [1, 2, 3, 4, 5]
@@ -16,9 +15,6 @@ const clampRating = (value) => {
 }
 
 const RatingStars = ({ value = 0, onRate, readOnly = false, showValue = false, size = 'md', align = 'right' }) => {
-  const MotionButton = motion.button
-  const MotionSpan = motion.span
-  const MotionDiv = motion.div
   const [hoverValue, setHoverValue] = useState(null)
   const [lastRated, setLastRated] = useState(null)
   const [showConfirmation, setShowConfirmation] = useState(false)
@@ -53,63 +49,39 @@ const RatingStars = ({ value = 0, onRate, readOnly = false, showValue = false, s
 
           return (
             <div key={star} className={`relative ${readOnly ? 'h-6 w-6' : 'h-8 w-8'}`}>
-              <AnimatePresence>
-                {isRecentlySelected && (
-                  <MotionSpan
-                    initial={{ scale: 0.5, opacity: 0.8 }}
-                    animate={{ scale: 2.5, opacity: 0 }}
-                    exit={{ opacity: 0 }}
-                    transition={{ duration: 0.6, ease: 'easeOut' }}
-                    className="absolute inset-0 z-0 rounded-full bg-white/30"
-                  />
-                )}
-              </AnimatePresence>
-
               {!readOnly && (
                 <>
-                  <MotionButton
+                  <button
                     type="button"
                     aria-label={`Rate ${star - 0.5} stars`}
-                    whileTap={{ scale: 0.92 }}
-                    whileHover={{ scale: 1.06 }}
                     onClick={(event) => {
                       event.stopPropagation()
                       handleRate(star - 0.5)
                     }}
                     onMouseEnter={() => setHoverValue(star - 0.5)}
                     onMouseLeave={() => setHoverValue(null)}
-                    className="absolute inset-y-0 left-0 z-20 w-1/2 rounded-l focus-visible:outline-none"
+                    className="absolute inset-y-0 left-0 z-20 w-1/2 rounded-l focus-visible:outline-none active:scale-90 hover:scale-105 transition-transform"
                   />
-                  <MotionButton
+                  <button
                     type="button"
                     aria-label={`Rate ${star} star${star === 1 ? '' : 's'}`}
-                    whileTap={{ scale: 0.92 }}
-                    whileHover={{ scale: 1.06 }}
                     onClick={(event) => {
                       event.stopPropagation()
                       handleRate(star)
                     }}
                     onMouseEnter={() => setHoverValue(star)}
                     onMouseLeave={() => setHoverValue(null)}
-                    className="absolute inset-y-0 right-0 z-20 w-1/2 rounded-r focus-visible:outline-none"
+                    className="absolute inset-y-0 right-0 z-20 w-1/2 rounded-r focus-visible:outline-none active:scale-90 hover:scale-105 transition-transform"
                   />
                 </>
               )}
 
               <span className={`pointer-events-none absolute inset-0 flex items-center justify-center ${readOnly ? '' : 'p-1'}`}>
-                <motion.span
-                  className="relative inline-flex"
-                  animate={{
-                    scale: fill > 0 ? 1.04 : 1,
-                    y: isHovered ? -1 : 0,
-                  }}
-                  transition={{ type: 'spring', stiffness: 360, damping: 24, mass: 0.6 }}
-                >
+                <span className={`relative inline-flex transition-all duration-300 ${fill > 0 ? 'scale-[1.04]' : ''} ${isHovered ? '-translate-y-0.5' : ''}`}>
                   <FaStar aria-hidden="true" className={`${iconSizeClass} text-muted/40 transition-colors duration-300`} />
-                  <MotionSpan
-                    className="absolute inset-y-0 left-0 overflow-hidden"
-                    animate={{ width: `${fill * 100}%` }}
-                    transition={{ type: 'spring', stiffness: 320, damping: 30, mass: 0.7 }}
+                  <span
+                    className="absolute inset-y-0 left-0 overflow-hidden transition-all duration-300"
+                    style={{ width: `${fill * 100}%` }}
                   >
                     <FaStar
                       aria-hidden="true"
@@ -117,28 +89,21 @@ const RatingStars = ({ value = 0, onRate, readOnly = false, showValue = false, s
                         fill > 0 ? 'scale-105' : ''
                       } ${isRecentlySelected ? 'drop-shadow-[0_0_8px_rgba(255,255,255,0.8)]' : ''}`}
                     />
-                  </MotionSpan>
-                </motion.span>
+                  </span>
+                </span>
               </span>
             </div>
           )
         })}
       </div>
 
-      <AnimatePresence>
-        {showConfirmation && (
-          <MotionDiv
-            initial={{ opacity: 0, y: 0 }}
-            animate={{ opacity: 1, y: -20 }}
-            exit={{ opacity: 0, y: -40 }}
-            className="absolute -top-4 right-0 pointer-events-none"
-          >
-            <span className="text-[10px] font-bold uppercase tracking-[0.3em] text-white">
-              {confirmationLabel}
-            </span>
-          </MotionDiv>
-        )}
-      </AnimatePresence>
+      {showConfirmation && (
+        <div className="absolute -top-4 right-0 pointer-events-none animate-[fade-in_0.3s_ease-out]">
+          <span className="text-[10px] font-bold uppercase tracking-[0.3em] text-white">
+            {confirmationLabel}
+          </span>
+        </div>
+      )}
 
       {showValue && (
         <p className="text-xs uppercase tracking-[0.3em] text-muted">

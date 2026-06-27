@@ -1,5 +1,4 @@
 import { lazy, Suspense, useEffect } from 'react'
-import { AnimatePresence } from 'framer-motion'
 import { Route, Routes, useLocation, useNavigate } from 'react-router-dom'
 
 import Footer from './components/ui/Footer.jsx'
@@ -131,8 +130,7 @@ const App = () => {
       <Navigation />
       <main className="flex-1">
         <RouteErrorBoundary>
-          <AnimatePresence mode="wait" initial={false}>
-            <Routes location={location} key={location.pathname}>
+          <Routes location={location} key={location.pathname}>
               <Route path="/" element={withRouteFallback(<Home />, <HomePageSkeleton />)} />
               <Route path="/discover" element={withRouteFallback(<Discover />, <DiscoverPageSkeleton />)} />
               <Route path="/search" element={withRouteFallback(<SearchResults />, <SearchResultsPageSkeleton />)} />
@@ -146,7 +144,6 @@ const App = () => {
               <Route path="/album/:albumId" element={withRouteFallback(<AlbumDetails />, <AlbumDetailsPageSkeleton />)} />
               <Route path="*" element={withRouteFallback(<NotFound />, <NotFoundPageSkeleton />)} />
             </Routes>
-          </AnimatePresence>
         </RouteErrorBoundary>
       </main>
       <Footer />

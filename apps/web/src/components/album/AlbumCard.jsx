@@ -1,5 +1,4 @@
 import { memo, useRef } from 'react'
-import { motion } from 'framer-motion'
 import { prefetchReleaseDetails } from '../../services/discogsService.js'
 import { useRatings } from '../../hooks/useRatings.js'
 import { formatReleaseDate } from '../../utils/helpers.js'
@@ -7,7 +6,6 @@ import RatingStars from '../ui/RatingStars.jsx'
 import CoverImage from '../ui/CoverImage.jsx'
 
 const AlbumCard = ({ album, onSelect }) => {
-  const MotionArticle = motion.article
   const { getCommunityStats } = useRatings()
   const prefetchTimerRef = useRef(null)
   const community = getCommunityStats(album)
@@ -32,15 +30,11 @@ const AlbumCard = ({ album, onSelect }) => {
   }
 
   return (
-    <MotionArticle
-      layout
-      initial={{ opacity: 0, y: 30 }}
-      animate={{ opacity: 1, y: 0 }}
-      whileHover={{ y: -6 }}
+    <article
       onClick={handleNavigate}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
-      className="group relative flex cursor-pointer flex-col gap-4 rounded-3xl border border-outline bg-panel p-4 text-white transition hover:border-white/40"
+      className="group relative flex cursor-pointer flex-col gap-4 rounded-3xl border border-outline bg-panel p-4 text-white transition-all hover:-translate-y-1.5 hover:border-white/40"
     >
       <div className="relative aspect-square overflow-hidden rounded-2xl bg-black/40">
         <CoverImage
@@ -83,7 +77,7 @@ const AlbumCard = ({ album, onSelect }) => {
           size="sm"
         />
       </div>
-    </MotionArticle>
+    </article>
   )
 }
 
