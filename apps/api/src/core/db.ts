@@ -3,6 +3,19 @@ import { drizzle } from 'drizzle-orm/neon-http'
 
 import { env } from './env'
 
-const sql = neon(env.DATABASE_URL)
+// ponytail: defer DB connection to first query so the worker can start
+// and serve health routes even when DATABASE_URL is misconfigured.
+// Move to eager init when cold-start profiling shows a bottleneck.
 
-export const db = drizzle(sql)
+let _db: ReturnType<typeof drizzle> | null = null
+
+const getDb = () => {
+  if (!_db) _db = drizzle(neon(env.DATABASE_URL))
+  return _db
+}
+
+export const db = new Proxy({} as ReturnType<typeof drizzle>, {
+  get(_, key: string | symbol) {
+    return Reflect.get(getDb(), key)
+  },
+})
