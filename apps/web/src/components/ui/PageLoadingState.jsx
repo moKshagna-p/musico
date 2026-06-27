@@ -325,7 +325,7 @@ export const NotFoundPageSkeleton = () => {
 export const ProfilePageSkeleton = ({ withBackButton = false, showActions = false }) => {
   return (
     <section aria-busy="true" aria-label="Loading profile" className="mx-auto w-full max-w-6xl py-4 tablet:py-8">
-      {withBackButton && <div className="h-4 w-20 rounded-full bg-outline/70" />}
+      {withBackButton ? <div className="h-4 w-20 rounded-full bg-outline/70" /> : null}
 
       <div className="py-8 text-center tablet:py-14">
         <div className="mx-auto mb-5 h-20 w-20 animate-pulse rounded-full bg-outline/60" />
