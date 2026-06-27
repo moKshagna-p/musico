@@ -1,4 +1,11 @@
-import { authClient } from '../services/authClient.js'
+import { getAuthClient } from '../services/authClient.js'
+
+const authClient = new Proxy({}, {
+  get(_, prop) {
+    const client = getAuthClient()
+    return client[prop]
+  },
+})
 
 export const useAuth = () => {
   const sessionState = authClient.useSession()
