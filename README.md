@@ -96,3 +96,4 @@ Cloudflare Worker or Vercel deploy.
 ## Contributing
 
 Contributions are welcome. If you have improvements or bug fixes, please open an issue or submit a pull request for review.
+
