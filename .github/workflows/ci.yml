@@ -14,57 +14,77 @@ on:
 permissions:
   contents: read
 
-# Ensure only one CI run happens per branch at a time
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
-jobs:
-  check:
-    name: Build & Test
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    env:
-      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-    
-    steps:
-      - name: 1. Checkout repository
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0 # Required for Turbo's git integration
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
-      - name: 2. Setup Node.js (Current)
-        uses: actions/setup-node@v4
+jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: 22
-
-      - name: 3. Setup Bun (Stable)
-        uses: oven-sh/setup-bun@v2
+      - uses: oven-sh/setup-bun@v2
         with:
           bun-version: 1.3.10
+      - run: bun install --frozen-lockfile
+      - run: bun run check:bun
+      - run: bun run lint
 
-      - name: 4. Install dependencies
-        run: bun install --frozen-lockfile
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.10
+      - run: bun install --frozen-lockfile
+      - run: bun run build
 
-      - name: 5. Verify Workspace Integrity
-        run: bun run check:bun
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.10
+      - run: bun install --frozen-lockfile
+      - run: bun run test
 
-      - name: 6. Lint
-        run: bun run lint
-
-      - name: 7. Build Project
-        run: bun run build
-
-      - name: 8. Run Unit Tests
-        run: bun run test
-
-      - name: 9. Install Playwright Browsers
-        run: bunx playwright install --with-deps chromium
-
-      - name: 10. Run E2E Smoke Tests
-        run: bun run test:e2e
-
-      - name: 11. Upload Playwright Artifacts
+  e2e:
+    name: E2E
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.10
+      - run: bun install --frozen-lockfile
+      - run: bun run build
+      - run: bunx playwright install --with-deps chromium
+      - run: bun run test:e2e
+      - name: Upload Playwright Artifacts
         if: failure()
         uses: actions/upload-artifact@v4
         with:
