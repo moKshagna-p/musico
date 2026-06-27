@@ -32,3 +32,4 @@ createRoot(document.getElementById('root')).render(
     </QueryClientProvider>
   </StrictMode>,
 )
+// test: verify PR checks
