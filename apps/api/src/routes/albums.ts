@@ -15,7 +15,7 @@ export const albumRoutes = new Elysia({ prefix: '/api' })
       const data = await getStoredTrendingAlbumsEnsuringFresh(limit, normalizedMode)
 
       set.headers ??= {}
-      set.headers['Cache-Control'] = 'public, max-age=60'
+      set.headers['Cache-Control'] = 'public, max-age=300, stale-while-revalidate=3600'
       return { data: await attachMusicoCommunityStats(data) }
     } catch (error) {
       console.error('[featured] error', error)
@@ -48,7 +48,7 @@ export const albumRoutes = new Elysia({ prefix: '/api' })
       }
 
       set.headers ??= {}
-      set.headers['Cache-Control'] = 'public, max-age=60'
+      set.headers['Cache-Control'] = 'public, max-age=300, stale-while-revalidate=3600'
       return {
         mostHappening: {
           data: mostHappeningData,
@@ -78,7 +78,7 @@ export const albumRoutes = new Elysia({ prefix: '/api' })
        const data = await getReleaseDetails(params.id)
        const [hydrated] = await attachMusicoCommunityStats([data])
        set.headers ??= {}
-       set.headers['Cache-Control'] = 'public, max-age=3600, immutable'
+       set.headers['Cache-Control'] = 'public, max-age=86400, stale-while-revalidate=86400'
        return hydrated
      } catch (error) {
        console.error('[release] error', error)
