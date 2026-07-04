@@ -32,3 +32,4 @@ release-summary.md
 *.njsproj
 *.sln
 *.sw?
+# trigger CI
