@@ -27,7 +27,6 @@
   "devDependencies": {
     "@playwright/test": "^1.55.0",
     "mprocs": "0.7.3",
-    "puppeteer": "^24.40.0",
     "turbo": "^2.5.6"
   }
 }
