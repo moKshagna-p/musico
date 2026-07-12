@@ -7,4 +7,3 @@ export const MAX_REVIEW_LENGTH = 280
 export const MAX_BIO_LENGTH = 160
 export const MAX_RELEASE_PREVIEW_LOOKUPS = 36
 export const USERNAME_REGEX = /^[a-z0-9][a-z0-9-]{1,22}[a-z0-9]$/
-export const BOOTSTRAP_ADMIN_EMAIL = 'mokshagnareddy45@gmail.com'

@@ -26,6 +26,7 @@ import {
   normalizeEmail,
 } from '../core/utils'
 import { USERNAME_REGEX, MAX_BIO_LENGTH } from '../core/constants'
+import { isRecord, readBoolean, readBoundedText, readIdentifier, readRating } from './validation'
 
 export const userRoutes = new Elysia({ prefix: '/api' })
   .get('/me/ratings', async ({ request, set }) => {
@@ -217,9 +218,9 @@ export const userRoutes = new Elysia({ prefix: '/api' })
     const authUser = await ensureAuthenticated(request, set)
     if (!authUser) return { error: 'Unauthorized.' }
 
-    const albumId = String(params?.albumId ?? '').trim()
-    const typedBody = body as { rating?: unknown; albumName?: unknown; albumCover?: unknown }
-    const rating = normalizeRating(Number(typedBody?.rating))
+    const albumId = readIdentifier(params?.albumId)
+    const typedBody = isRecord(body) ? body : null
+    const rating = normalizeRating(readRating(typedBody?.rating) ?? Number.NaN)
 
     if (!albumId) {
       set.status = 400
@@ -288,7 +289,7 @@ export const userRoutes = new Elysia({ prefix: '/api' })
     const authUser = await ensureAuthenticated(request, set)
     if (!authUser) return { error: 'Unauthorized.' }
 
-    const albumId = String(params?.albumId ?? '').trim()
+    const albumId = readIdentifier(params?.albumId)
     if (!albumId) {
       set.status = 400
       return { error: 'Missing album id.' }
@@ -434,14 +435,23 @@ export const userRoutes = new Elysia({ prefix: '/api' })
     const authUser = await ensureAuthenticated(request, set)
     if (!authUser) return { error: 'Unauthorized.' }
 
-    const typed = body as { username?: unknown; bio?: unknown; isPublic?: unknown; image?: unknown }
+    const typed = isRecord(body) ? body : null
+    if (!typed) {
+      set.status = 400
+      return { error: 'Profile update must be an object.' }
+    }
     const updates: Record<string, unknown> = {}
     const userUpdates: Record<string, unknown> = {}
     const now = new Date()
 
     // Validate and set username
     if (typed.username !== undefined) {
-      const rawUsername = String(typed.username ?? '').trim().toLowerCase()
+      const usernameValue = readBoundedText(typed.username, 24)
+      if (usernameValue === null) {
+        set.status = 400
+        return { error: 'Username must be valid text.' }
+      }
+      const rawUsername = usernameValue.toLowerCase()
       if (!rawUsername) {
         // Allow clearing username
         updates.username = null
@@ -465,22 +475,39 @@ export const userRoutes = new Elysia({ prefix: '/api' })
 
     // Validate and set bio
     if (typed.bio !== undefined) {
-      updates.bio = String(typed.bio ?? '').trim().slice(0, MAX_BIO_LENGTH)
+      const bio = readBoundedText(typed.bio, MAX_BIO_LENGTH)
+      if (bio === null) {
+        set.status = 400
+        return { error: `Bio must be at most ${MAX_BIO_LENGTH} characters.` }
+      }
+      updates.bio = bio
     }
 
     // Validate and set isPublic
     if (typed.isPublic !== undefined) {
-      updates.isPublic = Boolean(typed.isPublic)
+      const isPublic = readBoolean(typed.isPublic)
+      if (isPublic === null) {
+        set.status = 400
+        return { error: 'isPublic must be a boolean.' }
+      }
+      updates.isPublic = isPublic
     }
 
     if (typed.image !== undefined) {
-      const parsedImage = parseProfileImage(typed.image)
-      const rawImage = String(typed.image ?? '').trim()
-      if (rawImage && !parsedImage) {
+      if (typed.image === null) {
+        userUpdates.image = null
+      } else if (typeof typed.image !== 'string') {
         set.status = 400
         return { error: 'Profile image must be a valid http or https URL.' }
+      } else {
+        const parsedImage = parseProfileImage(typed.image)
+        const rawImage = typed.image.trim()
+        if (rawImage && !parsedImage) {
+          set.status = 400
+          return { error: 'Profile image must be a valid http or https URL.' }
+        }
+        userUpdates.image = parsedImage
       }
-      userUpdates.image = parsedImage
     }
 
     if (!Object.keys(updates).length && !Object.keys(userUpdates).length) {
@@ -516,7 +543,8 @@ export const userRoutes = new Elysia({ prefix: '/api' })
     }
   })
   .get('/username/check', async ({ query, set }) => {
-    const username = String(query?.username ?? '').trim().toLowerCase()
+    const usernameValue = readBoundedText(query?.username, 24)
+    const username = usernameValue?.toLowerCase() ?? ''
     if (!username || !USERNAME_REGEX.test(username)) {
       return { data: { available: false, valid: false } }
     }
@@ -535,7 +563,7 @@ export const userRoutes = new Elysia({ prefix: '/api' })
     }
   })
   .get('/users/search', async ({ request, query, set }) => {
-    const q = String(query?.q ?? '').trim()
+    const q = readBoundedText(query?.q, 120)
     if (!q || q.length < 2) {
       return { data: [] }
     }
@@ -573,7 +601,8 @@ export const userRoutes = new Elysia({ prefix: '/api' })
     }
   })
   .get('/users/:username', async ({ params, request, set }) => {
-    const username = String(params?.username ?? '').trim().toLowerCase()
+    const usernameValue = readBoundedText(params?.username, 24)
+    const username = usernameValue?.toLowerCase() ?? ''
     if (!username) {
       set.status = 400
       return { error: 'Username is required.' }
@@ -787,7 +816,8 @@ export const userRoutes = new Elysia({ prefix: '/api' })
     const authUser = await ensureAuthenticated(request, set)
     if (!authUser) return { error: 'Unauthorized.' }
 
-    const username = String(params?.username ?? '').trim().toLowerCase()
+    const usernameValue = readBoundedText(params?.username, 24)
+    const username = usernameValue?.toLowerCase() ?? ''
     if (!username) {
       set.status = 400
       return { error: 'Username is required.' }

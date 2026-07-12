@@ -8,26 +8,22 @@ import {
   recordActivity,
 } from '../core/utils'
 import { MAX_REVIEW_LENGTH } from '../core/constants'
+import { isRecord, readBoundedText, readIdentifier } from './validation'
 
 export const reviewRoutes = new Elysia()
   .put('/api/me/reviews/:albumId', async ({ request, params, body, set }) => {
     const authUser = await ensureAuthenticated(request, set)
     if (!authUser) return { error: 'Unauthorized.' }
 
-    const albumId = String(params?.albumId ?? '').trim()
+    const albumId = readIdentifier(params?.albumId)
     if (!albumId) {
       set.status = 400
       return { error: 'Missing album id.' }
     }
 
-    const typedBody = body as {
-      content?: unknown
-      albumName?: unknown
-      albumCover?: unknown
-      artists?: unknown
-      releaseYear?: unknown
-    }
-    const content = String(typedBody?.content ?? '').trim().slice(0, MAX_REVIEW_LENGTH)
+    const typedBody = isRecord(body) ? body : null
+    const rawContent = readBoundedText(typedBody?.content, MAX_REVIEW_LENGTH)
+    const content = rawContent?.slice(0, MAX_REVIEW_LENGTH) ?? ''
 
     if (!content) {
       set.status = 400
@@ -36,10 +32,10 @@ export const reviewRoutes = new Elysia()
 
     // Ensure we have canonical metadata for the activity feed
     const meta = await getCanonicalAlbumMetadata(albumId, {
-      name: typedBody.albumName,
-      cover: typedBody.albumCover,
-      artists: typedBody.artists,
-      releaseYear: typedBody.releaseYear,
+      name: typedBody?.albumName,
+      cover: typedBody?.albumCover,
+      artists: typedBody?.artists,
+      releaseYear: typedBody?.releaseYear,
     })
 
     const now = new Date()
@@ -85,7 +81,7 @@ export const reviewRoutes = new Elysia()
     const authUser = await ensureAuthenticated(request, set)
     if (!authUser) return { error: 'Unauthorized.' }
 
-    const albumId = String(params?.albumId ?? '').trim()
+    const albumId = readIdentifier(params?.albumId)
     if (!albumId) {
       set.status = 400
       return { error: 'Missing album id.' }
@@ -114,7 +110,7 @@ export const reviewRoutes = new Elysia()
     }
   })
   .get('/api/albums/:albumId/reviews', async ({ params, query, set }) => {
-    const albumId = String(params?.albumId ?? '').trim()
+    const albumId = readIdentifier(params?.albumId)
     if (!albumId) {
       set.status = 400
       return { error: 'Missing album id.' }

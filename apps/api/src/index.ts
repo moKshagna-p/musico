@@ -22,6 +22,11 @@ export const createApp = (options?: ConstructorParameters<typeof Elysia>[0]) => 
     const requestId = crypto.randomUUID()
     set.headers ??= {}
     set.headers['X-Request-Id'] = requestId
+    set.headers['X-Content-Type-Options'] = 'nosniff'
+    set.headers['X-Frame-Options'] = 'DENY'
+    set.headers['Referrer-Policy'] = 'no-referrer'
+    set.headers['Permissions-Policy'] = 'camera=(), microphone=(), geolocation=()'
+    set.headers['Content-Security-Policy'] = "default-src 'none'; base-uri 'none'; frame-ancestors 'none'"
     return { requestId, requestStartedAt: Date.now(), requestPath: new URL(request.url).pathname }
   })
   .onAfterHandle(({ request, set, requestId, requestStartedAt, requestPath }) => {
@@ -48,8 +53,7 @@ export const createApp = (options?: ConstructorParameters<typeof Elysia>[0]) => 
       origin: allowedOrigin,
       methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
       credentials: true,
-      allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Set-Cookie'],
-      exposedHeaders: ['Set-Cookie'],
+      allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
     }),
   )
   .mount(auth.handler)
@@ -83,10 +87,13 @@ export const createApp = (options?: ConstructorParameters<typeof Elysia>[0]) => 
       await db.execute(sql`select 1`)
       return { status: 'ready' }
     } catch (error) {
+      log('error', 'readiness.failed', {
+        message: error instanceof Error ? error.message : 'Database unavailable.',
+      })
       set.status = 503
       return {
         status: 'not_ready',
-        error: error instanceof Error ? error.message : 'Database unavailable.',
+        error: 'Database unavailable.',
       }
     }
   })
@@ -95,10 +102,13 @@ export const createApp = (options?: ConstructorParameters<typeof Elysia>[0]) => 
       await db.execute(sql`select 1`)
       return { status: 'ready' }
     } catch (error) {
+      log('error', 'readiness.failed', {
+        message: error instanceof Error ? error.message : 'Database unavailable.',
+      })
       set.status = 503
       return {
         status: 'not_ready',
-        error: error instanceof Error ? error.message : 'Database unavailable.',
+        error: 'Database unavailable.',
       }
     }
   })
