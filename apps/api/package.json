@@ -9,23 +9,25 @@
     "start:local": "bun --env-file=../../.env run db:migrate:local && bun --env-file=../../.env run server.ts",
     "worker:dev": "wrangler dev",
     "worker:deploy": "wrangler deploy",
+    "admin:grant": "bun --env-file=../../.env run scripts/grant-admin.ts --",
     "home:refresh": "bun --env-file=../../.env run scripts/refresh-home.ts",
     "db:generate": "bun --env-file=../../.env drizzle-kit generate --config=drizzle.config.ts",
     "db:migrate": "drizzle-kit migrate --config=drizzle.config.ts",
     "db:migrate:local": "bun --env-file=../../.env drizzle-kit migrate --config=drizzle.config.ts",
-    "db:studio": "bun --env-file=../../.env drizzle-kit studio --config=drizzle.config.ts"
+    "db:studio": "bun --env-file=../../.env drizzle-kit studio --config=drizzle.config.ts",
+    "test": "bun test"
   },
   "dependencies": {
     "@elysiajs/cors": "^1.4.1",
     "@neondatabase/serverless": "^0.10.4",
-    "better-auth": "^1.3.4",
+    "better-auth": "^1.6.23",
     "drizzle-kit": "^0.31.6",
-    "drizzle-orm": "^0.44.5",
+    "drizzle-orm": "^0.45.2",
     "elysia": "^1.4.22",
     "lru-cache": "^11.3.1"
   },
   "devDependencies": {
     "@types/node": "^25.2.1",
-    "wrangler": "^4.45.0"
+    "wrangler": "^4.110.0"
   }
 }
