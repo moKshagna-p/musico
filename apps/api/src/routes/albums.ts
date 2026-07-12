@@ -4,6 +4,7 @@ import {
   attachMusicoCommunityStats,
 } from '../core/utils'
 import { getStoredTrendingAlbumsEnsuringFresh } from '../services/trending'
+import { readIdentifier } from './validation'
 
 export const albumRoutes = new Elysia({ prefix: '/api' })
   .get('/featured', async ({ query, set }) => {
@@ -70,12 +71,13 @@ export const albumRoutes = new Elysia({ prefix: '/api' })
     }
   })
    .get('/releases/:id', async ({ params, set }) => {
-     if (!params?.id) {
+     const releaseId = readIdentifier(params?.id)
+     if (!releaseId) {
        set.status = 400
        return { error: 'Missing release id.' }
      }
      try {
-       const data = await getReleaseDetails(params.id)
+       const data = await getReleaseDetails(releaseId)
        const [hydrated] = await attachMusicoCommunityStats([data])
        set.headers ??= {}
        set.headers['Cache-Control'] = 'public, max-age=3600, immutable'

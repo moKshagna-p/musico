@@ -8,8 +8,8 @@ import {
 } from '../services/trending'
 
 export const cronRoutes = new Elysia({ prefix: '/api/cron' })
-  .get('/home-refresh', async ({ query, request, set }) => {
-    const authError = authorizeCron(request, set)
+  .post('/home-refresh', async ({ query, request, set }) => {
+    const authError = await authorizeCron(request, set)
     if (authError) return authError
 
     try {
@@ -69,8 +69,8 @@ export const cronRoutes = new Elysia({ prefix: '/api/cron' })
       return { error: 'Unable to refresh stored homepage releases right now.' }
     }
   })
-  .get('/recent-releases-refresh', async ({ query, request, set }) => {
-    const authError = authorizeCron(request, set)
+  .post('/recent-releases-refresh', async ({ query, request, set }) => {
+    const authError = await authorizeCron(request, set)
     if (authError) return authError
 
     try {

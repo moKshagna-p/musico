@@ -1,7 +1,7 @@
 import { sql, eq, inArray } from 'drizzle-orm'
 import { db } from './db'
 import { auth } from '../auth'
-import { env, readOptionalSecret } from './env'
+import { env } from './env'
 import { getReleaseDetails } from '../services/discogs'
 import {
   activity,
@@ -15,7 +15,6 @@ import {
   RATE_LIMIT_MAX,
   RATE_LIMIT_MAX_TRACKED_IPS,
   MAX_RELEASE_PREVIEW_LOOKUPS,
-  BOOTSTRAP_ADMIN_EMAIL,
 } from './constants'
 
 export const normalizeRating = (value: number) => {
@@ -41,40 +40,61 @@ export const log = (level: 'info' | 'warn' | 'error', message: string, data: Rec
 }
 
 export const getClientIp = (request: Request) => {
-  const forwardedFor = request.headers.get('x-forwarded-for') ?? request.headers.get('cf-connecting-ip')
-  if (forwardedFor) return forwardedFor.split(',')[0]?.trim() ?? 'unknown'
-  const realIp = request.headers.get('x-real-ip') ?? request.headers.get('x-client-ip')
-  if (realIp) return realIp
-  return request.headers.get('host') ?? 'local'
+  const connectingIp = request.headers.get('cf-connecting-ip')?.trim()
+  if (connectingIp && isIpAddress(connectingIp)) return connectingIp
+
+  if (env.BETTER_AUTH_URL.startsWith('http://localhost')) {
+    const localForwardedIp = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim()
+    if (localForwardedIp && isIpAddress(localForwardedIp)) return localForwardedIp
+  }
+
+  return 'unknown'
 }
 
 const rateLimiter = new Map<string, { count: number; resetAt: number }>()
+let lastRateLimitCleanupAt = 0
+
+const isIpAddress = (value: string) => {
+  const ipv4Parts = value.split('.')
+  if (ipv4Parts.length === 4 && ipv4Parts.every((part) => /^\d{1,3}$/.test(part) && Number(part) <= 255)) return true
+
+  if (!value.includes(':') || value.length > 45 || !/^[0-9a-f:.]+$/i.test(value)) return false
+  try {
+    new URL(`http://[${value}]/`)
+    return true
+  } catch {
+    return false
+  }
+}
+
+const cleanupExpiredRateLimits = (now: number) => {
+  if (rateLimiter.size < RATE_LIMIT_MAX_TRACKED_IPS && now - lastRateLimitCleanupAt < 60_000) return
+  for (const [trackedIp, tracked] of rateLimiter) {
+    if (tracked.resetAt <= now) rateLimiter.delete(trackedIp)
+  }
+  lastRateLimitCleanupAt = now
+}
 
 export const consumeRateLimit = (ip: string) => {
   const now = Date.now()
-  if (rateLimiter.size > RATE_LIMIT_MAX_TRACKED_IPS) {
-    for (const [trackedIp, tracked] of rateLimiter) {
-      if (tracked.resetAt <= now) {
-        rateLimiter.delete(trackedIp)
-      }
-      if (rateLimiter.size <= RATE_LIMIT_MAX_TRACKED_IPS) break
-    }
-  }
-
   const entry = rateLimiter.get(ip)
 
-  if (!entry || now > entry.resetAt) {
-    rateLimiter.set(ip, { count: 1, resetAt: now + RATE_LIMIT_WINDOW })
-    return { allowed: true, remaining: RATE_LIMIT_MAX - 1, retryAfter: RATE_LIMIT_WINDOW / 1000 }
+  if (entry && now <= entry.resetAt) {
+    if (entry.count >= RATE_LIMIT_MAX) {
+      return { allowed: false, remaining: 0, retryAfter: Math.ceil((entry.resetAt - now) / 1000) }
+    }
+    entry.count += 1
+    return { allowed: true, remaining: RATE_LIMIT_MAX - entry.count, retryAfter: Math.ceil((entry.resetAt - now) / 1000) }
   }
 
-  if (entry.count >= RATE_LIMIT_MAX) {
-    return { allowed: false, remaining: 0, retryAfter: Math.ceil((entry.resetAt - now) / 1000) }
+  if (entry) rateLimiter.delete(ip)
+  cleanupExpiredRateLimits(now)
+  if (rateLimiter.size >= RATE_LIMIT_MAX_TRACKED_IPS) {
+    return { allowed: false, remaining: 0, retryAfter: 60 }
   }
 
-  entry.count += 1
-  rateLimiter.set(ip, entry)
-  return { allowed: true, remaining: RATE_LIMIT_MAX - entry.count, retryAfter: Math.ceil((entry.resetAt - now) / 1000) }
+  rateLimiter.set(ip, { count: 1, resetAt: now + RATE_LIMIT_WINDOW })
+  return { allowed: true, remaining: RATE_LIMIT_MAX - 1, retryAfter: RATE_LIMIT_WINDOW / 1000 }
 }
 
 export const normalizeListName = (value: unknown) =>
@@ -249,12 +269,10 @@ export const ensureAuthenticated = async (request: Request, set: { status?: numb
   return user
 }
 
-export const isAdminIdentity = async (identity: { id?: string | null; email?: string | null }) => {
+export const isAdminIdentity = async (identity: { id?: string | null }) => {
   const userId = String(identity?.id ?? '').trim()
-  const email = normalizeEmail(identity?.email)
 
   if (!userId) return false
-  if (email === BOOTSTRAP_ADMIN_EMAIL) return true
 
   try {
     const rows = await db.select({ userId: adminUser.userId }).from(adminUser).where(eq(adminUser.userId, userId)).limit(1)
@@ -271,7 +289,7 @@ export const ensureAdmin = async (request: Request, set: { status?: number }) =>
   const authUser = await ensureAuthenticated(request, set)
   if (!authUser) return null
 
-  const allowed = await isAdminIdentity({ id: authUser.id, email: authUser.email })
+  const allowed = await isAdminIdentity({ id: authUser.id })
   if (!allowed) {
     set.status = 403
     return null
@@ -280,23 +298,38 @@ export const ensureAdmin = async (request: Request, set: { status?: number }) =>
   return authUser
 }
 
-export const authorizeCron = (request: Request, set: { status?: number }) => {
-  const cronSecret =
-    readOptionalSecret('HOME_REFRESH_SECRET') ??
-    readOptionalSecret('CRON_SECRET') ??
-    readOptionalSecret('BETTER_AUTH_SECRET')
+const secureSecretEquals = async (provided: string, expected: string) => {
+  const encoder = new TextEncoder()
+  const [providedHash, expectedHash] = await Promise.all([
+    crypto.subtle.digest('SHA-256', encoder.encode(provided)),
+    crypto.subtle.digest('SHA-256', encoder.encode(expected)),
+  ])
+  const providedBytes = new Uint8Array(providedHash)
+  const expectedBytes = new Uint8Array(expectedHash)
+  let difference = 0
+  for (let index = 0; index < expectedBytes.length; index += 1) {
+    difference |= providedBytes[index]! ^ expectedBytes[index]!
+  }
+  return difference === 0
+}
+
+export const authorizeCron = async (request: Request, set: { status?: number }) => {
+  if (request.method !== 'POST') {
+    set.status = 405
+    return { error: 'Method not allowed.' }
+  }
+
+  const cronSecret = env.CRON_SECRET
   if (!cronSecret) {
     set.status = 500
     return { error: 'Cron secret is not configured.' }
   }
 
   const authorization = request.headers.get('authorization') ?? ''
-  const bearerToken = authorization.startsWith('Bearer ') ? authorization.slice(7).trim() : ''
-  const headerToken = request.headers.get('x-cron-secret')?.trim() ?? ''
-  const queryToken = new URL(request.url).searchParams.get('secret')?.trim() ?? ''
-  const providedSecret = bearerToken || headerToken || queryToken
+  const match = /^Bearer\s+(.+)$/i.exec(authorization)
+  const providedSecret = match?.[1]?.trim() ?? ''
 
-  if (providedSecret !== cronSecret) {
+  if (!providedSecret || !(await secureSecretEquals(providedSecret, cronSecret))) {
     set.status = 401
     return { error: 'Unauthorized cron request.' }
   }

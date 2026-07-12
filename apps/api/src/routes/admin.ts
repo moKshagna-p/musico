@@ -16,17 +16,16 @@ import {
   ensureAuthenticated,
   isAdminIdentity,
   isMissingAdminTableError,
-  normalizeEmail,
   recordActivity,
 } from '../core/utils'
-import { BOOTSTRAP_ADMIN_EMAIL } from '../core/constants'
+import { readBoundedText, readIdentifier } from './validation'
 
 export const adminRoutes = new Elysia({ prefix: '/api/admin' })
   .get('/me', async ({ request, set }) => {
     const authUser = await ensureAuthenticated(request, set)
     if (!authUser) return { error: 'Unauthorized.' }
 
-    const isAdmin = await isAdminIdentity({ id: authUser.id, email: authUser.email })
+    const isAdmin = await isAdminIdentity({ id: authUser.id })
 
     set.headers ??= {}
     set.headers['Cache-Control'] = 'no-store'
@@ -42,7 +41,7 @@ export const adminRoutes = new Elysia({ prefix: '/api/admin' })
 
     const limitParam = Number(query?.limit)
     const limit = Number.isFinite(limitParam) ? Math.min(Math.max(limitParam, 1), 50) : 25
-    const search = String(query?.q ?? '').trim().toLowerCase()
+    const search = readBoundedText(query?.q, 120)?.toLowerCase() ?? ''
 
     const searchPattern = search ? `%${search.replace(/[%_]/g, '')}%` : ''
 
@@ -130,8 +129,6 @@ export const adminRoutes = new Elysia({ prefix: '/api/admin' })
       const filtered = mergedCandidates
         .map((entry) => {
           const profile = profileByUserId.get(entry.id)
-          const normalizedEmail = normalizeEmail(entry.email)
-          const isBootstrapAdmin = normalizedEmail === BOOTSTRAP_ADMIN_EMAIL
           return {
             userId: entry.id,
             name: entry.name,
@@ -139,8 +136,8 @@ export const adminRoutes = new Elysia({ prefix: '/api/admin' })
             username: profile?.username ?? null,
             image: entry.image ?? null,
             createdAt: entry.createdAt.getTime(),
-            isAdmin: isBootstrapAdmin || adminUserIds.has(entry.id),
-            isBootstrapAdmin,
+            isAdmin: adminUserIds.has(entry.id),
+            isBootstrapAdmin: false,
           }
         })
         .filter((entry) => {
@@ -183,8 +180,8 @@ export const adminRoutes = new Elysia({ prefix: '/api/admin' })
             username: null,
             image: entry.image ?? null,
             createdAt: entry.createdAt.getTime(),
-            isAdmin: normalizeEmail(entry.email) === BOOTSTRAP_ADMIN_EMAIL,
-            isBootstrapAdmin: normalizeEmail(entry.email) === BOOTSTRAP_ADMIN_EMAIL,
+            isAdmin: false,
+            isBootstrapAdmin: false,
           }))
           .filter((entry) => {
             if (!search) return true
@@ -203,9 +200,13 @@ export const adminRoutes = new Elysia({ prefix: '/api/admin' })
     const authUser = await ensureAdmin(request, set)
     if (!authUser) return { error: 'Forbidden.' }
 
-    const targetUserId = String(params?.userId ?? '').trim()
+    const targetUserId = readIdentifier(params?.userId)
     const typedBody = body as { isAdmin?: unknown }
-    const nextIsAdmin = Boolean(typedBody?.isAdmin)
+    if (typeof typedBody?.isAdmin !== 'boolean') {
+      set.status = 400
+      return { error: 'isAdmin must be a boolean.' }
+    }
+    const nextIsAdmin = typedBody.isAdmin
 
     if (!targetUserId) {
       set.status = 400
@@ -230,14 +231,7 @@ export const adminRoutes = new Elysia({ prefix: '/api/admin' })
       return { error: 'Target user not found.' }
     }
 
-    const targetIsBootstrapAdmin = normalizeEmail(target.email) === BOOTSTRAP_ADMIN_EMAIL
-    if (targetIsBootstrapAdmin && !nextIsAdmin) {
-      set.status = 400
-      return { error: 'Bootstrap admin access cannot be removed.' }
-    }
-
-    const actorIsBootstrapAdmin = normalizeEmail(authUser.email) === BOOTSTRAP_ADMIN_EMAIL
-    if (!nextIsAdmin && targetUserId === authUser.id && !actorIsBootstrapAdmin) {
+    if (!nextIsAdmin && targetUserId === authUser.id) {
       set.status = 400
       return { error: 'You cannot remove your own admin access.' }
     }
@@ -279,8 +273,8 @@ export const adminRoutes = new Elysia({ prefix: '/api/admin' })
         username: profileRow?.username ?? null,
         image: target.image ?? null,
         createdAt: target.createdAt.getTime(),
-        isAdmin: nextIsAdmin || targetIsBootstrapAdmin,
-        isBootstrapAdmin: targetIsBootstrapAdmin,
+        isAdmin: nextIsAdmin,
+        isBootstrapAdmin: false,
       },
     }
   })
@@ -372,7 +366,7 @@ export const adminRoutes = new Elysia({ prefix: '/api/admin' })
           totalLists: Number(activeListRows[0]?.count ?? 0),
           searches7d: Number(weeklySearchRows[0]?.count ?? 0),
           averageRating: Math.round(Number(averageRatingRows[0]?.average ?? 0) * 10) / 10,
-          adminCount: Number(adminRows[0]?.count ?? 0) + 1,
+          adminCount: Number(adminRows[0]?.count ?? 0),
         },
         recentReviews: recentReviewsRows.map((entry) => ({
           id: entry.id,
@@ -469,7 +463,7 @@ export const adminRoutes = new Elysia({ prefix: '/api/admin' })
     const authUser = await ensureAdmin(request, set)
     if (!authUser) return { error: 'Forbidden.' }
 
-    const reviewId = String(params?.reviewId ?? '').trim()
+    const reviewId = readIdentifier(params?.reviewId)
     if (!reviewId) {
       set.status = 400
       return { error: 'Missing review id.' }

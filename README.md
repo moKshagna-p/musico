@@ -32,8 +32,8 @@ Musico is built as a TypeScript monorepo managed by Turbo, ensuring a clean sepa
 
 ### Prerequisites
 
-- Node.js 18+
-- Bun 1.0+
+- Node.js 22+
+- Bun 1.3.10+
 - A PostgreSQL instance (e.g., Neon)
 
 ### Setup
@@ -64,7 +64,7 @@ Musico is built as a TypeScript monorepo managed by Turbo, ensuring a clean sepa
 We maintain reliability through comprehensive testing and linting:
 
 - **Linting**: `bun run lint`
-- **Unit Testing**: `bun run test`
+- **Unit Testing**: `bun run test` (Bun API tests and Node's built-in web tests)
 - **E2E Testing**: `npx playwright test`
 
 ## Release Workflow
@@ -92,6 +92,17 @@ gh secret set VERCEL_PROJECT_ID --env production
 
 If any of these are missing, the release workflow fails before attempting the
 Cloudflare Worker or Vercel deploy.
+
+## Production Security
+
+- Provision the first administrator with the operator-only command in
+  [`apps/api/CLOUDFLARE.md`](apps/api/CLOUDFLARE.md). Runtime admin access is
+  granted only through the `admin_user` table.
+- Set a dedicated, high-entropy `CRON_SECRET`. Cron refresh endpoints accept
+  `POST` requests with `Authorization: Bearer <CRON_SECRET>` only.
+- Configure Cloudflare WAF/rate-limiting rules for `/api/auth/*`, `/api/search`,
+  and `/api/releases/*`; the Worker limiter is intentionally a bounded local
+  fallback, not global DDoS protection.
 
 ## Contributing
 

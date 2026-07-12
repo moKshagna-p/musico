@@ -15,6 +15,7 @@ import {
   getReleasePreviewMap,
 } from '../core/utils'
 import { MAX_LISTS_PER_USER, MAX_ALBUMS_PER_LIST } from '../core/constants'
+import { isRecord, readBoundedText, readIdentifier } from './validation'
 
 export const listRoutes = new Elysia({ prefix: '/api' })
   .get('/me/lists', async ({ request, set }) => {
@@ -71,23 +72,18 @@ export const listRoutes = new Elysia({ prefix: '/api' })
     const authUser = await ensureAuthenticated(request, set)
     if (!authUser) return { error: 'Unauthorized.' }
 
-    const typedBody = body as {
-      name?: unknown
-      album?: {
-        id?: unknown
-        name?: unknown
-        cover?: unknown
-        artists?: unknown
-        releaseYear?: unknown
-      }
-    }
-
-    const name = normalizeListName(typedBody?.name)
-    const initialAlbum = typedBody?.album
-    const initialAlbumId = String(initialAlbum?.id ?? '').trim()
+    const typedBody = isRecord(body) ? body : null
+    const rawName = readBoundedText(typedBody?.name, 48)
+    const name = normalizeListName(rawName)
+    const initialAlbum = isRecord(typedBody?.album) ? typedBody.album : null
+    const initialAlbumId = initialAlbum?.id === undefined ? '' : readIdentifier(initialAlbum.id)
     if (!name) {
       set.status = 400
       return { error: 'List name is required.' }
+    }
+    if (initialAlbumId === null) {
+      set.status = 400
+      return { error: 'Invalid album id.' }
     }
 
     const currentLists = await db.select().from(userList).where(eq(userList.userId, authUser.id))
@@ -177,15 +173,9 @@ export const listRoutes = new Elysia({ prefix: '/api' })
     const authUser = await ensureAuthenticated(request, set)
     if (!authUser) return { error: 'Unauthorized.' }
 
-    const listId = String(params?.listId ?? '').trim()
-    const album = body as {
-      id?: unknown
-      name?: unknown
-      cover?: unknown
-      artists?: unknown
-      releaseYear?: unknown
-    }
-    const albumId = String(album?.id ?? '').trim()
+    const listId = readIdentifier(params?.listId)
+    const album = isRecord(body) ? body : null
+    const albumId = readIdentifier(album?.id)
 
     if (!listId || !albumId) {
       set.status = 400
@@ -275,7 +265,7 @@ export const listRoutes = new Elysia({ prefix: '/api' })
     }
   })
   .get('/lists/:listId', async ({ params, set }) => {
-    const listId = String(params?.listId ?? '').trim()
+    const listId = readIdentifier(params?.listId)
     if (!listId) {
       set.status = 400
       return { error: 'Missing list id.' }
