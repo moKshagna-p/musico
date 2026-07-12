@@ -132,7 +132,24 @@ jobs:
         run: bun install --frozen-lockfile
 
       - name: Deploy Cloudflare Worker
-        run: bun run --cwd apps/api worker:deploy
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          for attempt in 1 2 3; do
+            if bun run --cwd apps/api worker:deploy; then
+              exit 0
+            fi
+
+            if [ "$attempt" -eq 3 ]; then
+              echo "Cloudflare deployment failed after ${attempt} attempts." >&2
+              exit 1
+            fi
+
+            sleep_seconds=$((attempt * 10))
+            echo "Cloudflare deployment failed; retrying in ${sleep_seconds}s..." >&2
+            sleep "$sleep_seconds"
+          done
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
