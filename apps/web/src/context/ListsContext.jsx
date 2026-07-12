@@ -74,6 +74,7 @@ export const ListsProvider = ({ children }) => {
     let isCancelled = false
 
     const loadLists = async () => {
+      setLists([])
       if (isPending) return
       if (!user?.id) {
         setLists([])

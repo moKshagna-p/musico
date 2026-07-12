@@ -1,11 +1,13 @@
 import { useInfiniteQuery } from '@tanstack/react-query'
 import api from '../services/apiClient.js'
+import { useAuth } from './useAuth.js'
 
 /**
  * Professional Feed Hook using TanStack Query
  * Handles: Caching, SWR, Infinite Scroll, and Loading/Error states automatically.
  */
 const useFeed = () => {
+  const { user, isPending } = useAuth()
   const {
     data,
     fetchNextPage,
@@ -16,7 +18,7 @@ const useFeed = () => {
     error,
     refetch,
   } = useInfiniteQuery({
-    queryKey: ['feed'],
+    queryKey: ['feed', user?.id ?? null],
     queryFn: async ({ pageParam = null }) => {
       const response = await api.get('/api/me/feed', {
         params: {
@@ -28,6 +30,7 @@ const useFeed = () => {
     },
     getNextPageParam: (lastPage) => lastPage.nextCursor || undefined,
     initialPageParam: null,
+    enabled: !isPending && Boolean(user?.id),
   })
 
   // Flatten the pages into a single items array
