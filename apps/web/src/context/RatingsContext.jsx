@@ -19,6 +19,7 @@ export const RatingsProvider = ({ children }) => {
 
     const loadRatings = async () => {
       setLoadingRatings(true)
+      setRatings({})
       if (isPending) return
       if (!user?.id) {
         setRatings({})

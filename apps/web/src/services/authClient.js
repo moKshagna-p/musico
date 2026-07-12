@@ -2,12 +2,8 @@ import { createAuthClient } from 'better-auth/react'
 
 // Environment-aware API resolution
 const getApiBaseUrl = () => {
-  // If we are on Vercel production, we MUST use relative paths to trigger the vercel.json rewrite.
-  // This makes Safari think the API is on the same domain, fixing the cookie blocking.
-  if (typeof window !== 'undefined' && (
-    window.location.hostname.includes('vercel.app') || 
-    window.location.hostname === 'musico-web.vercel.app'
-  )) {
+  // Production requests use the Vercel rewrite, including custom domains.
+  if (typeof window !== 'undefined' && import.meta.env.PROD) {
     return window.location.origin
   }
 
