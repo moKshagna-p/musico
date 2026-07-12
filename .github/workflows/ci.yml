@@ -70,6 +70,10 @@ jobs:
         if: steps.filter.outputs.code == 'true'
         run: bun run test
 
+      - name: 8a. Test Release Notes
+        if: steps.filter.outputs.code == 'true'
+        run: bun run test:release-notes
+
       - name: 9. Install Playwright Browsers
         if: steps.filter.outputs.code == 'true'
         run: bunx playwright install --with-deps chromium

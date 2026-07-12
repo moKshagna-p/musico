@@ -67,6 +67,9 @@ jobs:
       - name: Run unit tests
         run: bun run test
 
+      - name: Test release notes
+        run: bun run test:release-notes
+
       - name: Install Playwright browsers
         run: bunx playwright install --with-deps chromium
 
