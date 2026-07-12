@@ -69,7 +69,7 @@ We maintain reliability through comprehensive testing and linting:
 
 ## Release Workflow
 
-Normal pushes and pull requests run CI checks only. Production deployments run from the `Release` workflow when a `v*` tag is pushed or the workflow is started manually.
+Normal pushes and pull requests run CI checks only. Production deployments run from the `Release` workflow when a `v*` tag is pushed or the workflow is started manually. Each release automatically publishes a professional, four-to-five-line summary of the commits since the previous release tag.
 
 Release deployments require these GitHub Actions secrets:
 

@@ -19,6 +19,7 @@
     "build": "npm run check:bun && turbo run build",
     "lint": "turbo run lint",
     "test": "turbo run test",
+    "test:release-notes": "node --test scripts/generate-release-notes.test.mjs",
     "preview": "npm run preview --workspace=@musico/web",
     "dev:web": "bun run --cwd apps/web dev",
     "dev:api": "npm run check:bun && bun run --cwd apps/api dev",
