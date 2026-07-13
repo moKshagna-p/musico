@@ -11,7 +11,6 @@ import {
   AuthPageSkeleton,
   DiscoverPageSkeleton,
   FeedPageSkeleton,
-  HomePageSkeleton,
   ListeningHistoryPageSkeleton,
   NotFoundPageSkeleton,
   ProfilePageSkeleton,
@@ -136,7 +135,8 @@ const App = () => {
         <RouteErrorBoundary>
           <AnimatePresence mode="wait" initial={false}>
             <Routes location={location} key={location.pathname}>
-              <Route path="/" element={withRouteFallback(<Home />, <HomePageSkeleton />)} />
+              {/* Home is statically imported and never suspends; it renders its own skeleton while loading */}
+              <Route path="/" element={<Home />} />
               <Route path="/discover" element={withRouteFallback(<Discover />, <DiscoverPageSkeleton />)} />
               <Route path="/search" element={withRouteFallback(<SearchResults />, <SearchResultsPageSkeleton />)} />
               <Route path="/profile" element={withRouteFallback(<Profile />, <ProfilePageSkeleton showActions />)} />
