@@ -6,6 +6,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import App from './App.jsx'
 import { ListsProvider } from './context/ListsContext.jsx'
 import { RatingsProvider } from './context/RatingsContext.jsx'
+import { homeSectionsQueryOptions } from './queries/homeSections.js'
 import './index.css'
 
 const queryClient = new QueryClient({
@@ -18,6 +19,12 @@ const queryClient = new QueryClient({
     },
   },
 })
+
+// Kick off the homepage data fetch before React mounts so the request
+// runs in parallel with rendering instead of after it.
+if (window.location.pathname === '/') {
+  void queryClient.prefetchQuery(homeSectionsQueryOptions)
+}
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>

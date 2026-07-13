@@ -21,7 +21,10 @@ import {
 import RouteErrorBoundary from './components/ui/RouteErrorBoundary.jsx'
 import { useAuth } from './hooks/useAuth.js'
 
-const Home = lazy(() => import('./pages/Home.jsx'))
+// Home is the landing page: importing it statically avoids the extra
+// network round trip for its chunk before the first render.
+import Home from './pages/Home.jsx'
+
 const Discover = lazy(() => import('./pages/Discover.jsx'))
 const SearchResults = lazy(() => import('./pages/SearchResults.jsx'))
 const Profile = lazy(() => import('./pages/Profile.jsx'))
