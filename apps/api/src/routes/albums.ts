@@ -16,7 +16,12 @@ export const albumRoutes = new Elysia({ prefix: '/api' })
       const data = await getStoredTrendingAlbumsEnsuringFresh(limit, normalizedMode)
 
       set.headers ??= {}
-      set.headers['Cache-Control'] = 'public, max-age=60, s-maxage=300, stale-while-revalidate=86400'
+      // Never let shared caches hold an empty payload: the trending service
+      // swallows refresh failures and returns [], and a cached empty response
+      // would be served to every user until it expires.
+      set.headers['Cache-Control'] = data.length
+        ? 'public, max-age=60, s-maxage=300, stale-while-revalidate=86400'
+        : 'no-store'
       return { data: await attachMusicoCommunityStats(data) }
     } catch (error) {
       console.error('[featured] error', error)
@@ -48,8 +53,19 @@ export const albumRoutes = new Elysia({ prefix: '/api' })
         console.warn('[home] both sections failed, returning empty data')
       }
 
+      // Only allow shared caches to store fully healthy responses; a failed or
+      // empty section cached at the edge would show every user a broken
+      // homepage until the entry expires.
+      const isHealthy =
+        mostHappening.status === 'fulfilled' &&
+        recentReleases.status === 'fulfilled' &&
+        mostHappeningData.length > 0 &&
+        recentReleasesData.length > 0
+
       set.headers ??= {}
-      set.headers['Cache-Control'] = 'public, max-age=60, s-maxage=300, stale-while-revalidate=86400'
+      set.headers['Cache-Control'] = isHealthy
+        ? 'public, max-age=60, s-maxage=300, stale-while-revalidate=86400'
+        : 'no-store'
       return {
         mostHappening: {
           data: mostHappeningData,
