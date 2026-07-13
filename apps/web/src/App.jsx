@@ -11,7 +11,6 @@ import {
   AuthPageSkeleton,
   DiscoverPageSkeleton,
   FeedPageSkeleton,
-  HomePageSkeleton,
   ListeningHistoryPageSkeleton,
   NotFoundPageSkeleton,
   ProfilePageSkeleton,
@@ -21,7 +20,10 @@ import {
 import RouteErrorBoundary from './components/ui/RouteErrorBoundary.jsx'
 import { useAuth } from './hooks/useAuth.js'
 
-const Home = lazy(() => import('./pages/Home.jsx'))
+// Home is the landing page: importing it statically avoids the extra
+// network round trip for its chunk before the first render.
+import Home from './pages/Home.jsx'
+
 const Discover = lazy(() => import('./pages/Discover.jsx'))
 const SearchResults = lazy(() => import('./pages/SearchResults.jsx'))
 const Profile = lazy(() => import('./pages/Profile.jsx'))
@@ -133,7 +135,8 @@ const App = () => {
         <RouteErrorBoundary>
           <AnimatePresence mode="wait" initial={false}>
             <Routes location={location} key={location.pathname}>
-              <Route path="/" element={withRouteFallback(<Home />, <HomePageSkeleton />)} />
+              {/* Home is statically imported and never suspends; it renders its own skeleton while loading */}
+              <Route path="/" element={<Home />} />
               <Route path="/discover" element={withRouteFallback(<Discover />, <DiscoverPageSkeleton />)} />
               <Route path="/search" element={withRouteFallback(<SearchResults />, <SearchResultsPageSkeleton />)} />
               <Route path="/profile" element={withRouteFallback(<Profile />, <ProfilePageSkeleton showActions />)} />

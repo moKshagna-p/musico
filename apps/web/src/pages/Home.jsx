@@ -6,31 +6,20 @@ import AlbumGrid from '../components/album/AlbumGrid.jsx'
 import Hero from '../components/ui/Hero.jsx'
 import PageTransition from '../components/ui/PageTransition.jsx'
 import { HomePageSkeleton } from '../components/ui/PageLoadingState.jsx'
-import { getHomeSections } from '../services/discogsService.js'
+import { homeSectionsQueryOptions } from '../queries/homeSections.js'
 import { useInfiniteScroll } from '../hooks/useInfiniteScroll.js'
 
 // Initial load: 12 albums per section (reduced from 24)
 const HOME_SECTION_INITIAL_LIMIT = 12
 // Load 12 more albums when user scrolls to the bottom
 const HOME_SECTION_PAGE_SIZE = 12
-const HOME_SECTION_FETCH_LIMIT = 24
 
 const Home = () => {
   const navigate = useNavigate()
   const [showAllHappeningAlbums, setShowAllHappeningAlbums] = useState(false)
   const [displayRecentCount, setDisplayRecentCount] = useState(HOME_SECTION_INITIAL_LIMIT)
 
-  // Query fetches a larger set than we initially display
-  // This allows pagination without additional API calls
-  const homeSectionsQuery = useQuery({
-    queryKey: ['home-sections', HOME_SECTION_FETCH_LIMIT, HOME_SECTION_FETCH_LIMIT],
-    queryFn: () =>
-      getHomeSections({
-        happeningLimit: HOME_SECTION_FETCH_LIMIT,
-        recentLimit: HOME_SECTION_FETCH_LIMIT,
-      }),
-    staleTime: 1000 * 60 * 5,
-  })
+  const homeSectionsQuery = useQuery(homeSectionsQueryOptions)
 
   const mostHappeningAlbums = Array.isArray(homeSectionsQuery.data?.mostHappening?.data)
     ? homeSectionsQuery.data.mostHappening.data
