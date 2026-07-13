@@ -15,6 +15,15 @@ const CoverImage = ({
 }) => {
   const [failedSrc, setFailedSrc] = useState(null)
   const [loadedSrc, setLoadedSrc] = useState(null)
+  const [prevSrc, setPrevSrc] = useState(src)
+
+  // Reset load state during render when src changes, so a previously loaded
+  // URL that cycles back (e.g. after cache eviction) still shows the placeholder.
+  if (prevSrc !== src) {
+    setPrevSrc(src)
+    setLoadedSrc(null)
+  }
+
   const isLoaded = loadedSrc === src
 
   if (!src || failedSrc === src) {
@@ -23,10 +32,11 @@ const CoverImage = ({
 
   return (
     <div className="relative overflow-hidden">
-      {/* Lightweight placeholder while the image loads (no extra network cost) */}
-      {!isLoaded && (
-        <div aria-hidden="true" className={`${className} absolute inset-0 animate-pulse ${fallbackClassName}`.trim()} />
-      )}
+      {/* Lightweight placeholder (no extra network cost); crossfades with the image */}
+      <div
+        aria-hidden="true"
+        className={`${className} pointer-events-none absolute inset-0 ${fallbackClassName} transition-opacity duration-300 ${isLoaded ? 'opacity-0' : 'animate-pulse opacity-100'}`.trim()}
+      />
 
       <img
         src={src}
