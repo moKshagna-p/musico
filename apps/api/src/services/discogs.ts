@@ -22,7 +22,10 @@ const DISCOGS_KEY = sanitizeDiscogsCredential(env.DISCOGS_KEY)
 const DISCOGS_SECRET = sanitizeDiscogsCredential(env.DISCOGS_SECRET)
 const DISCOGS_USER_AGENT = env.DISCOGS_USER_AGENT
 
-const RELEASE_CACHE_WINDOW = 1000 * 60 * 60 // 1 hour
+// Album metadata (name, artists, tracklist, cover) is effectively immutable on Discogs,
+// and Musico community stats are attached fresh from our own DB at serve time —
+// so a long TTL only delays picking up rare upstream metadata corrections.
+const RELEASE_CACHE_WINDOW = 1000 * 60 * 60 * 24 * 30 // 30 days
 const FEATURED_DB_CACHE_WINDOW = env.FEATURED_CACHE_TTL_MS
 const SEARCH_DB_CACHE_WINDOW = env.SEARCH_CACHE_TTL_MS
 const FEATURED_RETRY_COOLDOWN_MS = env.FEATURED_RETRY_COOLDOWN_MS
