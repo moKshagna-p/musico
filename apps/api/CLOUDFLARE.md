@@ -57,6 +57,7 @@ Plain variables:
 - `SEARCH_CACHE_TTL_MS`: optional, capped at `21300000` (5 hours 55 minutes).
 - `DISCOGS_MIN_REQUEST_INTERVAL_MS`: optional, defaults to `1100`.
 - `DISCOGS_REQUEST_TIMEOUT_MS`: optional, defaults to `10000`.
+- `HOMEPAGE_REFRESH_MINIMAL`: optional, defaults to `false`; leave it disabled so the Billboard snapshot replaces older homepage albums.
 - `HOME_RELEASE_DETAILS_PREWARM_LIMIT`: optional, defaults to `6`.
 
 ## First Administrator

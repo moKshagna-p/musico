@@ -67,7 +67,7 @@ export const env = new Proxy({} as Record<string, unknown>, {
       case 'DISCOGS_MAX_RETRIES': return parsePositiveInteger(get('DISCOGS_MAX_RETRIES'), 4)
       case 'DISCOGS_REQUEST_TIMEOUT_MS': return parsePositiveInteger(get('DISCOGS_REQUEST_TIMEOUT_MS'), 10000)
       case 'HOME_RELEASE_DETAILS_PREWARM_LIMIT': return parsePositiveInteger(get('HOME_RELEASE_DETAILS_PREWARM_LIMIT'), 6)
-      case 'HOMEPAGE_REFRESH_MINIMAL': return get('HOMEPAGE_REFRESH_MINIMAL') !== 'false'
+      case 'HOMEPAGE_REFRESH_MINIMAL': return get('HOMEPAGE_REFRESH_MINIMAL') === 'true'
       case 'RELEASE_CACHE_MAX_ENTRIES': return parsePositiveInteger(get('RELEASE_CACHE_MAX_ENTRIES'), 1500)
       case 'CRON_SECRET': return sanitizeOptionalSecret(get('CRON_SECRET'))
       default: return undefined

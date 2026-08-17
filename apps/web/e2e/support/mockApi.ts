@@ -269,6 +269,15 @@ export const installApiMocks = async (page: Page) => {
           })
         : []
 
+      if (query === 'u2') {
+        return json(route, {
+          data: [{ ...toSummary(albumCatalog[0]), id: 'm:u2', name: 'U2', artists: ['U2'] }],
+          correctedQuery: null,
+          hasMore: false,
+          nextOffset: null,
+        })
+      }
+
       const results = query === 'pagination'
         ? Array.from({ length: 13 }, (_, index) => ({
             ...toSummary(albumCatalog[0]),

@@ -646,10 +646,10 @@ const mapDiscogsMasterSearchResults = (results: any[]): ReleaseSummary[] =>
     })
     .filter(Boolean) as ReleaseSummary[]
 
-const normalizeSearchValue = (value = '') =>
+export const normalizeSearchValue = (value = '') =>
   value
     .toLowerCase()
-    .replace(/[^\w\s]/g, ' ')
+    .replace(/[^\p{L}\p{N}\s]/gu, ' ')
     .replace(/\s+/g, ' ')
     .trim()
 
@@ -762,6 +762,7 @@ type ScoredRelease = {
   rankScore: number
   isExactNameMatch: boolean
   isExactArtistMatch: boolean
+  isExactArtistAlbumMatch: boolean
 }
 
 const scoreReleaseAgainstQuery = (release: ReleaseSummary, sourceQuery: string): ScoredRelease => {
@@ -769,11 +770,16 @@ const scoreReleaseAgainstQuery = (release: ReleaseSummary, sourceQuery: string):
   const queryTokens = toNormalizedTokens(sourceQuery)
   const normalizedName = normalizeSearchValue(release.name ?? '')
   const normalizedArtists = (release.artists ?? []).map((artist) => normalizeSearchValue(artist)).filter(Boolean)
+  const normalizedArtistAlbums = normalizedArtists.map((artist) => `${artist} ${normalizedName}`.trim())
   const albumType = normalizeSearchValue(release.albumType ?? '')
 
   const nameFuzzy = fuzzyScore(normalizedQuery, normalizedName)
   const bestArtistFuzzy = normalizedArtists.reduce(
     (best, artist) => Math.max(best, fuzzyScore(normalizedQuery, artist)),
+    0,
+  )
+  const bestArtistAlbumFuzzy = normalizedArtistAlbums.reduce(
+    (best, artistAlbum) => Math.max(best, fuzzyScore(normalizedQuery, artistAlbum)),
     0,
   )
 
@@ -784,13 +790,18 @@ const scoreReleaseAgainstQuery = (release: ReleaseSummary, sourceQuery: string):
 
   const exactName = normalizedName === normalizedQuery
   const exactArtist = normalizedArtists.includes(normalizedQuery)
+  const exactArtistAlbum = normalizedArtistAlbums.includes(normalizedQuery)
   const startsWithMatch =
-    normalizedName.startsWith(normalizedQuery) || normalizedArtists.some((artist) => artist.startsWith(normalizedQuery))
+    normalizedName.startsWith(normalizedQuery) ||
+    normalizedArtists.some((artist) => artist.startsWith(normalizedQuery)) ||
+    normalizedArtistAlbums.some((artistAlbum) => artistAlbum.startsWith(normalizedQuery))
   const includesMatch =
-    normalizedName.includes(normalizedQuery) || normalizedArtists.some((artist) => artist.includes(normalizedQuery))
+    normalizedName.includes(normalizedQuery) ||
+    normalizedArtists.some((artist) => artist.includes(normalizedQuery)) ||
+    normalizedArtistAlbums.some((artistAlbum) => artistAlbum.includes(normalizedQuery))
 
-  let intentScore = Math.max(nameFuzzy * 0.94, bestArtistFuzzy, tokenCoverage * 0.9)
-  if (exactName || exactArtist) intentScore += 0.42
+  let intentScore = Math.max(nameFuzzy * 0.94, bestArtistFuzzy, bestArtistAlbumFuzzy, tokenCoverage * 0.9)
+  if (exactName || exactArtist || exactArtistAlbum) intentScore += 0.42
   else if (startsWithMatch) intentScore += 0.22
   else if (includesMatch) intentScore += 0.1
 
@@ -811,10 +822,11 @@ const scoreReleaseAgainstQuery = (release: ReleaseSummary, sourceQuery: string):
     rankScore: Number(rankScore.toFixed(4)),
     isExactNameMatch: exactName,
     isExactArtistMatch: exactArtist,
+    isExactArtistAlbumMatch: exactArtistAlbum,
   }
 }
 
-const buildSmartSearchResults = (
+export const buildSmartSearchResults = (
   releases: ReleaseSummary[],
   sourceQuery: string,
   limit = SMART_SEARCH_RESULT_LIMIT,
@@ -833,7 +845,9 @@ const buildSmartSearchResults = (
 
   const bestMatchScore = ranked[0]?.intentScore ?? 0
 
-  const exactMatches = ranked.filter((entry) => entry.isExactNameMatch || entry.isExactArtistMatch)
+  const exactMatches = ranked.filter(
+    (entry) => entry.isExactNameMatch || entry.isExactArtistMatch || entry.isExactArtistAlbumMatch,
+  )
   if (exactMatches.length > safeLimit) {
     return {
       data: exactMatches.slice(0, safeLimit).map((entry) => entry.release),

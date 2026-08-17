@@ -34,6 +34,7 @@ const SearchResults = () => {
   } = useSearch(query, { 
     limit: pageSize,
     offset,
+    minLength: 1,
     enabled: !!query 
   })
 

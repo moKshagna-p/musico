@@ -10,7 +10,7 @@ command = "cd ../.. && bun install --frozen-lockfile"
 enabled = true
 
 [triggers]
-crons = ["0 0 * * *"]
+crons = ["0 */6 * * *"]
 
 [vars]
 ALLOWED_ORIGIN = "https://musico-web.vercel.app"

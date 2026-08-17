@@ -7,6 +7,7 @@ import PageTransition from '../components/ui/PageTransition.jsx'
 import SearchBar from '../components/search/SearchBar.jsx'
 import { useAuth } from '../hooks/useAuth.js'
 import { getRecentPopularReleases } from '../services/discogsService.js'
+import { recordSearchSignal } from '../services/searchSignalService.js'
 
 const RECENT_RELEASES_LIMIT = 24
 
@@ -35,6 +36,7 @@ const Discover = () => {
 
   const handleSearch = (value) => {
     if (value?.trim()) {
+      void recordSearchSignal(value)
       navigate(`/search?q=${encodeURIComponent(value)}`)
     }
   }
