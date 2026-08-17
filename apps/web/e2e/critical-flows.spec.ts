@@ -52,6 +52,33 @@ test.describe('Critical user flows', () => {
     expect(offsets.at(-1)).toBe('12')
   })
 
+  test('short full-page searches request and render results', async ({ page }) => {
+    const requests: string[] = []
+    page.on('request', (request) => {
+      const url = new URL(request.url())
+      if (url.pathname === '/api/search') requests.push(url.searchParams.get('q') ?? '')
+    })
+
+    await page.goto('/search?q=U2')
+    await expect(page.getByRole('heading', { name: 'U2', exact: true })).toBeVisible()
+    await expect.poll(() => requests).toContain('U2')
+  })
+
+  test('Discover records submitted searches', async ({ page }) => {
+    const searchEvents: string[] = []
+    page.on('request', (request) => {
+      if (new URL(request.url()).pathname === '/api/search-events') {
+        searchEvents.push(request.postData() ?? '')
+      }
+    })
+
+    await page.goto('/discover')
+    await page.getByPlaceholder(/search artists or albums/i).fill('U2')
+    await page.getByPlaceholder(/search artists or albums/i).press('Enter')
+    await expect(page).toHaveURL(/\/search\?q=U2/i)
+    expect(searchEvents).toContain(JSON.stringify({ query: 'U2' }))
+  })
+
   test('list flow creates list and toggles album in listen later', async ({ page }) => {
     await signIn(page)
 

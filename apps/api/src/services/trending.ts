@@ -6,7 +6,6 @@ import { fetchBillboard200Albums } from './charts'
 import { db } from '../core/db'
 import {
   fetchRecentReleaseCandidatesFromDiscogs,
-  getFeaturedReleases,
   getReleaseDetails,
   getRecentPopularReleases,
   searchReleases,
@@ -57,8 +56,8 @@ const toDateOrNull = (value: unknown) => {
   return null
 }
 
-const getSnapshotTargetLimit = (requestedLimit: number) =>
-  env.HOMEPAGE_REFRESH_MINIMAL
+const getSnapshotTargetLimit = (requestedLimit: number, mode: StoredMode) =>
+  mode !== 'featured' && env.HOMEPAGE_REFRESH_MINIMAL
     ? clampLimit(requestedLimit, MINIMAL_SNAPSHOT_LIMIT)
     : Math.max(clampLimit(requestedLimit), DEFAULT_SNAPSHOT_LIMIT)
 
@@ -148,8 +147,13 @@ const parseReleaseTimestamp = (release: ReleaseSummary) => {
   return 0
 }
 
-const getMostHappeningAlbums = async (limit = 12) => {
-  const chartAlbums = await fetchBillboard200Albums(Math.min(Math.max(limit * 2, limit), 50))
+type SearchLookup = (query: string) => Promise<{ data: ReleaseSummary[] }>
+
+export const matchBillboardAlbums = async (
+  chartAlbums: Array<{ rank: number; name: string; artist: string }>,
+  search: SearchLookup,
+  limit = 12,
+) => {
   const matches: ReleaseSummary[] = []
 
   for (const chartAlbum of chartAlbums) {
@@ -157,7 +161,7 @@ const getMostHappeningAlbums = async (limit = 12) => {
 
     const query = `${chartAlbum.artist} ${chartAlbum.name}`.trim()
     try {
-      const result = await searchReleases(query)
+      const result = await search(query)
       const bestMatch = pickBestDiscogsMatch(result.data, chartAlbum)
       if (bestMatch) matches.push(bestMatch)
     } catch {
@@ -165,16 +169,12 @@ const getMostHappeningAlbums = async (limit = 12) => {
     }
   }
 
-  const uniqueMatches = Array.from(new Map(matches.map((release) => [release.id, release])).values())
-  if (uniqueMatches.length >= limit) return uniqueMatches.slice(0, limit)
+  return Array.from(new Map(matches.map((release) => [release.id, release])).values()).slice(0, limit)
+}
 
-  try {
-    const fallback = await getFeaturedReleases(limit)
-    const merged = Array.from(new Map([...uniqueMatches, ...fallback].map((release) => [release.id, release])).values())
-    return merged.slice(0, limit)
-  } catch {
-    return uniqueMatches.slice(0, limit)
-  }
+const getMostHappeningAlbums = async (limit = 12) => {
+  const chartAlbums = await fetchBillboard200Albums(Math.min(Math.max(limit * 2, limit), 50))
+  return matchBillboardAlbums(chartAlbums, searchReleases, limit)
 }
 
 const getStoredAlbumIds = async (mode: StoredMode) => {
@@ -257,6 +257,7 @@ const upsertStoredSnapshot = async (mode: StoredMode, snapshot: ReleaseSummary[]
   const refreshedAt = new Date()
 
   if (!snapshot.length) {
+    await db.delete(storedTrendingAlbum).where(eq(storedTrendingAlbum.mode, mode))
     return { refreshedAt, insertedOrUpdated: 0, data: [] as ReleaseSummary[] }
   }
 
@@ -399,13 +400,14 @@ export const refreshStoredTrendingAlbums = async (mode: StoredMode = DEFAULT_MOD
   const existing = storedRefreshInFlight.get(mode)
   if (existing) return existing
 
-  const targetLimit = getSnapshotTargetLimit(limit)
+  const targetLimit = getSnapshotTargetLimit(limit, mode)
   const refreshPromise = (async () => {
     const snapshot = await getSourceSnapshotByMode(mode, targetLimit)
-    const result = env.HOMEPAGE_REFRESH_MINIMAL
+    const shouldMerge = mode !== 'featured' && env.HOMEPAGE_REFRESH_MINIMAL
+    const result = shouldMerge
       ? await mergeStoredSnapshot(mode, snapshot)
       : await upsertStoredSnapshot(mode, snapshot)
-    if (!env.HOMEPAGE_REFRESH_MINIMAL) {
+    if (!shouldMerge) {
       void prewarmReleaseDetails(result.data).catch(() => {
         // Ignore detail prewarm failures so snapshot refresh still succeeds.
       })

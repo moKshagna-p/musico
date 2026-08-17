@@ -4,7 +4,7 @@ Bun.env.DISCOGS_MIN_REQUEST_INTERVAL_MS = '1'
 Bun.env.DISCOGS_MAX_RETRIES = '1'
 Bun.env.DISCOGS_REQUEST_TIMEOUT_MS = '10'
 
-const { isDiscogsCacheFresh, requestDiscogs } = await import('./discogs')
+const { buildSmartSearchResults, isDiscogsCacheFresh, normalizeSearchValue, requestDiscogs } = await import('./discogs')
 
 test('rejects Discogs cache data at the six-hour ceiling', () => {
   expect(isDiscogsCacheFresh(new Date())).toBe(true)
@@ -60,4 +60,20 @@ test('aborts a stalled Discogs request', async () => {
   } finally {
     globalThis.fetch = originalFetch
   }
+})
+
+test('keeps Unicode letters searchable', () => {
+  expect(normalizeSearchValue('宇多田ヒカル')).toBe('宇多田ヒカル')
+})
+
+test('ranks an exact artist and album match above a more popular partial result', () => {
+  const result = buildSmartSearchResults(
+    [
+      { id: 'm:partial', name: 'Discovery Live', artists: ['Different Artist'], popularity: 10000, reviewCount: 1000 },
+      { id: 'm:exact', name: 'Discovery', artists: ['Daft Punk'], popularity: 1, reviewCount: 0 },
+    ],
+    'Daft Punk Discovery',
+  )
+
+  expect(result.data[0]?.id).toBe('m:exact')
 })
