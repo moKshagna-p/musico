@@ -212,20 +212,22 @@ export const getHomeSections = async (options = {}) => {
     console.warn('[Validation Warning] Home recent releases malformed:', recentReleasesResult.error.format())
   }
 
-  featuredCache.timestamp = Date.now()
-  featuredCache.data = mostHappeningData
-  recentPopularCache.timestamp = Date.now()
-  recentPopularCache.data = recentReleasesData
-  homeSectionsCache.timestamp = Date.now()
-  homeSectionsCache.data = {
-    mostHappening: {
-      data: mostHappeningData,
-      error: response?.mostHappening?.error ?? null,
-    },
-    recentReleases: {
-      data: recentReleasesData,
-      error: response?.recentReleases?.error ?? null,
-    },
+  const isHealthy =
+    mostHappeningData.length > 0 &&
+    recentReleasesData.length > 0 &&
+    !response?.mostHappening?.error &&
+    !response?.recentReleases?.error
+
+  if (isHealthy) {
+    featuredCache.timestamp = Date.now()
+    featuredCache.data = mostHappeningData
+    recentPopularCache.timestamp = Date.now()
+    recentPopularCache.data = recentReleasesData
+    homeSectionsCache.timestamp = Date.now()
+    homeSectionsCache.data = {
+      mostHappening: { data: mostHappeningData, error: null },
+      recentReleases: { data: recentReleasesData, error: null },
+    }
   }
 
   return {

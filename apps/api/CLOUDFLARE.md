@@ -53,9 +53,10 @@ Plain variables:
 - `ALLOWED_ORIGIN`: your frontend origin, for example `https://your-app.vercel.app`.
 - `BETTER_AUTH_URL`: your API origin. If Vercel rewrites `/api` to the Worker, use the Vercel site origin, for example `https://your-app.vercel.app`.
 - `DISCOGS_USER_AGENT`: for example `musico/1.0 (+https://your-app.vercel.app)`.
-- `FEATURED_CACHE_TTL_MS`: optional, defaults to `604800000`.
-- `SEARCH_CACHE_TTL_MS`: optional, defaults to `604800000`.
+- `FEATURED_CACHE_TTL_MS`: optional, capped at `21300000` (5 hours 55 minutes).
+- `SEARCH_CACHE_TTL_MS`: optional, capped at `21300000` (5 hours 55 minutes).
 - `DISCOGS_MIN_REQUEST_INTERVAL_MS`: optional, defaults to `1100`.
+- `DISCOGS_REQUEST_TIMEOUT_MS`: optional, defaults to `10000`.
 - `HOME_RELEASE_DETAILS_PREWARM_LIMIT`: optional, defaults to `6`.
 
 ## First Administrator

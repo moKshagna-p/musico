@@ -28,6 +28,10 @@ const parsePositiveInteger = (value: string | undefined, fallback: number) => {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback
 }
 
+const DISCOGS_CACHE_MAX_AGE_MS = 1000 * 60 * 60 * 5 + 1000 * 60 * 55
+const parseDiscogsCacheTtl = (value: string | undefined) =>
+  Math.min(parsePositiveInteger(value, DISCOGS_CACHE_MAX_AGE_MS), DISCOGS_CACHE_MAX_AGE_MS)
+
 const parseOrigins = (value: string | undefined, fallback: string) =>
   (value ?? fallback)
     .split(',')
@@ -51,8 +55,8 @@ export const env = new Proxy({} as Record<string, unknown>, {
       case 'DISCOGS_KEY': return sanitizeOptionalSecret(get('DISCOGS_KEY'))
       case 'DISCOGS_SECRET': return sanitizeOptionalSecret(get('DISCOGS_SECRET'))
       case 'DISCOGS_USER_AGENT': return get('DISCOGS_USER_AGENT') || 'musico/1.0 (+https://example.com)'
-      case 'FEATURED_CACHE_TTL_MS': return parsePositiveInteger(get('FEATURED_CACHE_TTL_MS'), 1000 * 60 * 60 * 24 * 7)
-      case 'SEARCH_CACHE_TTL_MS': return parsePositiveInteger(get('SEARCH_CACHE_TTL_MS'), 1000 * 60 * 60 * 24 * 7)
+      case 'FEATURED_CACHE_TTL_MS': return parseDiscogsCacheTtl(get('FEATURED_CACHE_TTL_MS'))
+      case 'SEARCH_CACHE_TTL_MS': return parseDiscogsCacheTtl(get('SEARCH_CACHE_TTL_MS'))
       case 'FEATURED_RETRY_COOLDOWN_MS': return parsePositiveInteger(get('FEATURED_RETRY_COOLDOWN_MS'), 1000 * 60 * 10)
       case 'SEARCH_RETRY_COOLDOWN_MS': return parsePositiveInteger(get('SEARCH_RETRY_COOLDOWN_MS'), 1000 * 60 * 10)
       case 'FEATURED_DETAIL_HYDRATION_LIMIT': return parsePositiveInteger(get('FEATURED_DETAIL_HYDRATION_LIMIT'), 12)
@@ -61,6 +65,7 @@ export const env = new Proxy({} as Record<string, unknown>, {
       case 'SEARCH_MIN_RESULTS_BEFORE_PAGING': return parsePositiveInteger(get('SEARCH_MIN_RESULTS_BEFORE_PAGING'), 60)
       case 'DISCOGS_MIN_REQUEST_INTERVAL_MS': return parsePositiveInteger(get('DISCOGS_MIN_REQUEST_INTERVAL_MS'), 1100)
       case 'DISCOGS_MAX_RETRIES': return parsePositiveInteger(get('DISCOGS_MAX_RETRIES'), 4)
+      case 'DISCOGS_REQUEST_TIMEOUT_MS': return parsePositiveInteger(get('DISCOGS_REQUEST_TIMEOUT_MS'), 10000)
       case 'HOME_RELEASE_DETAILS_PREWARM_LIMIT': return parsePositiveInteger(get('HOME_RELEASE_DETAILS_PREWARM_LIMIT'), 6)
       case 'HOMEPAGE_REFRESH_MINIMAL': return get('HOMEPAGE_REFRESH_MINIMAL') !== 'false'
       case 'RELEASE_CACHE_MAX_ENTRIES': return parsePositiveInteger(get('RELEASE_CACHE_MAX_ENTRIES'), 1500)
@@ -88,6 +93,7 @@ export const env = new Proxy({} as Record<string, unknown>, {
   SEARCH_MIN_RESULTS_BEFORE_PAGING: number
   DISCOGS_MIN_REQUEST_INTERVAL_MS: number
   DISCOGS_MAX_RETRIES: number
+  DISCOGS_REQUEST_TIMEOUT_MS: number
   HOME_RELEASE_DETAILS_PREWARM_LIMIT: number
   HOMEPAGE_REFRESH_MINIMAL: boolean
   RELEASE_CACHE_MAX_ENTRIES: number

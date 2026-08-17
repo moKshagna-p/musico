@@ -11,13 +11,15 @@ import { addToSearchHistory } from '../services/searchHistoryService.js'
 import { recordSearchSignal } from '../services/searchSignalService.js'
 
 const SearchResults = () => {
+  const pageSize = 12
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
   const { user } = useAuth()
   
   const initialQuery = searchParams.get('q') ?? ''
   const [query, setQuery] = useState(initialQuery)
-  const [resultLimit, setResultLimit] = useState(12)
+  const [offset, setOffset] = useState(0)
+  const [previousPages, setPreviousPages] = useState([])
   const lastLoggedQueryRef = useRef('')
 
   // Professional Fetching with TanStack Query
@@ -28,8 +30,10 @@ const SearchResults = () => {
     error, 
     correctedQuery,
     hasMore,
+    nextOffset,
   } = useSearch(query, { 
-    limit: resultLimit,
+    limit: pageSize,
+    offset,
     enabled: !!query 
   })
 
@@ -46,7 +50,8 @@ const SearchResults = () => {
   // Handle Search Submission
   const handleSearch = (newQuery) => {
     setQuery(newQuery)
-    setResultLimit(12)
+    setOffset(0)
+    setPreviousPages([])
     if (newQuery?.trim()) {
       addToSearchHistory(newQuery, user?.id ?? 'guest')
       logSearch(newQuery)
@@ -57,6 +62,12 @@ const SearchResults = () => {
     } else {
       navigate('/discover')
     }
+  }
+
+  const loadMore = () => {
+    if (nextOffset === null) return
+    setPreviousPages((pages) => [...pages, ...albums])
+    setOffset(nextOffset)
   }
 
   return (
@@ -82,12 +93,13 @@ const SearchResults = () => {
           onSearch={handleSearch}
           autoFocus={!initialQuery}
           historyScope={user?.id ?? 'guest'}
+          enablePredictive={false}
         />
 
         {query && (
           <div className="mt-12">
             <AlbumGrid
-              albums={albums}
+              albums={[...previousPages, ...albums]}
               loading={loading}
               error={error?.message}
               correctedQuery={correctedQuery}
@@ -97,7 +109,7 @@ const SearchResults = () => {
               <div className="mt-8 flex justify-center">
                 <button
                   type="button"
-                  onClick={() => setResultLimit((current) => current + 12)}
+                  onClick={loadMore}
                   disabled={isFetching}
                   className="rounded-full border border-outline px-6 py-3 text-xs font-bold uppercase tracking-[0.24em] text-white transition hover:border-white/40 hover:bg-white/10 disabled:cursor-wait disabled:opacity-60"
                 >

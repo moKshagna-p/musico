@@ -22,10 +22,8 @@ const DISCOGS_KEY = sanitizeDiscogsCredential(env.DISCOGS_KEY)
 const DISCOGS_SECRET = sanitizeDiscogsCredential(env.DISCOGS_SECRET)
 const DISCOGS_USER_AGENT = env.DISCOGS_USER_AGENT
 
-// Album metadata (name, artists, tracklist, cover) is effectively immutable on Discogs,
-// and Musico community stats are attached fresh from our own DB at serve time —
-// so a long TTL only delays picking up rare upstream metadata corrections.
-const RELEASE_CACHE_WINDOW = 1000 * 60 * 60 * 24 * 30 // 30 days
+const DISCOGS_CACHE_MAX_AGE_MS = 1000 * 60 * 60 * 5 + 1000 * 60 * 55
+const RELEASE_CACHE_WINDOW = DISCOGS_CACHE_MAX_AGE_MS
 const FEATURED_DB_CACHE_WINDOW = env.FEATURED_CACHE_TTL_MS
 const SEARCH_DB_CACHE_WINDOW = env.SEARCH_CACHE_TTL_MS
 const FEATURED_RETRY_COOLDOWN_MS = env.FEATURED_RETRY_COOLDOWN_MS
@@ -46,6 +44,7 @@ const SMART_SEARCH_CLOSE_MATCH_THRESHOLD = 0.56
 const SMART_SEARCH_CORRECTION_TRIGGER_SCORE = 0.7
 const DISCOGS_MIN_REQUEST_INTERVAL_MS = env.DISCOGS_MIN_REQUEST_INTERVAL_MS
 const DISCOGS_MAX_RETRIES = env.DISCOGS_MAX_RETRIES
+const DISCOGS_REQUEST_TIMEOUT_MS = env.DISCOGS_REQUEST_TIMEOUT_MS
 const RELEASE_CACHE_MAX_ENTRIES = env.RELEASE_CACHE_MAX_ENTRIES
 
 // ── In-memory LRU cache to protect RAM and speed up repeat requests ──
@@ -274,11 +273,11 @@ const toReleaseDetails = (value: unknown): ReleaseDetails | null => {
   }
 }
 
-const getCachedReleaseDetails = async (releaseId: string, allowExpired = false) => {
+const getCachedReleaseDetails = async (releaseId: string) => {
   const rows = await db.select().from(releaseCacheTable).where(eq(releaseCacheTable.releaseId, releaseId)).limit(1)
   const cached = rows[0]
   if (!cached) return null
-  if (!allowExpired && !isNotExpired(cached.expiresAt)) return null
+  if (!isNotExpired(cached.expiresAt) || !isDiscogsCacheFresh(cached.refreshedAt)) return null
   return toReleaseDetails(cached.payload)
 }
 
@@ -307,7 +306,7 @@ const upsertReleaseDetailsCache = async (release: ReleaseDetails) => {
     })
 }
 
-const requestDiscogs = async (endpoint: string, params: Record<string, string | number | undefined> = {}) => {
+export const requestDiscogs = async (endpoint: string, params: Record<string, string | number | undefined> = {}) => {
   const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
   const throttleDiscogs = async () => {
     const now = Date.now()
@@ -352,26 +351,45 @@ const requestDiscogs = async (endpoint: string, params: Record<string, string | 
   }
 
   const fetchWithAuthFallback = async () => {
+    const fetchWithTimeout = async (url: URL, headers: Record<string, string>) => {
+      const controller = new AbortController()
+      const timeout = setTimeout(() => controller.abort(), DISCOGS_REQUEST_TIMEOUT_MS)
+      try {
+        return await fetch(url, { headers, signal: controller.signal })
+      } finally {
+        clearTimeout(timeout)
+      }
+    }
+
     await throttleDiscogs()
-    let response = await fetch(makeUrl(false), { headers: makeHeaders(true) })
+    let response = await fetchWithTimeout(makeUrl(false), makeHeaders(true))
 
     // Some Discogs setups only accept user token via query param.
     if (response.status === 401 && DISCOGS_TOKEN) {
       await throttleDiscogs()
-      response = await fetch(makeUrl(true), { headers: makeHeaders(false) })
+      response = await fetchWithTimeout(makeUrl(true), makeHeaders(false))
     }
 
     // If token auth fails entirely and no key/secret exists, retry as anonymous public request.
     if (response.status === 401 && DISCOGS_TOKEN && !(DISCOGS_KEY && DISCOGS_SECRET)) {
       await throttleDiscogs()
-      response = await fetch(makeUrl(false), { headers: makeHeaders(false) })
+      response = await fetchWithTimeout(makeUrl(false), makeHeaders(false))
     }
 
     return response
   }
 
   for (let attempt = 0; attempt <= DISCOGS_MAX_RETRIES; attempt += 1) {
-    const response = await fetchWithAuthFallback()
+    let response: Response
+    try {
+      response = await fetchWithAuthFallback()
+    } catch (error) {
+      if (attempt >= DISCOGS_MAX_RETRIES) throw error
+      const delayMs = backoffMs(attempt)
+      discogsNextRequestAt = Math.max(discogsNextRequestAt, Date.now() + delayMs)
+      await wait(delayMs)
+      continue
+    }
     if (response.ok) {
       return response.json()
     }
@@ -396,6 +414,8 @@ const requestDiscogs = async (endpoint: string, params: Record<string, string | 
 
 const isFresh = (timestamp: number, ttl = RELEASE_CACHE_WINDOW) => Date.now() - timestamp < ttl
 const isNotExpired = (expiresAt: Date | null | undefined) => Boolean(expiresAt && expiresAt.getTime() > Date.now())
+export const isDiscogsCacheFresh = (refreshedAt: Date | null | undefined) =>
+  Boolean(refreshedAt && Date.now() - refreshedAt.getTime() < DISCOGS_CACHE_MAX_AGE_MS)
 const normalizeCacheQuery = (query: string) => query.trim().toLowerCase().replace(/\s+/g, ' ')
 const createQueryHash = (query: string) => createHash('sha256').update(`${SEARCH_CACHE_VERSION}:${query}`).digest('hex')
 
@@ -1172,6 +1192,7 @@ const getFeaturedByMode = async (mode: FeaturedMode, limit = 24, forceRefresh = 
     !forceRefresh &&
     cachedPayload.length &&
     isNotExpired(cached?.expiresAt) &&
+    isDiscogsCacheFresh(cached?.refreshedAt) &&
     (!cachedNeedsRefresh || recentRefresh)
   ) {
     return cachedPayload.slice(0, safeLimit)
@@ -1181,7 +1202,7 @@ const getFeaturedByMode = async (mode: FeaturedMode, limit = 24, forceRefresh = 
     const refreshed = await refreshFeaturedMode(mode)
     return refreshed.slice(0, safeLimit)
   } catch {
-    if (cachedPayload.length) {
+    if (cachedPayload.length && isDiscogsCacheFresh(cached?.refreshedAt)) {
       return cachedPayload.slice(0, safeLimit)
     }
     throw new Error('Unable to refresh featured releases from Discogs.')
@@ -1339,6 +1360,7 @@ export const searchReleases = async (query: string, options: SearchOptions = {})
     if (
       correctedPayload.length &&
       isNotExpired(correctedCached?.expiresAt) &&
+      isDiscogsCacheFresh(correctedCached?.refreshedAt) &&
       (!shouldRefreshSummaryPayload(correctedPayload) || correctedRecentRefresh)
     ) {
       return buildSmartSearchResults(correctedPayload, corrected, EXPANDED_SEARCH_RESULT_LIMIT)
@@ -1350,6 +1372,7 @@ export const searchReleases = async (query: string, options: SearchOptions = {})
   if (
     cachedPayload.length &&
     isNotExpired(cached?.expiresAt) &&
+    isDiscogsCacheFresh(cached?.refreshedAt) &&
     (!shouldRefreshSummaryPayload(cachedPayload) || recentRefresh)
   ) {
     const cachedSmart = buildSmartSearchResults(cachedPayload, trimmed, EXPANDED_SEARCH_RESULT_LIMIT)
@@ -1394,7 +1417,7 @@ export const searchReleases = async (query: string, options: SearchOptions = {})
 
     return pageSearchBatch(results, limit, offset)
   } catch {
-    if (cachedPayload.length) {
+    if (cachedPayload.length && isDiscogsCacheFresh(cached?.refreshedAt)) {
       const cachedSmart = buildSmartSearchResults(cachedPayload, trimmed, EXPANDED_SEARCH_RESULT_LIMIT)
       return pageSearchBatch(cachedSmart, limit, offset)
     }
@@ -1460,16 +1483,6 @@ export const getReleaseDetails = async (releaseId: string): Promise<ReleaseDetai
       const response = await requestDiscogs(`/releases/${cleanId}`)
       return normalizeAndCache(response, response.tracklist?.length)
     } catch (error) {
-      try {
-        const staleCached = await getCachedReleaseDetails(releaseId, true)
-        if (staleCached) {
-          releaseMemoryCache.set(releaseId, staleCached)
-          return staleCached
-        }
-      } catch {
-        // Ignore stale cache read failures and continue throwing the original error.
-      }
-
       if (isRelease) throw error
       const message = error instanceof Error ? error.message : ''
       if (!message.includes('404') && !isMaster) throw error
