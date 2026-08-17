@@ -35,6 +35,23 @@ test.describe('Critical user flows', () => {
     await expect(page.getByRole('heading', { name: 'Discovery' })).toBeVisible()
   })
 
+  test('search load more requests the next API offset', async ({ page }) => {
+    const offsets: string[] = []
+    page.on('request', (request) => {
+      const url = new URL(request.url())
+      if (url.pathname === '/api/search' && url.searchParams.get('q') === 'pagination') {
+        offsets.push(url.searchParams.get('offset') ?? '0')
+      }
+    })
+
+    await page.goto('/search?q=pagination')
+    await expect(page.getByText('Pagination Album 12')).toBeVisible()
+    await page.getByRole('button', { name: /load more/i }).click()
+    await expect(page.getByText('Pagination Album 13')).toBeVisible()
+
+    expect(offsets.at(-1)).toBe('12')
+  })
+
   test('list flow creates list and toggles album in listen later', async ({ page }) => {
     await signIn(page)
 

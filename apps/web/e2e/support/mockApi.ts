@@ -269,9 +269,22 @@ export const installApiMocks = async (page: Page) => {
           })
         : []
 
+      const results = query === 'pagination'
+        ? Array.from({ length: 13 }, (_, index) => ({
+            ...toSummary(albumCatalog[0]),
+            id: `m:pagination-${index + 1}`,
+            name: `Pagination Album ${index + 1}`,
+          }))
+        : filtered.map(toSummary)
+      const limit = Number(url.searchParams.get('limit') ?? 12)
+      const offset = Number(url.searchParams.get('offset') ?? 0)
+      const page = results.slice(offset, offset + limit)
+
       return json(route, {
-        data: filtered.map(toSummary),
+        data: page,
         correctedQuery: null,
+        hasMore: offset + page.length < results.length,
+        nextOffset: offset + page.length < results.length ? offset + page.length : null,
       })
     }
 

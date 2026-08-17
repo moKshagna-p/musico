@@ -437,7 +437,7 @@ export const getStoredTrendingAlbumsEnsuringFresh = async (limit = 24, mode: Sto
     const refreshed = await refreshStoredTrendingAlbums(mode, safeLimit)
     return refreshed.data.slice(0, safeLimit)
   } catch (error) {
-    if (latestSnapshotAt) {
+    if (isStoredSnapshotFresh(latestSnapshotAt)) {
       return getStoredTrendingAlbums(safeLimit, mode)
     }
     console.warn('[trending] refresh failed, returning empty', { mode, limit: safeLimit, error: String(error) })

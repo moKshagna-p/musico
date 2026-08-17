@@ -20,7 +20,7 @@ export const albumRoutes = new Elysia({ prefix: '/api' })
       // swallows refresh failures and returns [], and a cached empty response
       // would be served to every user until it expires.
       set.headers['Cache-Control'] = data.length
-        ? 'public, max-age=60, s-maxage=300, stale-while-revalidate=86400'
+        ? 'public, max-age=60, s-maxage=300, stale-while-revalidate=21000'
         : 'no-store'
       return { data: await attachMusicoCommunityStats(data) }
     } catch (error) {
@@ -64,7 +64,7 @@ export const albumRoutes = new Elysia({ prefix: '/api' })
 
       set.headers ??= {}
       set.headers['Cache-Control'] = isHealthy
-        ? 'public, max-age=60, s-maxage=300, stale-while-revalidate=86400'
+        ? 'public, max-age=60, s-maxage=300, stale-while-revalidate=21000'
         : 'no-store'
       return {
         mostHappening: {
@@ -96,7 +96,7 @@ export const albumRoutes = new Elysia({ prefix: '/api' })
        const data = await getReleaseDetails(releaseId)
        const [hydrated] = await attachMusicoCommunityStats([data])
        set.headers ??= {}
-       set.headers['Cache-Control'] = 'public, max-age=3600, s-maxage=86400, stale-while-revalidate=604800'
+       set.headers['Cache-Control'] = 'public, max-age=3600, s-maxage=21300'
        return hydrated
      } catch (error) {
        console.error('[release] error', error)
