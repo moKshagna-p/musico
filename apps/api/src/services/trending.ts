@@ -21,7 +21,6 @@ const MAX_LIMIT = 50
 const DEFAULT_SNAPSHOT_LIMIT = 24
 const MINIMAL_SNAPSHOT_LIMIT = 6
 const MAX_STORED_SNAPSHOT_SIZE = 24
-const STORED_TRENDING_REFRESH_WINDOW_MS = env.FEATURED_CACHE_TTL_MS
 const HOME_RELEASE_DETAILS_PREWARM_LIMIT = env.HOME_RELEASE_DETAILS_PREWARM_LIMIT
 const storedRefreshInFlight = new Map<StoredMode, Promise<{ refreshedAt: Date; insertedOrUpdated: number; data: ReleaseSummary[] }>>()
 
@@ -375,27 +374,6 @@ export const getStoredTrendingAlbums = async (limit = 24, mode: StoredMode = DEF
   }
 }
 
-const getLatestStoredSnapshotAt = async (mode: StoredMode = DEFAULT_MODE) => {
-  try {
-    const latestSnapshot = await db
-      .select({
-        lastSeenAt: sql<Date | null>`max(${storedTrendingAlbum.lastSeenAt})`,
-      })
-      .from(storedTrendingAlbum)
-      .where(eq(storedTrendingAlbum.mode, mode))
-
-    return toDateOrNull(latestSnapshot[0]?.lastSeenAt)
-  } catch (error) {
-    if (isStoredTrendingTableMissingError(error)) {
-      return null
-    }
-    throw error
-  }
-}
-
-const isStoredSnapshotFresh = (snapshotAt: Date | null) =>
-  Boolean(snapshotAt && Date.now() - snapshotAt.getTime() < STORED_TRENDING_REFRESH_WINDOW_MS)
-
 export const refreshStoredTrendingAlbums = async (mode: StoredMode = DEFAULT_MODE, limit = 24) => {
   const existing = storedRefreshInFlight.get(mode)
   if (existing) return existing
@@ -419,32 +397,6 @@ export const refreshStoredTrendingAlbums = async (mode: StoredMode = DEFAULT_MOD
   return refreshPromise.finally(() => {
     storedRefreshInFlight.delete(mode)
   })
-}
-
-export const getStoredTrendingAlbumsEnsuringFresh = async (limit = 24, mode: StoredMode = DEFAULT_MODE) => {
-  const safeLimit = clampLimit(limit)
-  let latestSnapshotAt: Date | null = null
-
-  try {
-    latestSnapshotAt = await getLatestStoredSnapshotAt(mode)
-  } catch {
-    // If the table doesn't exist, treat as no snapshot available.
-  }
-
-  if (isStoredSnapshotFresh(latestSnapshotAt)) {
-    return getStoredTrendingAlbums(safeLimit, mode)
-  }
-
-  try {
-    const refreshed = await refreshStoredTrendingAlbums(mode, safeLimit)
-    return refreshed.data.slice(0, safeLimit)
-  } catch (error) {
-    if (isStoredSnapshotFresh(latestSnapshotAt)) {
-      return getStoredTrendingAlbums(safeLimit, mode)
-    }
-    console.warn('[trending] refresh failed, returning empty', { mode, limit: safeLimit, error: String(error) })
-    return []
-  }
 }
 
 export const refreshStoredHomeAlbums = async (params?: { happeningLimit?: number; recentLimit?: number }) => {
