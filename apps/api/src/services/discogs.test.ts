@@ -4,7 +4,15 @@ Bun.env.DISCOGS_MIN_REQUEST_INTERVAL_MS = '1'
 Bun.env.DISCOGS_MAX_RETRIES = '1'
 Bun.env.DISCOGS_REQUEST_TIMEOUT_MS = '10'
 
-const { buildSmartSearchResults, isDiscogsCacheFresh, normalizeSearchValue, requestDiscogs } = await import('./discogs')
+const {
+  buildSmartSearchResults,
+  isDiscogsCacheFresh,
+  matchesSearchCacheQuery,
+  normalizeSearchValue,
+  requestDiscogs,
+  selectStoredSearchCache,
+  shouldServeStoredSearchCache,
+} = await import('./discogs')
 
 test('rejects Discogs cache data at the six-hour ceiling', () => {
   expect(isDiscogsCacheFresh(new Date())).toBe(true)
@@ -64,6 +72,40 @@ test('aborts a stalled Discogs request', async () => {
 
 test('keeps Unicode letters searchable', () => {
   expect(normalizeSearchValue('宇多田ヒカル')).toBe('宇多田ヒカル')
+})
+
+test('reuses matching search caches across cache key version changes', () => {
+  expect(matchesSearchCacheQuery(
+    { queryHash: 'v9-hash', normalizedQuery: 'daft punk' },
+    'v10-hash',
+    'daft punk',
+  )).toBe(true)
+  expect(matchesSearchCacheQuery(
+    { queryHash: 'other-hash', normalizedQuery: 'radiohead' },
+    'v10-hash',
+    'daft punk',
+  )).toBe(false)
+})
+
+test('serves stored search results after their provider refresh window expires', () => {
+  expect(shouldServeStoredSearchCache({
+    payload: [{ id: 'm:1001', name: 'Discovery', artists: ['Daft Punk'] }],
+    expiresAt: new Date('2026-01-01T00:00:00.000Z'),
+  })).toBe(true)
+  expect(shouldServeStoredSearchCache({ payload: [], expiresAt: new Date() })).toBe(false)
+})
+
+test('selects an older populated cache when the newest matching row is empty', () => {
+  const populated = {
+    queryHash: 'v9-hash',
+    normalizedQuery: 'daft punk',
+    payload: [{ id: 'm:1001', name: 'Discovery', artists: ['Daft Punk'] }],
+  }
+
+  expect(selectStoredSearchCache([
+    { queryHash: 'v10-hash', normalizedQuery: 'daft punk', payload: [] },
+    populated,
+  ], 'v10-hash', 'daft punk')).toBe(populated)
 })
 
 test('ranks an exact artist and album match above a more popular partial result', () => {

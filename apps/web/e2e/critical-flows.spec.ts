@@ -20,6 +20,54 @@ test.describe('Critical user flows', () => {
     await expect(page.getByRole('link', { name: /profile/i })).toBeVisible()
   })
 
+  test('navbar pages render their data and album links open details', async ({ page }) => {
+    const browserErrors: string[] = []
+    page.on('console', (message) => {
+      if (message.type() === 'error' && !message.text().startsWith('Failed to load resource:')) {
+        browserErrors.push(message.text())
+      }
+    })
+    page.on('response', (response) => {
+      if (response.status() >= 500) browserErrors.push(`${response.status()} ${new URL(response.url()).pathname}`)
+    })
+    page.on('pageerror', (error) => browserErrors.push(error.message))
+
+    await page.goto('/')
+    await expect(page.getByRole('heading', { name: /most happening right now/i })).toBeVisible()
+    await page.locator('article').filter({ hasText: 'Discovery' }).first().click()
+    await expect(page).toHaveURL(/\/album\//)
+    await expect(page.getByRole('heading', { name: 'Discovery' })).toHaveCount(1)
+    await page.getByRole('link', { name: 'Home', exact: true }).click()
+
+    await page.getByRole('link', { name: 'Discover', exact: true }).click()
+    await expect(page.getByRole('heading', { name: /dig through the vault/i })).toBeVisible()
+    await expect(page.locator('article').filter({ hasText: 'Discovery' }).first()).toBeVisible()
+
+    const searchInput = page.getByPlaceholder(/search artists or albums/i)
+    await searchInput.fill('daft punk')
+    await searchInput.press('Enter')
+    await expect(page).toHaveURL(/\/search\?q=daft%20punk/i)
+    await page.locator('article').filter({ hasText: 'Discovery' }).first().click()
+    await expect(page).toHaveURL(/\/album\//)
+    await expect(page.getByRole('heading', { name: 'Discovery' })).toHaveCount(1)
+
+    await page.getByRole('link', { name: 'Sign In', exact: true }).click()
+    await expect(page).toHaveURL('/auth')
+    await signIn(page)
+    await page.getByRole('link', { name: 'Feed', exact: true }).click()
+    await expect(page.getByRole('heading', { name: 'Feed', exact: true })).toBeVisible()
+    await page.getByRole('link', { name: 'Discovery', exact: true }).first().click()
+    await expect(page).toHaveURL(/\/album\//)
+    await expect(page.getByRole('heading', { name: 'Discovery' })).toHaveCount(1)
+
+    await page.getByRole('link', { name: 'Profile', exact: true }).click()
+    await expect(page.getByRole('heading', { name: 'E2E User' })).toBeVisible()
+
+    await page.getByRole('link', { name: 'Home', exact: true }).click()
+    await expect(page.getByRole('heading', { name: /most happening right now/i })).toBeVisible()
+    expect(browserErrors).toEqual([])
+  })
+
   test('search flow submits query and opens album details', async ({ page }) => {
     await page.goto('/discover')
 

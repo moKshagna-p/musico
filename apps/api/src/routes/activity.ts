@@ -4,6 +4,32 @@ import { db } from '../core/db'
 import { activity, user, userFollow } from '../core/schema'
 import { ensureAuthenticated } from '../core/utils'
 
+type FeedRow = {
+  id: string
+  userId: string
+  type: string
+  albumId: string | null
+  albumName: string | null
+  albumCover: string | null
+  targetUserId: string | null
+  metadata: unknown
+  createdAt: Date
+  userName: string
+  userImage: string | null
+}
+
+type FeedUser = Pick<typeof user.$inferSelect, 'name' | 'image'>
+
+export const toFeedItem = ({ userName, userImage, createdAt, ...item }: FeedRow, targetUser?: FeedUser) => ({
+  ...item,
+  createdAt: createdAt.getTime(),
+  user: {
+    name: userName,
+    image: userImage,
+  },
+  ...(targetUser ? { targetUser } : {}),
+})
+
 export const activityRoutes = new Elysia()
   .get('/api/me/feed', async ({ request, query, set }) => {
     const authUser = await ensureAuthenticated(request, set)
@@ -45,10 +71,20 @@ export const activityRoutes = new Elysia()
       .orderBy(desc(activity.createdAt))
       .limit(limit)
 
+    const targetUserIds = [...new Set(feed
+      .map((item) => item.targetUserId)
+      .filter((id): id is string => Boolean(id)))]
+    const targetUsers = targetUserIds.length
+      ? await db.select({ id: user.id, name: user.name, image: user.image })
+        .from(user)
+        .where(inArray(user.id, targetUserIds))
+      : []
+    const targetUsersById = new Map(targetUsers.map(({ id, ...targetUser }) => [id, targetUser]))
+
     return {
-      data: feed.map((item) => ({
-        ...item,
-        createdAt: item.createdAt.getTime(),
-      })),
+      data: feed.map((item) => toFeedItem(
+        item,
+        item.targetUserId ? targetUsersById.get(item.targetUserId) : undefined,
+      )),
     }
   })

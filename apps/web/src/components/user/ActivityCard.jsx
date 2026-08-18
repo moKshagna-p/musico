@@ -22,12 +22,12 @@ const ActivityCard = ({ item }) => {
       case 'rated': {
         const rating = Number(metadata?.rating ?? 0)
         return (
-          <p className="text-sm text-white/80">
+          <div className="text-sm text-white/80">
             {userLink} rated {albumLink}{' '}
             <span className="inline-flex align-middle">
               <RatingStars value={rating} readOnly size="sm" align="left" />
             </span>
-          </p>
+          </div>
         )
       }
       case 'reviewed':
