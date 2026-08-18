@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto'
 
-import { eq } from 'drizzle-orm'
+import { desc, eq, or } from 'drizzle-orm'
 import { LRUCache } from 'lru-cache'
 
 import type { ReleaseDetails, ReleaseSummary } from '../core/types'
@@ -27,7 +27,6 @@ const RELEASE_CACHE_WINDOW = DISCOGS_CACHE_MAX_AGE_MS
 const FEATURED_DB_CACHE_WINDOW = env.FEATURED_CACHE_TTL_MS
 const SEARCH_DB_CACHE_WINDOW = env.SEARCH_CACHE_TTL_MS
 const FEATURED_RETRY_COOLDOWN_MS = env.FEATURED_RETRY_COOLDOWN_MS
-const SEARCH_RETRY_COOLDOWN_MS = env.SEARCH_RETRY_COOLDOWN_MS
 const FEATURED_REFRESH_SIZE = 50
 const FEATURED_DETAIL_HYDRATION_LIMIT = env.FEATURED_DETAIL_HYDRATION_LIMIT
 const SEARCH_CACHE_VERSION = 'v10'
@@ -418,11 +417,28 @@ export const isDiscogsCacheFresh = (refreshedAt: Date | null | undefined) =>
   Boolean(refreshedAt && Date.now() - refreshedAt.getTime() < DISCOGS_CACHE_MAX_AGE_MS)
 const normalizeCacheQuery = (query: string) => query.trim().toLowerCase().replace(/\s+/g, ' ')
 const createQueryHash = (query: string) => createHash('sha256').update(`${SEARCH_CACHE_VERSION}:${query}`).digest('hex')
+export const matchesSearchCacheQuery = (
+  row: Pick<typeof searchCacheTable.$inferSelect, 'queryHash' | 'normalizedQuery'>,
+  queryHash: string,
+  normalizedQuery: string,
+) => row.queryHash === queryHash || row.normalizedQuery === normalizedQuery
 
 const toReleaseSummaryArray = (value: unknown): ReleaseSummary[] => {
   if (!Array.isArray(value)) return []
   return value.filter(Boolean).map((entry) => toReleaseSummary(entry as ReleaseSummary))
 }
+
+// ponytail: stored catalog results stay usable indefinitely; add scheduled search refreshes if stale catalogs become measurable.
+export const shouldServeStoredSearchCache = (cached: { payload?: unknown } | null | undefined) =>
+  toReleaseSummaryArray(cached?.payload).length > 0
+
+export const selectStoredSearchCache = <T extends Pick<typeof searchCacheTable.$inferSelect, 'queryHash' | 'normalizedQuery' | 'payload'>>(
+  rows: T[],
+  queryHash: string,
+  normalizedQuery: string,
+) => rows.find((row) =>
+  matchesSearchCacheQuery(row, queryHash, normalizedQuery) && shouldServeStoredSearchCache(row),
+)
 
 const variantMarkers = [
   'deluxe',
@@ -1229,9 +1245,16 @@ export const getFeaturedReleases = async (limit = 24, forceRefresh = false) =>
 export const getRecentPopularReleases = async (limit = 24, forceRefresh = false) =>
   getFeaturedByMode('recent-popular', limit, forceRefresh)
 
-const getCachedSearch = async (queryHash: string) => {
-  const rows = await db.select().from(searchCacheTable).where(eq(searchCacheTable.queryHash, queryHash)).limit(1)
-  return rows[0]
+const getCachedSearch = async (queryHash: string, normalizedQuery: string) => {
+  const rows = await db
+    .select()
+    .from(searchCacheTable)
+    .where(or(
+      eq(searchCacheTable.queryHash, queryHash),
+      eq(searchCacheTable.normalizedQuery, normalizedQuery),
+    ))
+    .orderBy(desc(searchCacheTable.refreshedAt))
+  return selectStoredSearchCache(rows, queryHash, normalizedQuery)
 }
 
 const upsertSearchCache = async (queryHash: string, normalizedQuery: string, payload: ReleaseSummary[]) => {
@@ -1357,55 +1380,25 @@ export const searchReleases = async (query: string, options: SearchOptions = {})
   const offset = clampSearchOffset(options.offset)
   const normalizedQuery = normalizeCacheQuery(trimmed)
   const queryHash = createQueryHash(normalizedQuery)
-  const cached = await getCachedSearch(queryHash)
+  const cached = await getCachedSearch(queryHash, normalizedQuery)
   const cachedPayload = toReleaseSummaryArray(cached?.payload)
-  const refreshedAt = cached?.refreshedAt?.getTime?.() ?? 0
-  const recentRefresh = refreshedAt > 0 && Date.now() - refreshedAt < SEARCH_RETRY_COOLDOWN_MS
 
   const getCorrectedSearchResults = async (corrected: string) => {
     const correctedNorm = normalizeCacheQuery(corrected)
     const correctedHash = createQueryHash(correctedNorm)
 
-    const correctedCached = await getCachedSearch(correctedHash)
+    const correctedCached = await getCachedSearch(correctedHash, correctedNorm)
     const correctedPayload = toReleaseSummaryArray(correctedCached?.payload)
-    const correctedRefreshedAt = correctedCached?.refreshedAt?.getTime?.() ?? 0
-    const correctedRecentRefresh = correctedRefreshedAt > 0 && Date.now() - correctedRefreshedAt < SEARCH_RETRY_COOLDOWN_MS
 
-    if (
-      correctedPayload.length &&
-      isNotExpired(correctedCached?.expiresAt) &&
-      isDiscogsCacheFresh(correctedCached?.refreshedAt) &&
-      (!shouldRefreshSummaryPayload(correctedPayload) || correctedRecentRefresh)
-    ) {
+    if (shouldServeStoredSearchCache(correctedCached)) {
       return buildSmartSearchResults(correctedPayload, corrected, EXPANDED_SEARCH_RESULT_LIMIT)
     }
 
     return refreshSearchQuery(correctedHash, correctedNorm, corrected)
   }
 
-  if (
-    cachedPayload.length &&
-    isNotExpired(cached?.expiresAt) &&
-    isDiscogsCacheFresh(cached?.refreshedAt) &&
-    (!shouldRefreshSummaryPayload(cachedPayload) || recentRefresh)
-  ) {
+  if (shouldServeStoredSearchCache(cached)) {
     const cachedSmart = buildSmartSearchResults(cachedPayload, trimmed, EXPANDED_SEARCH_RESULT_LIMIT)
-    if (cachedSmart.bestMatchScore >= SMART_SEARCH_CORRECTION_TRIGGER_SCORE) {
-      return pageSearchBatch(cachedSmart, limit, offset)
-    }
-
-    try {
-      const corrected = await fetchFuzzySuggestions(trimmed)
-      if (corrected && normalizeSearchValue(corrected) !== normalizeSearchValue(trimmed)) {
-        const correctedSmart = await getCorrectedSearchResults(corrected)
-        if (correctedSmart.bestMatchScore > cachedSmart.bestMatchScore) {
-          return { ...pageSearchBatch(correctedSmart, limit, offset), correctedQuery: corrected }
-        }
-      }
-    } catch {
-      // Ignore correction lookup failures and fall back to cached results.
-    }
-
     return pageSearchBatch(cachedSmart, limit, offset)
   }
 
@@ -1431,7 +1424,7 @@ export const searchReleases = async (query: string, options: SearchOptions = {})
 
     return pageSearchBatch(results, limit, offset)
   } catch {
-    if (cachedPayload.length && isDiscogsCacheFresh(cached?.refreshedAt)) {
+    if (shouldServeStoredSearchCache(cached)) {
       const cachedSmart = buildSmartSearchResults(cachedPayload, trimmed, EXPANDED_SEARCH_RESULT_LIMIT)
       return pageSearchBatch(cachedSmart, limit, offset)
     }

@@ -311,6 +311,28 @@ export const installApiMocks = async (page: Page) => {
       })
     }
 
+    if (pathname === '/api/me/feed' && method === 'GET') {
+      if (!signedIn) return json(route, { error: 'Unauthorized.' }, 401)
+      return json(route, {
+        data: [{
+          id: 'activity-e2e',
+          userId: user.id,
+          type: 'rated',
+          albumId: albumCatalog[0].id,
+          albumName: albumCatalog[0].name,
+          albumCover: albumCatalog[0].cover,
+          targetUserId: null,
+          metadata: { rating: 5 },
+          createdAt: Date.now(),
+          user: {
+            name: user.name,
+            image: user.image,
+          },
+        }],
+        nextCursor: null,
+      })
+    }
+
     if (pathname === '/api/me/ratings' && method === 'GET') {
       const payload = Object.fromEntries(
         Array.from(ratings.entries()).map(([albumId, rating]) => [albumId, { rating, timestamp: Date.now() }]),
@@ -524,6 +546,26 @@ export const installApiMocks = async (page: Page) => {
           },
           joinedAt: Date.now(),
         },
+      })
+    }
+
+    if (pathname === '/api/me/dashboard' && method === 'GET') {
+      if (!signedIn) return json(route, { error: 'Unauthorized.' }, 401)
+      return json(route, {
+        ratings: {},
+        ratingSummary: { totalRated: 0, averageRating: 0 },
+        recentRatings: [],
+        profile: {
+          id: 'profile-e2e',
+          userId: user.id,
+          username: 'e2e-user',
+          bio: 'E2E profile',
+          name: user.name,
+          image: user.image,
+          followerCount: 0,
+          followingCount: 0,
+        },
+        lists,
       })
     }
 
