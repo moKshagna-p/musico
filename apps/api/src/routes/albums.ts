@@ -3,7 +3,7 @@ import { getReleaseDetails } from '../services/discogs'
 import {
   attachMusicoCommunityStats,
 } from '../core/utils'
-import { getStoredTrendingAlbumsEnsuringFresh } from '../services/trending'
+import { loadStoredFeaturedSection } from '../services/trending'
 import { readIdentifier } from './validation'
 
 export const albumRoutes = new Elysia({ prefix: '/api' })
@@ -13,7 +13,7 @@ export const albumRoutes = new Elysia({ prefix: '/api' })
       const limit = Number.isFinite(limitParam) ? Math.min(Math.max(limitParam, 1), 50) : 24
       const mode = String(query?.mode ?? '').toLowerCase()
       const normalizedMode = mode === 'recent-popular' ? 'recent-popular' : 'featured'
-      const data = await getStoredTrendingAlbumsEnsuringFresh(limit, normalizedMode)
+      const data = await loadStoredFeaturedSection(normalizedMode, limit)
 
       set.headers ??= {}
       // Never let shared caches hold an empty payload: the trending service
@@ -37,8 +37,8 @@ export const albumRoutes = new Elysia({ prefix: '/api' })
       const recentLimit = Number.isFinite(recentLimitParam) ? Math.min(Math.max(recentLimitParam, 1), 50) : 24
 
       const [mostHappening, recentReleases] = await Promise.allSettled([
-        getStoredTrendingAlbumsEnsuringFresh(happeningLimit, 'featured'),
-        getStoredTrendingAlbumsEnsuringFresh(recentLimit, 'recent-popular'),
+        loadStoredFeaturedSection('featured', happeningLimit),
+        loadStoredFeaturedSection('recent-popular', recentLimit),
       ])
 
       const mostHappeningData = mostHappening.status === 'fulfilled'
