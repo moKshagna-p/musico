@@ -56,6 +56,7 @@ test.describe('Critical user flows', () => {
     await expect(page).toHaveURL(/\/album\//)
     await expect(page.getByRole('heading', { name: 'Discovery' })).toHaveCount(1)
     await page.getByRole('link', { name: 'Home', exact: true }).click()
+    await expect(page.getByRole('heading', { name: /most happening right now/i })).toBeVisible()
 
     await page.getByRole('link', { name: 'Discover', exact: true }).click()
     await expect(page.getByRole('heading', { name: /dig through the vault/i })).toBeVisible()
