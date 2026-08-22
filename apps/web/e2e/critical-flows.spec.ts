@@ -20,6 +20,24 @@ test.describe('Critical user flows', () => {
     await expect(page.getByRole('link', { name: /profile/i })).toBeVisible()
   })
 
+  test('a stale previous session does not sign out a fresh login', async ({ page }) => {
+    let signOutRequests = 0
+    page.on('request', (request) => {
+      if (new URL(request.url()).pathname === '/api/auth/sign-out') signOutRequests += 1
+    })
+
+    await page.goto('/auth')
+    await page.evaluate(() => {
+      window.localStorage.setItem('musico:last-activity-at', String(Date.now() - 21 * 60 * 1000))
+    })
+    await page.getByLabel(/email/i).fill('e2e@musico.dev')
+    await page.getByLabel(/password/i).fill('password123')
+    await page.locator('form').getByRole('button', { name: /^sign in$/i }).click()
+
+    await expect(page.getByRole('link', { name: /profile/i })).toBeVisible()
+    expect(signOutRequests).toBe(0)
+  })
+
   test('navbar pages render their data and album links open details', async ({ page }) => {
     const browserErrors: string[] = []
     page.on('console', (message) => {
@@ -38,6 +56,7 @@ test.describe('Critical user flows', () => {
     await expect(page).toHaveURL(/\/album\//)
     await expect(page.getByRole('heading', { name: 'Discovery' })).toHaveCount(1)
     await page.getByRole('link', { name: 'Home', exact: true }).click()
+    await expect(page.getByRole('heading', { name: /most happening right now/i })).toBeVisible()
 
     await page.getByRole('link', { name: 'Discover', exact: true }).click()
     await expect(page.getByRole('heading', { name: /dig through the vault/i })).toBeVisible()
