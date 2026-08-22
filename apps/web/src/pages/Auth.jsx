@@ -56,6 +56,7 @@ const Auth = () => {
         return
       }
 
+      window.localStorage.setItem('musico:last-activity-at', String(Date.now()))
       const authUser = result?.data?.user
       const sessionResult = await refreshSession({ attempts: authUser ? 2 : 5, delayMs: 220 })
       if (!authUser && !sessionResult?.data?.user) {
