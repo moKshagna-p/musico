@@ -539,9 +539,7 @@ const Profile = () => {
             </div>
           </section>
 
-          {dashboard?.lists?.length > 0 && (
-            <AlbumSlotMachine albums={dashboard.lists[0]?.albums ?? []} />
-          )}
+          {!dashboardLoading && <AlbumSlotMachine key={user.id} userId={user.id} lists={dashboard?.lists ?? []} />}
 
           <section className="mt-20">
             <div className="mb-12 text-center">
