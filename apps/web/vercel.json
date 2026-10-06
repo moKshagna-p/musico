@@ -13,7 +13,7 @@
   ],
   "rewrites": [
       {
-        "source": "/api/:path*",
+        "source": "/api/:path((?!discogs$).*)",
         "destination": "https://musico-api.mokshagnareddy45.workers.dev/api/:path*"
       },
       {

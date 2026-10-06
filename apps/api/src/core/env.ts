@@ -54,6 +54,8 @@ export const env = new Proxy({} as Record<string, unknown>, {
       case 'DISCOGS_TOKEN': return sanitizeOptionalSecret(get('DISCOGS_TOKEN'))
       case 'DISCOGS_KEY': return sanitizeOptionalSecret(get('DISCOGS_KEY'))
       case 'DISCOGS_SECRET': return sanitizeOptionalSecret(get('DISCOGS_SECRET'))
+      case 'DISCOGS_RELAY_URL': return get('DISCOGS_RELAY_URL')
+      case 'DISCOGS_RELAY_SECRET': return sanitizeOptionalSecret(get('DISCOGS_RELAY_SECRET'))
       case 'DISCOGS_USER_AGENT': return get('DISCOGS_USER_AGENT') || 'musico/1.0 (+https://example.com)'
       case 'SEARCH_CACHE_TTL_MS': return parseDiscogsCacheTtl(get('SEARCH_CACHE_TTL_MS'))
       case 'SEARCH_RETRY_COOLDOWN_MS': return parsePositiveInteger(get('SEARCH_RETRY_COOLDOWN_MS'), 1000 * 60 * 10)
@@ -79,6 +81,8 @@ export const env = new Proxy({} as Record<string, unknown>, {
   DISCOGS_TOKEN: string | undefined
   DISCOGS_KEY: string | undefined
   DISCOGS_SECRET: string | undefined
+  DISCOGS_RELAY_URL: string | undefined
+  DISCOGS_RELAY_SECRET: string | undefined
   DISCOGS_USER_AGENT: string
   SEARCH_CACHE_TTL_MS: number
   SEARCH_RETRY_COOLDOWN_MS: number
