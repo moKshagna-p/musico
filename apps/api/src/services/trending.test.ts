@@ -68,23 +68,26 @@ const runRefreshScenario = async (scenario: string) => {
       { id: 'r:2', name: 'Popular', artists: ['Artist'], popularity: 100, reviewCount: 0 },
     ]
     let fallbackCalls = 0
+    let searchCalls = 0
+    let detailCalls = 0
     mock.module('./src/core/db.ts', () => ({ db }))
-    mock.module('./src/core/env.ts', () => ({ env: { HOMEPAGE_REFRESH_MINIMAL: false, HOME_RELEASE_DETAILS_PREWARM_LIMIT: 0 } }))
+    mock.module('./src/core/env.ts', () => ({ env: { HOMEPAGE_REFRESH_MINIMAL: false, HOME_RELEASE_DETAILS_PREWARM_LIMIT: 6 } }))
     mock.module('./src/services/charts.ts', () => ({ fetchBillboard200Albums: async () => {
       if (!['billboard-success', 'billboard-unmatched'].includes(scenario)) throw new Error('Billboard 200 request failed: 403')
       return [{ rank: 1, artist: 'Artist', name: 'First' }]
     } }))
-    mock.module('./src/services/searchSignals.ts', () => ({ getTopSearchQueries: async () => [] }))
+    mock.module('./src/services/searchSignals.ts', () => ({ getTopSearchQueries: async () => scenario === 'stored-interest' ? [{ displayQuery: 'Artist', searchCount: 10 }] : [] }))
     mock.module('./src/services/discogs.ts', () => ({
-      fetchRecentReleaseCandidatesFromDiscogs: async () => { fallbackCalls++; return scenario === 'empty' ? [] : [...candidates] },
-      searchReleases: async () => ({ data: scenario === 'billboard-unmatched' ? [] : [candidates[0]] }),
-      getReleaseDetails: async () => null,
+      fetchRecentReleaseCandidatesFromDiscogs: async (_limit, options) => { if (options?.hydrate !== false) throw new Error('Refresh must not hydrate details'); fallbackCalls++; return scenario === 'empty' ? [] : [...candidates] },
+      getStoredSearchResults: async (queries) => new Map(queries.map((query) => [query, scenario === 'billboard-unmatched' ? [] : [{ ...candidates[0], releaseYear: new Date().getFullYear() }]])),
+      searchReleases: async () => { searchCalls++; return { data: [] } },
+      getReleaseDetails: async () => { detailCalls++; return null },
     }))
     const { refreshStoredHomeAlbums } = await import('./src/services/trending.ts')
     let result, error
     try { result = await refreshStoredHomeAlbums({ happeningLimit: 24, recentLimit: 24 }) }
     catch (failure) { error = failure.message }
-    console.log(JSON.stringify({ result, error, queries, fallbackCalls }))
+    console.log(JSON.stringify({ result, error, queries, fallbackCalls, searchCalls, detailCalls }))
   `
   const child = Bun.spawn([process.execPath, '--eval', script], {
     cwd: new URL('../..', import.meta.url).pathname,
@@ -101,7 +104,7 @@ test('uses popularity-ranked Discogs albums when Billboard is blocked and refres
   const { result, queries, fallbackCalls } = await runRefreshScenario('billboard-blocked')
   expect(result.mostHappening.data.map((release) => release.id)).toEqual(['r:2', 'r:1'])
   expect(result.recentReleases.data).toHaveLength(2)
-  expect(fallbackCalls).toBe(2)
+  expect(fallbackCalls).toBe(1)
   expect(queries.filter((query) => query.sql.startsWith('insert'))).toHaveLength(2)
 })
 
@@ -114,14 +117,14 @@ test('keeps Billboard as the preferred featured source when it works', async () 
 test('uses Discogs when a valid Billboard chart has no catalog matches', async () => {
   const { result, fallbackCalls } = await runRefreshScenario('billboard-unmatched')
   expect(result.mostHappening.data.map((release) => release.id)).toEqual(['r:2', 'r:1'])
-  expect(fallbackCalls).toBe(2)
+  expect(fallbackCalls).toBe(1)
 })
 
 test('preserves existing snapshots when providers return no albums and reports both failures', async () => {
   const { error, queries, fallbackCalls } = await runRefreshScenario('empty')
   expect(error).toContain('featured: Homepage refresh returned no albums')
   expect(error).toContain('recent-popular: Homepage refresh returned no albums')
-  expect(fallbackCalls).toBe(2)
+  expect(fallbackCalls).toBe(1)
   expect(queries.some((query) => /^(delete|insert)/.test(query.sql))).toBe(false)
 })
 
@@ -130,4 +133,13 @@ test('attempts the recent section even when the featured database write fails', 
   expect(error).toContain('featured:')
   expect(queries.filter((query) => query.sql.startsWith('insert')).map((query) => query.params[0]))
     .toEqual(['featured', 'recent-popular'])
+})
+
+
+test('homepage refresh retains cached search interest without interactive searches or detail prewarming', async () => {
+  const { result, fallbackCalls, searchCalls, detailCalls } = await runRefreshScenario('stored-interest')
+  expect(result.recentReleases.data.map((release) => release.id)).toEqual(['r:1', 'r:2'])
+  expect(fallbackCalls).toBe(1)
+  expect(searchCalls).toBe(0)
+  expect(detailCalls).toBe(0)
 })

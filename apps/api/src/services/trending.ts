@@ -7,6 +7,7 @@ import { db } from '../core/db'
 import {
   fetchRecentReleaseCandidatesFromDiscogs,
   getReleaseDetails,
+  getStoredSearchResults,
   searchReleases,
 } from './discogs'
 import { env } from '../core/env'
@@ -145,6 +146,8 @@ const parseReleaseTimestamp = (release: ReleaseSummary) => {
   return 0
 }
 
+type SnapshotSource = { candidates: () => Promise<ReleaseSummary[]> }
+
 type SearchLookup = (query: string) => Promise<{ data: ReleaseSummary[] }>
 
 export const matchBillboardAlbums = async (
@@ -170,18 +173,20 @@ export const matchBillboardAlbums = async (
   return Array.from(new Map(matches.map((release) => [release.id, release])).values()).slice(0, limit)
 }
 
-const getMostHappeningAlbums = async (limit = 12) => {
+const getMostHappeningAlbums = async (limit = 12, source?: SnapshotSource) => {
   try {
     const chartAlbums = await fetchBillboard200Albums(Math.min(Math.max(limit * 2, limit), 50))
-    const matches = await matchBillboardAlbums(chartAlbums, searchReleases, limit)
+    const cached = source ? await getStoredSearchResults(chartAlbums.map(({ artist, name }) => `${artist} ${name}`.trim())) : null
+    const search: SearchLookup = cached ? async (query) => ({ data: cached.get(query) ?? [] }) : searchReleases
+    const matches = await matchBillboardAlbums(chartAlbums, search, limit)
     if (matches.length) return matches
     throw new Error('Billboard chart has no matching Discogs albums.')
   } catch (error) {
     console.warn('[homepage] Billboard unavailable; using Discogs', error instanceof Error ? error.message : String(error))
   }
 
-  const candidates = await fetchRecentReleaseCandidatesFromDiscogs(Math.max(limit * 2, 48))
-  return candidates
+  const candidates = source ? await source.candidates() : await fetchRecentReleaseCandidatesFromDiscogs(Math.max(limit * 2, 48))
+  return [...candidates]
     .sort((a, b) => Number(b.popularity ?? 0) - Number(a.popularity ?? 0))
     .slice(0, limit)
 }
@@ -195,19 +200,20 @@ const getStoredAlbumIds = async (mode: StoredMode) => {
   return new Set(rows.map((row) => row.albumId))
 }
 
-const selectSearchDrivenRecentReleases = async (limit: number) => {
+const selectSearchDrivenRecentReleases = async (limit: number, source?: SnapshotSource) => {
   const queryLimit = env.HOMEPAGE_REFRESH_MINIMAL ? limit : Math.max(limit, 12)
   const [topQueries, existingAlbumIds] = await Promise.all([
     getTopSearchQueries(queryLimit),
     getStoredAlbumIds('recent-popular'),
   ])
 
+  const cached = source ? await getStoredSearchResults(topQueries.map(({ displayQuery }) => displayQuery)) : null
   const now = Date.now()
   const recentCutoff = new Date(new Date().getFullYear() - 1, 0, 1).getTime()
   const queryResults = await Promise.all(
     topQueries.map(async ({ displayQuery, searchCount }) => {
       try {
-        const result = await searchReleases(displayQuery)
+        const result = cached ? { data: cached.get(displayQuery) ?? [] } : await searchReleases(displayQuery)
         const recentMatches = (result.data ?? [])
           .filter((release) => parseReleaseTimestamp(release) >= recentCutoff)
           .sort((a, b) => {
@@ -243,23 +249,23 @@ const selectSearchDrivenRecentReleases = async (limit: number) => {
   return [...unseen, ...seen].slice(0, limit)
 }
 
-const selectRecentReleaseSnapshot = async (limit: number) => {
-  const searchDriven = await selectSearchDrivenRecentReleases(limit)
+const selectRecentReleaseSnapshot = async (limit: number, source?: SnapshotSource) => {
+  const searchDriven = await selectSearchDrivenRecentReleases(limit, source)
   if (searchDriven.length >= limit) return searchDriven
 
   const existingIds = new Set(searchDriven.map((release) => release.id))
   const fallbackTargetSize = env.HOMEPAGE_REFRESH_MINIMAL ? Math.max(limit * 2, 12) : Math.max(limit * 4, 48)
-  const fallbackCandidates = await fetchRecentReleaseCandidatesFromDiscogs(fallbackTargetSize)
+  const fallbackCandidates = source ? await source.candidates() : await fetchRecentReleaseCandidatesFromDiscogs(fallbackTargetSize)
   const fallback = fallbackCandidates.filter((release) => !existingIds.has(release.id))
   return [...searchDriven, ...fallback].slice(0, limit)
 }
 
-const getSourceSnapshotByMode = async (mode: StoredMode, limit: number) => {
+const getSourceSnapshotByMode = async (mode: StoredMode, limit: number, source?: SnapshotSource) => {
   if (mode === 'recent-popular') {
-    return selectRecentReleaseSnapshot(limit)
+    return selectRecentReleaseSnapshot(limit, source)
   }
 
-  return getMostHappeningAlbums(limit)
+  return getMostHappeningAlbums(limit, source)
 }
 
 const upsertStoredSnapshot = async (mode: StoredMode, snapshot: ReleaseSummary[]) => {
@@ -380,18 +386,18 @@ export const getStoredTrendingAlbums = async (limit = 24, mode: StoredMode = DEF
   }
 }
 
-export const refreshStoredTrendingAlbums = async (mode: StoredMode = DEFAULT_MODE, limit = 24) => {
+export const refreshStoredTrendingAlbums = async (mode: StoredMode = DEFAULT_MODE, limit = 24, source?: SnapshotSource) => {
   const existing = storedRefreshInFlight.get(mode)
   if (existing) return existing
 
   const targetLimit = getSnapshotTargetLimit(limit, mode)
   const refreshPromise = (async () => {
-    const snapshot = await getSourceSnapshotByMode(mode, targetLimit)
+    const snapshot = await getSourceSnapshotByMode(mode, targetLimit, source)
     const shouldMerge = mode !== 'featured' && env.HOMEPAGE_REFRESH_MINIMAL
     const result = shouldMerge
       ? await mergeStoredSnapshot(mode, snapshot)
       : await upsertStoredSnapshot(mode, snapshot)
-    if (!shouldMerge) {
+    if (!shouldMerge && !source) {
       void prewarmReleaseDetails(result.data).catch(() => {
         // Ignore detail prewarm failures so snapshot refresh still succeeds.
       })
@@ -410,11 +416,20 @@ export const refreshStoredHomeAlbums = async (params?: { happeningLimit?: number
   const happeningLimit = clampLimit(params?.happeningLimit ?? defaultLimit, defaultLimit)
   const recentLimit = clampLimit(params?.recentLimit ?? defaultLimit, defaultLimit)
 
+  // One unhydrated scan feeds both sections. Detail fetching belongs to album requests,
+  // keeping the scheduled job within the free Worker's 50-subrequest budget.
+  let candidates: Promise<ReleaseSummary[]> | undefined
+  const source: SnapshotSource = {
+    candidates: () => candidates ??= fetchRecentReleaseCandidatesFromDiscogs(
+      Math.max(happeningLimit * 2, recentLimit * 4, 48), { hydrate: false },
+    ),
+  }
+
   // Attempt both sections, even when one provider or database operation fails.
-  const mostHappening = await refreshStoredTrendingAlbums('featured', happeningLimit)
+  const mostHappening = await refreshStoredTrendingAlbums('featured', happeningLimit, source)
     .then((value) => ({ value, error: null }))
     .catch((error: unknown) => ({ value: null, error }))
-  const recentReleases = await refreshStoredTrendingAlbums('recent-popular', recentLimit)
+  const recentReleases = await refreshStoredTrendingAlbums('recent-popular', recentLimit, source)
     .then((value) => ({ value, error: null }))
     .catch((error: unknown) => ({ value: null, error }))
 
