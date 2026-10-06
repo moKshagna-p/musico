@@ -354,7 +354,7 @@ export const requestDiscogs = async (endpoint: string, params: Record<string, st
             if (['token', 'key', 'secret'].includes(key)) relayHeaders[`x-discogs-${key}`] = value
             else relay.searchParams.append(key, value)
           })
-          return await fetch(relay, { headers: relayHeaders, signal: controller.signal, redirect: 'error' })
+          return await fetch(relay, { headers: relayHeaders, signal: controller.signal, redirect: 'manual' })
         }
         return await fetch(url, { headers, signal: controller.signal })
       } finally {
@@ -1287,7 +1287,8 @@ export const searchReleases = async (query: string, options: SearchOptions = {})
     }
 
     return pageSearchBatch(results, limit, offset)
-  } catch {
+  } catch (error) {
+    console.error('[search] refresh failed', error instanceof Error ? error.message : String(error))
     if (shouldServeStoredSearchCache(cached)) {
       const cachedSmart = buildSmartSearchResults(cachedPayload, trimmed, EXPANDED_SEARCH_RESULT_LIMIT)
       return pageSearchBatch(cachedSmart, limit, offset)
