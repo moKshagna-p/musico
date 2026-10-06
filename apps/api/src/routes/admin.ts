@@ -487,7 +487,7 @@ export const adminRoutes = new Elysia({ prefix: '/api/admin' })
 
     await db.delete(userReview).where(eq(userReview.id, reviewId))
 
-    recordActivity({
+    await recordActivity({
       userId: authUser.id,
       type: 'reviewed',
       albumId: existing.albumId,

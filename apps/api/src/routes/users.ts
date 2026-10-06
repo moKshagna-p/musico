@@ -265,7 +265,7 @@ export const userRoutes = new Elysia({ prefix: '/api' })
       .where(eq(userRating.albumId, albumId))
 
     // Record activity for the feed
-    recordActivity({
+    await recordActivity({
       userId: authUser.id,
       type: 'rated',
       albumId,
@@ -845,7 +845,7 @@ export const userRoutes = new Elysia({ prefix: '/api' })
     })
 
     // Record activity
-    recordActivity({
+    await recordActivity({
       userId: authUser.id,
       type: 'followed',
       targetUserId: target.userId,

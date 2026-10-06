@@ -142,7 +142,7 @@ export const listRoutes = new Elysia({ prefix: '/api' })
         addedAt: now,
       })
 
-      recordActivity({
+      await recordActivity({
         userId: authUser.id,
         type: 'listed',
         albumId: initialAlbumId,
@@ -251,7 +251,7 @@ export const listRoutes = new Elysia({ prefix: '/api' })
     await db.update(userList).set({ updatedAt: now }).where(eq(userList.id, listId))
 
     // Record activity for the feed
-    recordActivity({
+    await recordActivity({
       userId: authUser.id,
       type: 'listed',
       albumId,

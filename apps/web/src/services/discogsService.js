@@ -3,7 +3,6 @@ import { z } from 'zod'
 
 const CACHE_WINDOW = 1000 * 60 * 60 // 1 hour
 const FEATURED_CACHE_WINDOW = 1000 * 60 * 5 // 5 minutes
-const DETAILS_CACHE_WINDOW = 1000 * 60 * 60 * 24 // 24 hours
 const SEARCH_CACHE_VERSION = 'v5'
 
 const recentPopularCache = { timestamp: 0, data: [] }
@@ -273,13 +272,7 @@ export const searchReleases = async (query, options = {}) => {
 export const getReleaseDetails = async (releaseId) => {
   if (!releaseId) throw new Error('Release id missing')
 
-  const cacheKey = `musico:release:${releaseId}`
-  const cached = storage.get(cacheKey)
-  if (cached && isFresh(cached.timestamp, DETAILS_CACHE_WINDOW)) {
-    return cached.data
-  }
-
-  const data = await validatedRequest({ url: `/api/releases/${releaseId}` }, AlbumSchema)
-  storage.set(cacheKey, { data, timestamp: Date.now() })
-  return data
+  // TanStack Query owns the view cache; persisted release responses contain
+  // mutable community scores and cannot stay valid across page reloads.
+  return validatedRequest({ url: `/api/releases/${releaseId}` }, AlbumSchema)
 }

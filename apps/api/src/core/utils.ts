@@ -388,7 +388,7 @@ export const recordActivity = (params: {
   metadata?: Record<string, unknown>
 }) => {
   const now = new Date()
-  db.insert(activity)
+  return db.insert(activity)
     .values({
       id: crypto.randomUUID(),
       userId: params.userId,
