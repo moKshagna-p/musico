@@ -6,6 +6,7 @@ Bun.env.DISCOGS_REQUEST_TIMEOUT_MS = '10'
 
 const {
   buildSmartSearchResults,
+  fetchRecentReleaseCandidatesFromDiscogs,
   isDiscogsCacheFresh,
   matchesSearchCacheQuery,
   normalizeSearchValue,
@@ -118,4 +119,33 @@ test('ranks an exact artist and album match above a more popular partial result'
   )
 
   expect(result.data[0]?.id).toBe('m:exact')
+})
+
+
+test('homepage candidate scan uses at most five search requests without fetching album details', async () => {
+  const originalFetch = globalThis.fetch
+  const paths: string[] = []
+  let active = 0
+  let maxActive = 0
+  globalThis.fetch = async (input) => {
+    const url = new URL(String(input))
+    paths.push(url.pathname)
+    active++
+    maxActive = Math.max(maxActive, active)
+    await new Promise((resolve) => setTimeout(resolve, 1))
+    active--
+    return Response.json({ results: [{
+      id: paths.length, title: `Artist - Album ${paths.length}`, year: Number(url.searchParams.get('year')),
+      format: ['Album'], cover_image: 'https://example.com/cover.jpg', community: { have: 100, want: 20 },
+    }] })
+  }
+  try {
+    const results = await fetchRecentReleaseCandidatesFromDiscogs(96, { hydrate: false })
+    expect(results.length).toBeGreaterThan(0)
+    expect(paths.length).toBeLessThanOrEqual(5)
+    expect(paths.every((path) => path === '/database/search')).toBe(true)
+    expect(maxActive).toBe(1)
+  } finally {
+    globalThis.fetch = originalFetch
+  }
 })

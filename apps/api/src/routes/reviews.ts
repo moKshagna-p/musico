@@ -60,7 +60,7 @@ export const reviewRoutes = new Elysia()
       })
       .returning()
 
-    recordActivity({
+    await recordActivity({
       userId: authUser.id,
       type: 'reviewed',
       albumId,

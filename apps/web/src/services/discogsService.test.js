@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { QueryClient } from '@tanstack/react-query'
 
 import api from './apiClient.js'
-import { getHomeSections, updateAlbumCommunityStatsInCache } from './discogsService.js'
+import { getHomeSections, getReleaseDetails, updateAlbumCommunityStatsInCache } from './discogsService.js'
 import { homeSectionsQueryOptions, updateHomeSectionsCommunityStats } from '../queries/homeSections.js'
 
 const album = {
@@ -158,5 +158,28 @@ test('a cancelled Home request does not replace the patched service cache', asyn
   } finally {
     Date.now = originalNow
     api.defaults.adapter = originalAdapter
+  }
+})
+
+
+test('release scores bypass a persisted cache across visits', async () => {
+  const originalAdapter = api.defaults.adapter
+  const originalStorage = globalThis.localStorage
+  let calls = 0
+  globalThis.localStorage = {
+    getItem: () => JSON.stringify({ timestamp: Date.now(), data: { ...album, communityRating: 1 } }),
+    setItem: () => {},
+  }
+  api.defaults.adapter = async (config) => ({
+    data: { ...album, communityRating: ++calls === 1 ? 4 : 4.5 },
+    status: 200, statusText: 'OK', headers: {}, config,
+  })
+  try {
+    assert.equal((await getReleaseDetails(album.id)).communityRating, 4)
+    assert.equal((await getReleaseDetails(album.id)).communityRating, 4.5)
+    assert.equal(calls, 2)
+  } finally {
+    api.defaults.adapter = originalAdapter
+    globalThis.localStorage = originalStorage
   }
 })

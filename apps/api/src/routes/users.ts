@@ -21,7 +21,7 @@ import {
   ensureUserProfile,
   getCachedReleaseArtists,
   getReleasePreviewMap,
-  getCachedReleasePreviewMap,
+  getProfileReleasePreviewMap,
   parseProfileImage,
   normalizeEmail,
 } from '../core/utils'
@@ -165,6 +165,7 @@ export const userRoutes = new Elysia({ prefix: '/api' })
       })
     }
 
+    const cachedPayloadByAlbum = new Map(releaseCacheRows.map(row => [row.albumId, row.payload]))
     const cachedArtistsByAlbum = new Map<string, string[]>()
     for (const row of releaseCacheRows) {
       const albumId = String(row.albumId ?? '').trim()
@@ -194,8 +195,8 @@ export const userRoutes = new Elysia({ prefix: '/api' })
         albumId,
         rating: row.rating,
         timestamp: row.updatedAt.getTime(),
-        albumName: fromActivity?.albumName || fromReview?.albumName || fromList?.albumName || preview?.name || '',
-        albumCover: fromActivity?.albumCover || fromReview?.albumCover || fromList?.albumCover || preview?.cover || '',
+        albumName: fromActivity?.albumName || fromReview?.albumName || fromList?.albumName || String(cachedPayloadByAlbum.get(albumId)?.name ?? '').trim() || preview?.name || '',
+        albumCover: fromActivity?.albumCover || fromReview?.albumCover || fromList?.albumCover || String(cachedPayloadByAlbum.get(albumId)?.cover ?? '').trim() || preview?.cover || '',
         albumArtists:
           fromReview?.albumArtists?.length
             ? fromReview.albumArtists
@@ -265,7 +266,7 @@ export const userRoutes = new Elysia({ prefix: '/api' })
       .where(eq(userRating.albumId, albumId))
 
     // Record activity for the feed
-    recordActivity({
+    await recordActivity({
       userId: authUser.id,
       type: 'rated',
       albumId,
@@ -390,13 +391,7 @@ export const userRoutes = new Elysia({ prefix: '/api' })
     }
 
     const recentRatingAlbumIds = recentRatingsRows.map((row) => row.albumId)
-    const releasePreviewMap = await getCachedReleasePreviewMap(recentRatingAlbumIds)
-    const missingPreviewAlbumIds = recentRatingAlbumIds.filter((albumId) => !releasePreviewMap.has(String(albumId)))
-    if (missingPreviewAlbumIds.length) {
-      void getReleasePreviewMap(missingPreviewAlbumIds).catch(() => {
-        // Missing cache entries should not slow down the profile response.
-      })
-    }
+    const releasePreviewMap = await getProfileReleasePreviewMap(recentRatingAlbumIds)
 
     const recentRatings = recentRatingsRows.map((row) => {
       const activityMeta = latestActivityByAlbum.get(String(row.albumId))
@@ -744,15 +739,7 @@ export const userRoutes = new Elysia({ prefix: '/api' })
     }
 
     const recentRatingAlbumIds = recentRatingsRows.map((row) => row.albumId)
-    const releasePreviewMap = await getCachedReleasePreviewMap(recentRatingAlbumIds)
-    const missingAlbumIds = recentRatingAlbumIds.filter(
-      (id) => !releasePreviewMap.has(String(id ?? '').trim()),
-    )
-    if (missingAlbumIds.length > 0) {
-      void getReleasePreviewMap(missingAlbumIds).catch(() => {
-        // Keep profile reads fast; cache misses are warmed in the background.
-      })
-    }
+    const releasePreviewMap = await getProfileReleasePreviewMap(recentRatingAlbumIds)
 
     const recentRatings = recentRatingsRows.map((row) => {
       const albumIdStr = String(row.albumId ?? '').trim()
@@ -859,7 +846,7 @@ export const userRoutes = new Elysia({ prefix: '/api' })
     })
 
     // Record activity
-    recordActivity({
+    await recordActivity({
       userId: authUser.id,
       type: 'followed',
       targetUserId: target.userId,
@@ -1039,15 +1026,7 @@ export const userRoutes = new Elysia({ prefix: '/api' })
 
         // Get release previews for recent ratings
         const recentRatingAlbumIds = recentRatingsRows.map((row) => row.albumId)
-        const releasePreviewMap = await getCachedReleasePreviewMap(recentRatingAlbumIds)
-        const missingAlbumIds = recentRatingAlbumIds.filter(
-          (id) => !releasePreviewMap.has(String(id ?? '').trim()),
-        )
-        if (missingAlbumIds.length > 0) {
-          void getReleasePreviewMap(missingAlbumIds).catch(() => {
-            // Keep dashboard reads fast; cache misses are warmed in the background.
-          })
-        }
+        const releasePreviewMap = await getProfileReleasePreviewMap(recentRatingAlbumIds)
 
         // Build recent ratings with album details
         const recentRatings = recentRatingsRows.map((row) => {
@@ -1105,7 +1084,7 @@ export const userRoutes = new Elysia({ prefix: '/api' })
                id: list.id,
                name: list.name,
                description: list.description,
-               albumCount: list.albumCount,
+               albumCount: albumsByList.get(list.id)?.length ?? 0,
                albums,
              }
            })

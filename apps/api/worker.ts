@@ -38,7 +38,7 @@ export default {
         const { refreshStoredHomeAlbums } = await import('./src/services/trending')
         await refreshStoredHomeAlbums({ happeningLimit: 24, recentLimit: 24 })
       })().catch((error) => {
-        console.error('[worker.scheduled] homepage refresh failed', error)
+        console.error('[worker.scheduled] homepage refresh failed', error instanceof Error ? error.message : String(error), error)
       }),
     )
   },
