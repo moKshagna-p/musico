@@ -207,7 +207,10 @@ const selectSearchDrivenRecentReleases = async (limit: number, source?: Snapshot
     getStoredAlbumIds('recent-popular'),
   ])
 
-  const cached = source ? await getStoredSearchResults(topQueries.map(({ displayQuery }) => displayQuery)) : null
+  const cached = source ? await getStoredSearchResults(topQueries.map(({ displayQuery }) => displayQuery)).catch((error) => {
+    console.warn('[homepage] Search cache unavailable; using Discogs', error instanceof Error ? error.message : String(error))
+    return new Map<string, ReleaseSummary[]>()
+  }) : null
   const now = Date.now()
   const recentCutoff = new Date(new Date().getFullYear() - 1, 0, 1).getTime()
   const queryResults = await Promise.all(

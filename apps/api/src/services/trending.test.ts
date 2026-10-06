@@ -76,10 +76,10 @@ const runRefreshScenario = async (scenario: string) => {
       if (!['billboard-success', 'billboard-unmatched'].includes(scenario)) throw new Error('Billboard 200 request failed: 403')
       return [{ rank: 1, artist: 'Artist', name: 'First' }]
     } }))
-    mock.module('./src/services/searchSignals.ts', () => ({ getTopSearchQueries: async () => scenario === 'stored-interest' ? [{ displayQuery: 'Artist', searchCount: 10 }] : [] }))
+    mock.module('./src/services/searchSignals.ts', () => ({ getTopSearchQueries: async () => ['stored-interest', 'cache-read-failure'].includes(scenario) ? [{ displayQuery: 'Artist', searchCount: 10 }] : [] }))
     mock.module('./src/services/discogs.ts', () => ({
       fetchRecentReleaseCandidatesFromDiscogs: async (_limit, options) => { if (options?.hydrate !== false) throw new Error('Refresh must not hydrate details'); fallbackCalls++; return scenario === 'empty' ? [] : [...candidates] },
-      getStoredSearchResults: async (queries) => new Map(queries.map((query) => [query, scenario === 'billboard-unmatched' ? [] : [{ ...candidates[0], releaseYear: new Date().getFullYear() }]])),
+      getStoredSearchResults: async (queries) => { if (scenario === 'cache-read-failure') throw new Error('cache read unavailable'); return new Map(queries.map((query) => [query, scenario === 'billboard-unmatched' ? [] : [{ ...candidates[0], releaseYear: new Date().getFullYear() }]])) },
       searchReleases: async () => { searchCalls++; return { data: [] } },
       getReleaseDetails: async () => { detailCalls++; return null },
     }))
@@ -142,4 +142,13 @@ test('homepage refresh retains cached search interest without interactive search
   expect(fallbackCalls).toBe(1)
   expect(searchCalls).toBe(0)
   expect(detailCalls).toBe(0)
+})
+
+test('uses shared candidates when the optional search cache read fails', async () => {
+  const { result, error, queries, fallbackCalls, searchCalls } = await runRefreshScenario('cache-read-failure')
+  expect(error).toBeUndefined()
+  expect(result.recentReleases.data.map((release) => release.id)).toEqual(['r:1', 'r:2'])
+  expect(queries.filter((query) => query.sql.startsWith('insert')).map((query) => query.params[0])).toEqual(['featured', 'recent-popular'])
+  expect(fallbackCalls).toBe(1)
+  expect(searchCalls).toBe(0)
 })
