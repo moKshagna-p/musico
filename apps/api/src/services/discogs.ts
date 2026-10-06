@@ -340,6 +340,22 @@ export const requestDiscogs = async (endpoint: string, params: Record<string, st
       const controller = new AbortController()
       const timeout = setTimeout(() => controller.abort(), DISCOGS_REQUEST_TIMEOUT_MS)
       try {
+        const relayUrl = env.DISCOGS_RELAY_URL
+        if (relayUrl) {
+          if (!env.DISCOGS_RELAY_SECRET) throw new Error('Discogs relay secret missing')
+          const relay = new URL(relayUrl)
+          if (relay.protocol !== 'https:') throw new Error('Discogs relay requires HTTPS')
+          relay.searchParams.set('path', url.pathname)
+          const relayHeaders: Record<string, string> = {
+            Accept: 'application/json', Authorization: `Bearer ${env.DISCOGS_RELAY_SECRET}`,
+          }
+          if (headers.Authorization) relayHeaders['x-discogs-authorization'] = headers.Authorization
+          url.searchParams.forEach((value, key) => {
+            if (['token', 'key', 'secret'].includes(key)) relayHeaders[`x-discogs-${key}`] = value
+            else relay.searchParams.append(key, value)
+          })
+          return await fetch(relay, { headers: relayHeaders, signal: controller.signal, redirect: 'error' })
+        }
         return await fetch(url, { headers, signal: controller.signal })
       } finally {
         clearTimeout(timeout)

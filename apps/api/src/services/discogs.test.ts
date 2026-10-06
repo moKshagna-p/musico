@@ -149,3 +149,31 @@ test('homepage candidate scan uses at most five search requests without fetching
     globalThis.fetch = originalFetch
   }
 })
+
+test('configured relay keeps credentials out of its URL and bypasses Workers egress', async () => {
+  const script = `
+    process.env.DISCOGS_RELAY_URL = 'https://musico-web.vercel.app/api/discogs'
+    process.env.DISCOGS_RELAY_SECRET = 'internal-secret'
+    process.env.DISCOGS_TOKEN = 'provider-token'
+    process.env.DISCOGS_MIN_REQUEST_INTERVAL_MS = '1'
+    let received
+    globalThis.fetch = async (url, options) => {
+      received = { url: String(url), headers: options.headers }
+      return Response.json({ id: 1706292 })
+    }
+    const { requestDiscogs } = await import('./src/services/discogs.ts')
+    const result = await requestDiscogs('/masters/1706292')
+    console.log(JSON.stringify({ received, result }))
+  `
+  const child = Bun.spawn([process.execPath, '--eval', script], {
+    cwd: new URL('../..', import.meta.url).pathname, stdout: 'pipe', stderr: 'pipe',
+  })
+  const [exitCode, stdout, stderr] = await Promise.all([child.exited, new Response(child.stdout).text(), new Response(child.stderr).text()])
+  expect(stderr).toBe('')
+  expect(exitCode).toBe(0)
+  const { received, result } = JSON.parse(stdout)
+  expect(received.url).toBe('https://musico-web.vercel.app/api/discogs?path=%2Fmasters%2F1706292')
+  expect(received.headers.Authorization).toBe('Bearer internal-secret')
+  expect(received.headers['x-discogs-authorization']).toBe('Discogs token=provider-token')
+  expect(result.id).toBe(1706292)
+})

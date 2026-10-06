@@ -89,7 +89,7 @@ jobs:
   deploy-api:
     name: Deploy API
     runs-on: ubuntu-latest
-    needs: checks
+    needs: [checks, deploy-web]
     timeout-minutes: 10
     environment: production
     env:
@@ -202,21 +202,21 @@ jobs:
         run: bun install --frozen-lockfile
 
       - name: Pull Vercel environment
-        run: npx vercel pull --yes --environment=production --token="${VERCEL_TOKEN}"
+        run: bunx vercel pull --yes --environment=production --local-config apps/web/vercel.json --token="${VERCEL_TOKEN}"
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
 
       - name: Build Vercel project
-        run: npx vercel build --prod --token="${VERCEL_TOKEN}"
+        run: bunx vercel build --prod --local-config apps/web/vercel.json --token="${VERCEL_TOKEN}"
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
 
       - name: Deploy Vercel project
-        run: npx vercel deploy --prebuilt --prod --token="${VERCEL_TOKEN}"
+        run: bunx vercel deploy --prebuilt --prod --local-config apps/web/vercel.json --token="${VERCEL_TOKEN}"
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
