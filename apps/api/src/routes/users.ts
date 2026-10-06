@@ -1083,7 +1083,7 @@ export const userRoutes = new Elysia({ prefix: '/api' })
                id: list.id,
                name: list.name,
                description: list.description,
-               albumCount: list.albumCount,
+               albumCount: albumsByList.get(list.id)?.length ?? 0,
                albums,
              }
            })

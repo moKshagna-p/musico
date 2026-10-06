@@ -81,3 +81,29 @@ for (const failedMode of [null, 'featured', 'recent-popular']) {
     expect(result.cache).toBe(failedMode ? 'no-store' : 'public, max-age=60, s-maxage=300, stale-while-revalidate=21000')
   })
 }
+
+test('release responses never cache mutable community scores', async () => {
+  const script = `
+    import { mock } from 'bun:test'
+    import { Elysia } from 'elysia'
+    let score = 4
+    mock.module('./src/services/trending.ts', () => ({ loadStoredFeaturedSection: async () => [] }))
+    mock.module('./src/services/discogs.ts', () => ({ getReleaseDetails: async () => ({ id: 'm:1', name: 'Album' }) }))
+    mock.module('./src/core/utils.ts', () => ({ attachMusicoCommunityStats: async (albums) => albums.map(album => ({ ...album, communityRating: score })) }))
+    const { albumRoutes } = await import('./src/routes/albums.ts')
+    const app = new Elysia().use(albumRoutes)
+    const first = await app.handle(new Request('http://localhost/api/releases/m:1'))
+    score = 4.5
+    const second = await app.handle(new Request('http://localhost/api/releases/m:1'))
+    console.log(JSON.stringify({ first: await first.json(), second: await second.json(), cache: second.headers.get('cache-control') }))
+  `
+  const child = Bun.spawn([process.execPath, '--eval', script], {
+    cwd: new URL('../..', import.meta.url).pathname, stdout: 'pipe', stderr: 'pipe',
+  })
+  const [exitCode, stdout, stderr] = await Promise.all([child.exited, new Response(child.stdout).text(), new Response(child.stderr).text()])
+  expect(exitCode, stderr).toBe(0)
+  const result = JSON.parse(stdout)
+  expect(result.first.communityRating).toBe(4)
+  expect(result.second.communityRating).toBe(4.5)
+  expect(result.cache).toBe('no-store')
+})

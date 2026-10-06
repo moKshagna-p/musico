@@ -180,7 +180,7 @@ export const getReleasePreviewMap = async (albumIds: unknown[]) => {
   )
 }
 
-export const getCachedReleasePreviewMap = async (albumIds: unknown[]) => {
+export const getCachedReleasePreviewMap = async (albumIds: unknown[], allowExpiredMetadata = false) => {
   const uniqueAlbumIds = [...new Set(albumIds.map(normalizeAlbumId).filter(Boolean))].slice(0, MAX_RELEASE_PREVIEW_LOOKUPS)
   if (!uniqueAlbumIds.length) {
     return new Map<string, { name: string; cover: string; artists: string[]; genres: string[]; releaseYear: number | null }>()
@@ -197,7 +197,7 @@ export const getCachedReleasePreviewMap = async (albumIds: unknown[]) => {
 
   return new Map(
     rows
-      .filter((row) => row.expiresAt instanceof Date && row.expiresAt.getTime() > Date.now())
+      .filter((row) => allowExpiredMetadata || (row.expiresAt instanceof Date && row.expiresAt.getTime() > Date.now()))
       .map((row) => {
         const payload = (row.payload ?? {}) as {
           name?: unknown
@@ -221,16 +221,10 @@ export const getCachedReleasePreviewMap = async (albumIds: unknown[]) => {
   )
 }
 
-// Await missing previews so Workers cannot cancel hydration after the response.
-export const getProfileReleasePreviewMap = async (albumIds: unknown[]) => {
-  const previews = await getCachedReleasePreviewMap(albumIds)
-  const missingIds = albumIds.map(normalizeAlbumId).filter((id) => id && !previews.has(id))
-  if (missingIds.length) {
-    const hydrated = await getReleasePreviewMap(missingIds)
-    for (const [id, preview] of hydrated) previews.set(id, preview)
-  }
-  return previews
-}
+// Profile previews contain stable catalog metadata, not mutable community stats.
+// Reuse stored metadata after its provider TTL without live fan-out on Workers.
+export const getProfileReleasePreviewMap = (albumIds: unknown[]) =>
+  getCachedReleasePreviewMap(albumIds, true)
 
 export const getCanonicalAlbumMetadata = async (
   albumId: string,

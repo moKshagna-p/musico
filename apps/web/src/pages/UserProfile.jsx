@@ -44,6 +44,7 @@ const UserProfile = () => {
     ...item,
     name: item?.albumName || 'Untitled',
     cover: item?.albumCover || '',
+    artists: Array.isArray(item?.albumArtists) ? item.albumArtists : [],
   })) ?? []
   
   // Limit display to 12 items for better performance

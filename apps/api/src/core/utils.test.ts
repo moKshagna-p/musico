@@ -1,6 +1,6 @@
 import { expect, test } from 'bun:test'
 
-test('profile previews await missing metadata, reuse fresh cache, and tolerate provider failures', async () => {
+test('profile previews reuse stored catalog metadata without provider requests', async () => {
   const script = `
     import { mock } from 'bun:test'
     const calls = []
@@ -12,7 +12,7 @@ test('profile previews await missing metadata, reuse fresh cache, and tolerate p
       calls.push(id)
       if (id === 'm:3') throw new Error('provider unavailable')
       await new Promise(resolve => setTimeout(resolve, 5))
-      return { name: 'Hydrated', artists: ['Current artist'], genres: ['Rock'] }
+      return { name: 'Hydrated', artists: ['Old artist'], genres: ['Rock'] }
     } }))
     const { getProfileReleasePreviewMap } = await import('./src/core/utils.ts')
     const previews = await getProfileReleasePreviewMap(['m:1', 'm:2', 'm:2', 'm:3'])
@@ -24,10 +24,10 @@ test('profile previews await missing metadata, reuse fresh cache, and tolerate p
   const [exitCode, stdout, stderr] = await Promise.all([child.exited, new Response(child.stdout).text(), new Response(child.stderr).text()])
   expect(exitCode, stderr).toBe(0)
   const { calls, previews } = JSON.parse(stdout)
-  expect(calls).toEqual(['m:2', 'm:3'])
+  expect(calls).toEqual([])
   const result = new Map(previews)
   expect(result.get('m:1').name).toBe('Cached')
-  expect(result.get('m:2').artists).toEqual(['Current artist'])
-  expect(result.get('m:2').genres).toEqual(['Rock'])
+  expect(result.get('m:2').artists).toEqual(['Old artist'])
+  expect(result.get('m:2').name).toBe('Expired')
   expect(result.has('m:3')).toBe(false)
 })

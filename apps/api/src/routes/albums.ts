@@ -96,7 +96,8 @@ export const albumRoutes = new Elysia({ prefix: '/api' })
        const data = await getReleaseDetails(releaseId)
        const [hydrated] = await attachMusicoCommunityStats([data])
        set.headers ??= {}
-       set.headers['Cache-Control'] = 'public, max-age=3600, s-maxage=21300'
+       // Catalog data is cached internally; mutable community scores must stay current.
+       set.headers['Cache-Control'] = 'no-store'
        return hydrated
      } catch (error) {
        console.error('[release] error', error)
