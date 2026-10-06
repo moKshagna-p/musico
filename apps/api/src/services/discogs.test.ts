@@ -158,7 +158,8 @@ test('configured relay keeps credentials out of its URL and bypasses Workers egr
     process.env.DISCOGS_MIN_REQUEST_INTERVAL_MS = '1'
     let received
     globalThis.fetch = async (url, options) => {
-      received = { url: String(url), headers: options.headers }
+      if (!['follow', 'manual'].includes(options.redirect)) throw new Error('Unsupported Workers redirect mode')
+      received = { url: String(url), headers: options.headers, redirect: options.redirect }
       return Response.json({ id: 1706292 })
     }
     const { requestDiscogs } = await import('./src/services/discogs.ts')
@@ -175,5 +176,33 @@ test('configured relay keeps credentials out of its URL and bypasses Workers egr
   expect(received.url).toBe('https://musico-web.vercel.app/api/discogs?path=%2Fmasters%2F1706292')
   expect(received.headers.Authorization).toBe('Bearer internal-secret')
   expect(received.headers['x-discogs-authorization']).toBe('Discogs token=provider-token')
+  expect(received.redirect).toBe('manual')
   expect(result.id).toBe(1706292)
+})
+
+
+test('configured relay refuses redirects without forwarding credentials to another origin', async () => {
+  const script = `
+    process.env.DISCOGS_RELAY_URL = 'https://musico-web.vercel.app/api/discogs'
+    process.env.DISCOGS_RELAY_SECRET = 'internal-secret'
+    process.env.DISCOGS_MIN_REQUEST_INTERVAL_MS = '1'
+    let calls = 0
+    globalThis.fetch = async (url, options) => {
+      calls++
+      if (options.redirect !== 'manual') throw new Error('Redirect could expose credentials')
+      return new Response('', { status: 302, headers: { Location: 'https://other.example' } })
+    }
+    const { requestDiscogs } = await import('./src/services/discogs.ts')
+    try { await requestDiscogs('/masters/1706292') }
+    catch (error) { console.log(JSON.stringify({ calls, message: error.message })) }
+  `
+  const child = Bun.spawn([process.execPath, '--eval', script], {
+    cwd: new URL('../..', import.meta.url).pathname, stdout: 'pipe', stderr: 'pipe',
+  })
+  const [exitCode, stdout, stderr] = await Promise.all([child.exited, new Response(child.stdout).text(), new Response(child.stderr).text()])
+  expect(stderr).toBe('')
+  expect(exitCode).toBe(0)
+  const result = JSON.parse(stdout)
+  expect(result.calls).toBe(1)
+  expect(result.message).toContain('Discogs request failed: 302')
 })

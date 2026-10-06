@@ -22,6 +22,7 @@ export const searchRoutes = new Elysia()
       const withStats = await attachMusicoCommunityStats(data)
       return { data: withStats, correctedQuery, hasMore, nextOffset, total }
     } catch (error) {
+      console.error('[search] error', error instanceof Error ? error.message : String(error))
       set.status = 502
       return { error: 'Search service unavailable.' }
     }
