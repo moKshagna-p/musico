@@ -25,16 +25,29 @@ const normalizeWhitespace = (value = '') => value.replace(/\s+/g, ' ').trim()
 const sanitizeChartLine = (value: string) =>
   normalizeWhitespace(decodeHtmlEntities(value.replace(/<[^>]+>/g, ' ')))
 
+const chartElementPattern = (tag: string, className: string, captureContent = false) => {
+  // HTML classes are whitespace-separated tokens, not substrings or exact attribute values.
+  const space = '[\\t\\n\\f\\r ]'
+  const classes = `(?:"(?:[^"]*${space})?${className}(?:${space}[^"]*)?"|'(?:[^']*${space})?${className}(?:${space}[^']*)?')`
+  const openingTag = `<${tag}\\b[^>]*${space}class\\s*=\\s*${classes}[^>]*>`
+  return new RegExp(openingTag + (captureContent ? `([\\s\\S]*?)<\\/${tag}>` : ''), 'i')
+}
+
+const rowPattern = chartElementPattern('div', 'chart-item')
+const positionPattern = chartElementPattern('div', 'chart-item-position', true)
+const headlinePattern = chartElementPattern('h2', 'chart-item-headline', true)
+const subheadlinePattern = chartElementPattern('h3', 'chart-item-subheadline', true)
+
 export const parseBillboard200Albums = (html: string, limit = 12): ChartAlbum[] => {
   // Scope fields to a chart row: historical positions and weeks are also numbers.
-  const rows = html.split(/<div\b[^>]*class=["']chart-item["'][^>]*>/i).slice(1)
+  const rows = html.split(rowPattern).slice(1)
   const entries: ChartAlbum[] = []
   const seenRanks = new Set<number>()
 
   for (const row of rows) {
-    const position = row.match(/<div\b[^>]*class=["']chart-item-position["'][^>]*>([\s\S]*?)<\/div>/i)?.[1]
-    const headline = row.match(/<h2\b[^>]*class=["']chart-item-headline["'][^>]*>([\s\S]*?)<\/h2>/i)?.[1]
-    const subheadline = row.match(/<h3\b[^>]*class=["']chart-item-subheadline["'][^>]*>([\s\S]*?)<\/h3>/i)?.[1]
+    const position = row.match(positionPattern)?.[1]
+    const headline = row.match(headlinePattern)?.[1]
+    const subheadline = row.match(subheadlinePattern)?.[1]
     const rank = Number(position?.trim())
     const name = sanitizeChartLine(headline ?? '')
     const artist = sanitizeChartLine(subheadline ?? '')

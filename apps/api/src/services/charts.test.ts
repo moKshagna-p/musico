@@ -2,6 +2,33 @@ import { expect, test } from 'bun:test'
 
 import { parseBillboard200Albums } from './charts'
 
+const savedChart = await Bun.file(new URL('./fixtures/billboard-200.html', import.meta.url)).text()
+
+test('parses saved chart rows even when row and field classes gain extra tokens', () => {
+  const expected = [
+    { rank: 1, name: 'Bass Persuades', artist: 'Miley' },
+    { rank: 2, name: 'Dandelion', artist: 'Ella Langley' },
+    { rank: 3, name: "That's Just Me", artist: 'Riley Green' },
+  ]
+  expect(parseBillboard200Albums(savedChart)).toEqual(expected)
+  for (const quote of ['"', "'"]) {
+    for (const [before, after] of [['', ' highlighted'], ['layout ', ''], ['layout\t', '\n highlighted']]) {
+      const html = savedChart.replace(/class="(chart-item(?:-position|-headline|-subheadline)?)"/g,
+        (_, className) => `class = ${quote}${before}${className}${after}${quote}`)
+      expect(parseBillboard200Albums(html)).toEqual(expected)
+    }
+  }
+})
+
+test('class name substrings and data attributes do not count as chart classes', () => {
+  const fakeRow = row(1, 'Wrong album', 'Wrong artist', 1).replace('class="chart-item"', 'class="chart-item-wrapper"')
+  const fakeField = row(2, 'Wrong album', 'Wrong artist', 1).replace('class="chart-item-headline"', 'data-class="chart-item-headline"')
+  const prefixedField = row(3, 'Wrong album', 'Wrong artist', 1).replace('class="chart-item-headline"', 'class="other-chart-item-headline"')
+  expect(parseBillboard200Albums(fakeRow + fakeField + prefixedField + row(4, 'Album', 'Artist', 10))).toEqual([
+    { rank: 4, name: 'Album', artist: 'Artist' },
+  ])
+})
+
 const row = (rank: number, name: string, artist: string, weeks: number) => `
   <div class="chart-item" id="song-${rank}">
     <div class="chart-item-position">${rank}</div>
