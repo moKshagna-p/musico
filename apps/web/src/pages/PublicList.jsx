@@ -72,7 +72,7 @@ const PublicList = () => {
             <span>by</span>
             <span className="font-semibold text-white">{list.owner?.name ?? 'Unknown'}</span>
             <span className="text-muted/60">|</span>
-            <span>{list.albumCount} albums</span>
+            <span>{list.albumCount ?? list.albums?.length ?? 0} albums</span>
           </div>
 
           <button

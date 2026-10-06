@@ -21,7 +21,7 @@ import {
   ensureUserProfile,
   getCachedReleaseArtists,
   getReleasePreviewMap,
-  getCachedReleasePreviewMap,
+  getProfileReleasePreviewMap,
   parseProfileImage,
   normalizeEmail,
 } from '../core/utils'
@@ -390,13 +390,7 @@ export const userRoutes = new Elysia({ prefix: '/api' })
     }
 
     const recentRatingAlbumIds = recentRatingsRows.map((row) => row.albumId)
-    const releasePreviewMap = await getCachedReleasePreviewMap(recentRatingAlbumIds)
-    const missingPreviewAlbumIds = recentRatingAlbumIds.filter((albumId) => !releasePreviewMap.has(String(albumId)))
-    if (missingPreviewAlbumIds.length) {
-      void getReleasePreviewMap(missingPreviewAlbumIds).catch(() => {
-        // Missing cache entries should not slow down the profile response.
-      })
-    }
+    const releasePreviewMap = await getProfileReleasePreviewMap(recentRatingAlbumIds)
 
     const recentRatings = recentRatingsRows.map((row) => {
       const activityMeta = latestActivityByAlbum.get(String(row.albumId))
@@ -744,15 +738,7 @@ export const userRoutes = new Elysia({ prefix: '/api' })
     }
 
     const recentRatingAlbumIds = recentRatingsRows.map((row) => row.albumId)
-    const releasePreviewMap = await getCachedReleasePreviewMap(recentRatingAlbumIds)
-    const missingAlbumIds = recentRatingAlbumIds.filter(
-      (id) => !releasePreviewMap.has(String(id ?? '').trim()),
-    )
-    if (missingAlbumIds.length > 0) {
-      void getReleasePreviewMap(missingAlbumIds).catch(() => {
-        // Keep profile reads fast; cache misses are warmed in the background.
-      })
-    }
+    const releasePreviewMap = await getProfileReleasePreviewMap(recentRatingAlbumIds)
 
     const recentRatings = recentRatingsRows.map((row) => {
       const albumIdStr = String(row.albumId ?? '').trim()
@@ -1039,15 +1025,7 @@ export const userRoutes = new Elysia({ prefix: '/api' })
 
         // Get release previews for recent ratings
         const recentRatingAlbumIds = recentRatingsRows.map((row) => row.albumId)
-        const releasePreviewMap = await getCachedReleasePreviewMap(recentRatingAlbumIds)
-        const missingAlbumIds = recentRatingAlbumIds.filter(
-          (id) => !releasePreviewMap.has(String(id ?? '').trim()),
-        )
-        if (missingAlbumIds.length > 0) {
-          void getReleasePreviewMap(missingAlbumIds).catch(() => {
-            // Keep dashboard reads fast; cache misses are warmed in the background.
-          })
-        }
+        const releasePreviewMap = await getProfileReleasePreviewMap(recentRatingAlbumIds)
 
         // Build recent ratings with album details
         const recentRatings = recentRatingsRows.map((row) => {

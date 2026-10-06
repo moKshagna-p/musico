@@ -221,6 +221,17 @@ export const getCachedReleasePreviewMap = async (albumIds: unknown[]) => {
   )
 }
 
+// Await missing previews so Workers cannot cancel hydration after the response.
+export const getProfileReleasePreviewMap = async (albumIds: unknown[]) => {
+  const previews = await getCachedReleasePreviewMap(albumIds)
+  const missingIds = albumIds.map(normalizeAlbumId).filter((id) => id && !previews.has(id))
+  if (missingIds.length) {
+    const hydrated = await getReleasePreviewMap(missingIds)
+    for (const [id, preview] of hydrated) previews.set(id, preview)
+  }
+  return previews
+}
+
 export const getCanonicalAlbumMetadata = async (
   albumId: string,
   fallback: {
