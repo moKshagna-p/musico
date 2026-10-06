@@ -165,6 +165,7 @@ export const userRoutes = new Elysia({ prefix: '/api' })
       })
     }
 
+    const cachedPayloadByAlbum = new Map(releaseCacheRows.map(row => [row.albumId, row.payload]))
     const cachedArtistsByAlbum = new Map<string, string[]>()
     for (const row of releaseCacheRows) {
       const albumId = String(row.albumId ?? '').trim()
@@ -194,8 +195,8 @@ export const userRoutes = new Elysia({ prefix: '/api' })
         albumId,
         rating: row.rating,
         timestamp: row.updatedAt.getTime(),
-        albumName: fromActivity?.albumName || fromReview?.albumName || fromList?.albumName || preview?.name || '',
-        albumCover: fromActivity?.albumCover || fromReview?.albumCover || fromList?.albumCover || preview?.cover || '',
+        albumName: fromActivity?.albumName || fromReview?.albumName || fromList?.albumName || String(cachedPayloadByAlbum.get(albumId)?.name ?? '').trim() || preview?.name || '',
+        albumCover: fromActivity?.albumCover || fromReview?.albumCover || fromList?.albumCover || String(cachedPayloadByAlbum.get(albumId)?.cover ?? '').trim() || preview?.cover || '',
         albumArtists:
           fromReview?.albumArtists?.length
             ? fromReview.albumArtists
