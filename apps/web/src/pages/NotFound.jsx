@@ -4,13 +4,15 @@ import PageTransition from '../components/ui/PageTransition.jsx'
 
 const NotFound = () => (
   <PageTransition>
-    <div className="mx-auto max-w-xl rounded-3xl border border-outline bg-panel p-8 text-center">
-      <p className="text-xs uppercase tracking-[0.4em] text-muted">404</p>
-      <h1 className="mt-4 font-display text-4xl">This pressing is missing.</h1>
-      <p className="mt-2 text-muted">The album you requested is no longer in our archive.</p>
+    <div className="mx-auto flex max-w-xl flex-col items-center py-10 text-center tablet:py-20">
+      <div aria-hidden="true" className="vinyl relative w-40 opacity-80 aspect-square">
+        <span className="absolute inset-[33%] flex items-center justify-center rounded-full bg-paper font-display text-xl text-black">404</span>
+      </div>
+      <h1 className="mt-10 font-display text-5xl leading-none text-paper tablet:text-6xl">This pressing is missing.</h1>
+      <p className="mt-4 text-muted">The page you asked for isn&rsquo;t in our archive.</p>
       <Link
         to="/"
-        className="mt-6 inline-block rounded-full border border-outline px-6 py-3 text-xs uppercase tracking-[0.4em] text-muted hover:text-white"
+        className="mt-8 inline-block rounded-full bg-paper px-6 py-3 text-sm font-medium text-black transition-opacity hover:opacity-90"
       >
         Return Home
       </Link>
