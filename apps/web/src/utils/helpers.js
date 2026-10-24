@@ -47,3 +47,15 @@ export const formatLargeNumber = (value = 0) => {
   if (value > 999) return `${(value / 1000).toFixed(1)}K`
   return value.toString()
 }
+
+// Apple's image CDN renders any size named in the URL; other hosts (Discogs URLs are signed) are used as given.
+const APPLE_COVER = /^(https:\/\/[a-z0-9-]+\.mzstatic\.com\/image\/thumb\/.+)\/\d+x\d+[a-z]*\.(?:jpe?g|png|webp)$/i
+const COVER_WIDTHS = [300, 600, 1200]
+
+export const coverAt = (src, size) => {
+  const match = src?.match(APPLE_COVER)
+  return match ? `${match[1]}/${size}x${size}bb.webp` : src
+}
+
+export const coverSrcSet = (src) =>
+  APPLE_COVER.test(src ?? '') ? COVER_WIDTHS.map((size) => `${coverAt(src, size)} ${size}w`).join(', ') : undefined

@@ -7,6 +7,7 @@ import AlbumTile from '../components/album/AlbumTile.jsx'
 import PageTransition from '../components/ui/PageTransition.jsx'
 import { PublicListPageSkeleton } from '../components/ui/PageLoadingState.jsx'
 import { fetchPublicList } from '../services/socialService.js'
+import { coverAt } from '../utils/helpers.js'
 
 const PublicList = () => {
   const { listId } = useParams()
@@ -66,7 +67,7 @@ const PublicList = () => {
       <div className="mx-auto w-full max-w-6xl py-4 tablet:py-8">
         {list.albums?.[0]?.cover ? (
           <div aria-hidden="true" className="pointer-events-none absolute left-1/2 -top-28 -z-10 h-[40rem] w-screen -translate-x-1/2 overflow-hidden">
-            <img src={list.albums[0].cover} alt="" className="h-full w-full scale-125 object-cover opacity-25 blur-[110px] saturate-150" />
+            <img src={coverAt(list.albums[0].cover, 100)} alt="" className="h-full w-full scale-125 object-cover opacity-25 blur-[110px] saturate-150" />
             <div className="absolute inset-0 bg-gradient-to-b from-transparent via-black/60 to-black" />
           </div>
         ) : null}

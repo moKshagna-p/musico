@@ -1,5 +1,8 @@
 import { useState } from 'react'
 
+import { coverSrcSet } from '../../utils/helpers.js'
+
+export const COVER_SIZES = '(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw'
 const DEFAULT_FALLBACK_CLASS_NAME = 'bg-[linear-gradient(135deg,rgba(255,255,255,0.08),rgba(255,255,255,0.02))]'
 
 const CoverImage = ({
@@ -9,7 +12,7 @@ const CoverImage = ({
   fallbackClassName = DEFAULT_FALLBACK_CLASS_NAME,
   width = 320,
   height = 320,
-  sizes = '(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw',
+  sizes = COVER_SIZES,
   loading = 'lazy',
   ...props
 }) => {
@@ -40,6 +43,7 @@ const CoverImage = ({
 
       <img
         src={src}
+        srcSet={coverSrcSet(src)}
         alt={alt}
         width={width}
         height={height}

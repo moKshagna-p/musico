@@ -1,4 +1,5 @@
-import CoverImage from './CoverImage.jsx'
+import CoverImage, { COVER_SIZES } from './CoverImage.jsx'
+import { coverSrcSet } from '../../utils/helpers.js'
 
 // A record sleeve with its disc behind it. `out` pulls the disc halfway out;
 // otherwise it slides out (right, or `up` like pulling from a crate) on hover of the nearest `.group`.
@@ -7,7 +8,7 @@ const HOVER_PULL = {
   up: 'group-hover:-translate-y-[18%] group-focus-visible:-translate-y-[18%]',
 }
 
-const VinylSleeve = ({ src, alt = '', out = false, pull = 'right', spin = false, size = 640, loading = 'lazy', sizes, className = '' }) => (
+const VinylSleeve = ({ src, alt = '', out = false, pull = 'right', spin = false, size = 640, loading = 'lazy', sizes = COVER_SIZES, className = '' }) => (
   <div className={`relative aspect-square ${className}`}>
     <div
       aria-hidden="true"
@@ -16,7 +17,7 @@ const VinylSleeve = ({ src, alt = '', out = false, pull = 'right', spin = false,
       }`}
     >
       <div className={`absolute inset-[33%] overflow-hidden rounded-full ring-1 ring-black ${spin ? 'motion-safe:animate-[vinylSpin_9s_linear_infinite]' : ''}`}>
-        {src ? <img src={src} alt="" loading={loading} decoding="async" className="h-full w-full object-cover" /> : <div className="h-full w-full bg-paper/80" />}
+        {src ? <img src={src} srcSet={coverSrcSet(src)} sizes={sizes} alt="" loading={loading} decoding="async" className="h-full w-full object-cover" /> : <div className="h-full w-full bg-paper/80" />}
         <span className="absolute left-1/2 top-1/2 h-[12%] w-[12%] -translate-x-1/2 -translate-y-1/2 rounded-full bg-black" />
       </div>
     </div>

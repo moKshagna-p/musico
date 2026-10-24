@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 
 import { getArtistImage } from '../../services/artistService.js'
+import { coverAt } from '../../utils/helpers.js'
 
 export const PAGE_GUTTER = 'mx-auto w-full max-w-6xl px-4 tablet:px-6'
 // Edge-to-edge pages (Home) use the same gutter on both sides at every width.
@@ -79,7 +80,7 @@ const Billboard = ({ artist, cover, children, className = 'min-h-[82svh]', gutte
     <section className={`relative isolate flex items-end overflow-hidden ${className}`}>
       <div aria-hidden="true" className="absolute inset-0 -z-10 bg-black">
         {cover ? (
-          <img src={cover} alt="" decoding="async" className={`h-full w-full scale-125 object-cover blur-3xl saturate-150 transition-opacity duration-700 ${hasLoadedArt ? 'opacity-20' : 'opacity-50'}`} />
+          <img src={coverAt(cover, 100)} alt="" decoding="async" className={`h-full w-full scale-125 object-cover blur-3xl saturate-150 transition-opacity duration-700 ${hasLoadedArt ? 'opacity-20' : 'opacity-50'}`} />
         ) : null}
         {artistArt ? (
           <img
