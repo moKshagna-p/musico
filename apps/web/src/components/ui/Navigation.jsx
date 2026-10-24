@@ -1,106 +1,75 @@
-import { NavLink, useNavigate } from 'react-router-dom'
+import { motion } from 'framer-motion'
+import { Link, NavLink } from 'react-router-dom'
 
 import { useAuth } from '../../hooks/useAuth.js'
 import { useAdminAccess } from '../../hooks/useAdminAccess.js'
 
+const MotionSpan = motion.span
+
+export const MusicoMark = ({ className = '' }) => (
+  <svg viewBox="0 0 32 32" aria-hidden="true" className={className}>
+    <circle cx="16" cy="16" r="15.5" fill="#0b0b0b" stroke="rgba(255,255,255,0.16)" />
+    <circle cx="16" cy="16" r="12" fill="none" stroke="rgba(255,255,255,0.09)" />
+    <circle cx="16" cy="16" r="9" fill="none" stroke="rgba(255,255,255,0.09)" />
+    <path d="M5.5 11 A11.5 11.5 0 0 1 11 5.5" fill="none" stroke="rgba(255,255,255,0.4)" strokeWidth="1.4" strokeLinecap="round" />
+    <circle cx="16" cy="16" r="5.6" fill="#eeeae3" />
+    <circle cx="16" cy="16" r="1.2" fill="#0b0b0b" />
+  </svg>
+)
+
+const DockLink = ({ to, end, children }) => (
+  <NavLink
+    to={to}
+    end={end}
+    className={({ isActive }) =>
+      `relative shrink-0 rounded-full px-3 py-1.5 text-[13px] transition-colors tablet:px-4 ${isActive ? 'text-paper' : 'text-muted hover:text-paper'}`
+    }
+  >
+    {({ isActive }) => (
+      <>
+        {isActive && (
+          <MotionSpan
+            layoutId="dock-active"
+            transition={{ type: 'spring', stiffness: 420, damping: 34 }}
+            className="absolute inset-0 rounded-full bg-white/[0.09] ring-1 ring-inset ring-white/[0.08]"
+          />
+        )}
+        <span className="relative">{children}</span>
+      </>
+    )}
+  </NavLink>
+)
+
 const Navigation = () => {
-  const navigate = useNavigate()
   const { user } = useAuth()
   const { isAdmin } = useAdminAccess()
 
   return (
-    <header className="sticky top-0 z-40 border-b border-outline/60 bg-canvas/95 backdrop-blur">
-      <div className="mx-auto flex max-w-5xl items-center justify-between gap-3 px-3 py-3 tablet:gap-4 tablet:px-6 tablet:py-4">
-        <button
-          type="button"
-          onClick={() => navigate('/')}
-          className="inline-flex min-w-0 shrink items-center gap-2 font-sans text-base font-semibold tracking-[0.12em] text-white [font-variant-ligatures:none] transition hover:opacity-80 tablet:gap-3 tablet:text-2xl tablet:tracking-[0.24em]"
+    <header className="fixed inset-x-0 top-0 z-40 px-3 pt-3 tablet:pt-4">
+      <div className="mx-auto flex w-fit max-w-full items-center gap-1 rounded-full border border-white/[0.08] bg-black/55 p-1.5 shadow-[0_10px_40px_-10px_rgba(0,0,0,0.9)] backdrop-blur-xl backdrop-saturate-150">
+        <Link
+          to="/"
           aria-label="Go to Musico home"
+          className="group flex shrink-0 items-center gap-2 rounded-full py-0.5 pl-0.5 pr-1 sm:pr-3"
         >
-          <span
-            className="inline-block h-[1.1em] w-[1.1em] animate-vinylSpin"
-            aria-hidden="true"
-          >
-            <svg viewBox="0 0 100 100" className="h-full w-full drop-shadow-[0_0_7px_rgba(255,255,255,0.35)]">
-              <defs>
-                <radialGradient id="vinylBody" cx="35%" cy="30%" r="80%">
-                  <stop offset="0%" stopColor="#ffffff" />
-                  <stop offset="35%" stopColor="#ededed" />
-                  <stop offset="70%" stopColor="#cdcdcd" />
-                  <stop offset="100%" stopColor="#9e9e9e" />
-                </radialGradient>
-                <linearGradient id="vinylShine" x1="0%" y1="0%" x2="100%" y2="100%">
-                  <stop offset="0%" stopColor="#ffffff" stopOpacity="0.9" />
-                  <stop offset="45%" stopColor="#ffffff" stopOpacity="0.12" />
-                  <stop offset="100%" stopColor="#ffffff" stopOpacity="0" />
-                </linearGradient>
-                <clipPath id="vinylLabelClip">
-                  <circle cx="50" cy="50" r="10.8" />
-                </clipPath>
-                <linearGradient id="vinylLabelFill" x1="39.2" y1="39.2" x2="60.8" y2="60.8">
-                  <stop offset="0%" stopColor="#111111" />
-                  <stop offset="100%" stopColor="#2b2b2b" />
-                </linearGradient>
-              </defs>
+          <MusicoMark className="h-7 w-7 transition-transform duration-700 group-hover:rotate-[200deg]" />
+          <span className="hidden font-display text-lg leading-none text-paper sm:inline">musico</span>
+        </Link>
 
-              <circle cx="50" cy="50" r="49" fill="url(#vinylBody)" />
-              <circle cx="50" cy="50" r="46" fill="none" stroke="#f6f6f6" strokeWidth="0.9" opacity="0.65" />
-              <circle cx="50" cy="50" r="37" fill="none" stroke="#fefefe" strokeWidth="1.2" opacity="0.3" />
-              <circle cx="50" cy="50" r="30" fill="none" stroke="#fbfbfb" strokeWidth="1.1" opacity="0.28" />
-              <circle cx="50" cy="50" r="23" fill="none" stroke="#f6f6f6" strokeWidth="1" opacity="0.22" />
-              <circle cx="50" cy="50" r="16" fill="none" stroke="#fefefe" strokeWidth="0.95" opacity="0.24" />
-              <circle cx="50" cy="50" r="12.4" fill="#f8f8f8" opacity="0.9" />
-              <circle cx="50" cy="50" r="10.8" fill="url(#vinylLabelFill)" />
-              <text
-                x="50"
-                y="53.8"
-                textAnchor="middle"
-                fontSize="8.8"
-                fontWeight="700"
-                fill="#f5f5f5"
-                clipPath="url(#vinylLabelClip)"
-              >
-                M
-              </text>
-              <circle cx="50" cy="50" r="10.8" fill="none" stroke="#ffffff" strokeWidth="0.9" opacity="0.55" />
-              <circle cx="50" cy="50" r="2.1" fill="#d9d9d9" />
+        <span aria-hidden="true" className="mx-1 h-5 w-px shrink-0 bg-white/10" />
 
-              <path
-                d="M14 40 A36 36 0 0 1 40 14"
-                fill="none"
-                stroke="url(#vinylShine)"
-                strokeWidth="6"
-                strokeLinecap="round"
-              />
-              <ellipse cx="33" cy="28" rx="10" ry="6" fill="#ffffff" opacity="0.35" />
-            </svg>
-          </span>
-          musico
-        </button>
-
-        <nav className="flex min-w-0 shrink items-center gap-2 overflow-x-auto whitespace-nowrap text-[0.58rem] uppercase tracking-[0.12em] text-muted [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden tablet:gap-6 tablet:text-xs tablet:tracking-[0.35em]">
-          <NavLink to="/" className={({ isActive }) => (isActive ? 'text-white' : 'hover:text-white')}>
-            Home
-          </NavLink>
-          <NavLink to="/discover" className={({ isActive }) => (isActive ? 'text-white' : 'hover:text-white')}>
-            Discover
-          </NavLink>
-          {user && (
-            <NavLink to="/feed" className={({ isActive }) => (isActive ? 'text-white' : 'hover:text-white')}>
-              Feed
-            </NavLink>
-          )}
-          {isAdmin && (
-            <NavLink to="/admin" className={({ isActive }) => (isActive ? 'text-white' : 'hover:text-white')}>
-              Admin
-            </NavLink>
-          )}
+        <nav className="flex min-w-0 items-center overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          <DockLink to="/" end>Home</DockLink>
+          <DockLink to="/discover">Discover</DockLink>
+          {user && <DockLink to="/feed">Feed</DockLink>}
+          {isAdmin && <DockLink to="/admin">Admin</DockLink>}
           {user ? (
-            <NavLink to="/profile" className={({ isActive }) => (isActive ? 'text-white' : 'hover:text-white')}>
-              Profile
-            </NavLink>
+            <DockLink to="/profile">Profile</DockLink>
           ) : (
-            <NavLink to="/auth" className={({ isActive }) => (isActive ? 'text-white' : 'hover:text-white')}>
+            <NavLink
+              to="/auth"
+              className="ml-1 shrink-0 rounded-full bg-paper px-4 py-1.5 text-[13px] font-medium text-black transition-opacity hover:opacity-85"
+            >
               Sign In
             </NavLink>
           )}
