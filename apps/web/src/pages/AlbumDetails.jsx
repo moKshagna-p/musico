@@ -245,66 +245,64 @@ const AlbumDetails = () => {
   return (
     <PageTransition bleed>
       <Billboard artist={album.artists?.[0]} cover={album.cover} className="min-h-[86svh]">
-        {() => (
-          <>
-            <div className={`absolute inset-x-0 top-24 tablet:top-28 ${PAGE_GUTTER}`}>
-              <button
-                type="button"
-                onClick={goBack}
-                aria-label="Back"
-                className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/15 bg-black/40 text-paper backdrop-blur-md transition-colors hover:bg-black/60"
-              >
-                <FiArrowLeft aria-hidden="true" />
-              </button>
+        <>
+          <div className={`absolute inset-x-0 top-24 tablet:top-28 ${PAGE_GUTTER}`}>
+            <button
+              type="button"
+              onClick={goBack}
+              aria-label="Back"
+              className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/15 bg-black/40 text-paper backdrop-blur-md transition-colors hover:bg-black/60"
+            >
+              <FiArrowLeft aria-hidden="true" />
+            </button>
+          </div>
+
+          <div className="flex flex-col gap-8 md:flex-row md:items-end md:gap-10">
+            <div className="w-44 shrink-0 pr-14 tablet:w-64 tablet:pr-20">
+              <VinylSleeve src={album.cover} alt={album.name} out spin loading="eager" />
             </div>
 
-            <div className="flex flex-col gap-8 md:flex-row md:items-end md:gap-10">
-              <div className="w-44 shrink-0 pr-14 tablet:w-64 tablet:pr-20">
-                <VinylSleeve src={album.cover} alt={album.name} out spin loading="eager" />
-              </div>
+            <header className="min-w-0">
+              <p className="text-sm font-medium text-paper/70">
+                {formatReleaseDate(album.releaseDate, album.releaseYear)}, {genreLine}
+              </p>
+              <h1 className="mt-3 text-balance break-words font-display text-5xl leading-[0.92] text-paper tablet:text-7xl">{album.name}</h1>
+              <p className="mt-3 text-xl font-medium text-paper/85 tablet:text-2xl">{album.artists.join(', ')}</p>
 
-              <header className="min-w-0">
-                <p className="text-sm font-medium text-paper/70">
-                  {formatReleaseDate(album.releaseDate, album.releaseYear)}, {genreLine}
-                </p>
-                <h1 className="mt-3 text-balance break-words font-display text-5xl leading-[0.92] text-paper tablet:text-7xl">{album.name}</h1>
-                <p className="mt-3 text-xl font-medium text-paper/85 tablet:text-2xl">{album.artists.join(', ')}</p>
-
-                <div className="mt-7 flex flex-wrap items-end gap-x-10 gap-y-5">
-                  <div>
-                    <p className="text-sm text-paper/60">Community score</p>
-                    <p className="mt-1 flex items-baseline gap-2">
-                      <span className="font-display text-5xl leading-none text-paper">{community.average?.toFixed(1)}</span>
-                      <span className="text-sm text-paper/60">{formatLargeNumber(community.total)} votes</span>
-                    </p>
-                  </div>
-                  <div>
-                    <p className="mb-1 text-sm text-paper/60">{isSignedIn ? 'Your rating' : 'Sign in required to rate'}</p>
-                    <RatingStars
-                      value={userRating ?? 0}
-                      readOnly={!isSignedIn}
-                      align="left"
-                      onRate={(value) => {
-                        if (!isSignedIn) {
-                          setListStatus('Sign in to rate albums.')
-                          return
-                        }
-                        rateAlbum(album.id, value, {
-                          albumName: album.name,
-                          albumCover: album.cover,
-                        })
-                      }}
-                    />
-                  </div>
+              <div className="mt-7 flex flex-wrap items-end gap-x-10 gap-y-5">
+                <div>
+                  <p className="text-sm text-paper/60">Community score</p>
+                  <p className="mt-1 flex items-baseline gap-2">
+                    <span className="font-display text-5xl leading-none text-paper">{community.average?.toFixed(1)}</span>
+                    <span className="text-sm text-paper/60">{formatLargeNumber(community.total)} votes</span>
+                  </p>
                 </div>
-              </header>
-            </div>
+                <div>
+                  <p className="mb-1 text-sm text-paper/60">{isSignedIn ? 'Your rating' : 'Sign in required to rate'}</p>
+                  <RatingStars
+                    value={userRating ?? 0}
+                    readOnly={!isSignedIn}
+                    align="left"
+                    onRate={(value) => {
+                      if (!isSignedIn) {
+                        setListStatus('Sign in to rate albums.')
+                        return
+                      }
+                      rateAlbum(album.id, value, {
+                        albumName: album.name,
+                        albumCover: album.cover,
+                      })
+                    }}
+                  />
+                </div>
+              </div>
+            </header>
+          </div>
 
-            <div className="mt-10">
-              <StreamingLinks links={streamingLinks} />
-            </div>
-          </>
-        )}
+          <div className="mt-10">
+            <StreamingLinks links={streamingLinks} />
+          </div>
+        </>
       </Billboard>
 
       <div className={`${PAGE_GUTTER} mt-10`}>

@@ -32,9 +32,13 @@ const Home = () => {
   return (
     <PageTransition bleed>
       <Billboard artist={topAlbum?.artists?.[0]} cover={topAlbum?.cover} gutter={WIDE_GUTTER}>
-        {({ hasArtistPhoto, isResolving }) => (topAlbum ? (
-          <div className="flex items-end justify-between gap-10">
-            <div className="max-w-2xl">
+        {topAlbum ? (
+          <div className="flex flex-col gap-8 md:flex-row md:items-end md:gap-10">
+            {/* Phones skip the sleeve: it would cover the artist photo, and the same cover leads the chart row below. */}
+            <div className="hidden w-56 shrink-0 pr-16 md:block tablet:w-72 tablet:pr-24">
+              <VinylSleeve src={topAlbum.cover} alt={topAlbum.name} out spin loading="eager" />
+            </div>
+            <div className="min-w-0 max-w-2xl">
               <p className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-black/30 px-3 py-1 text-xs font-medium text-paper/90 backdrop-blur">
                 No. 1 on this week&rsquo;s chart
               </p>
@@ -54,11 +58,6 @@ const Home = () => {
                 Open album <FiArrowUpRight aria-hidden="true" />
               </Link>
             </div>
-            {!hasArtistPhoto && !isResolving && (
-              <div className="hidden w-64 shrink-0 pr-[4.5rem] md:block lg:w-80">
-                <VinylSleeve src={topAlbum.cover} alt={topAlbum.name} out spin loading="eager" />
-              </div>
-            )}
           </div>
         ) : (
           <div aria-hidden="true" className="max-w-xl space-y-5">
@@ -67,7 +66,7 @@ const Home = () => {
             <div className="h-5 w-40 rounded-full bg-white/[0.05]" />
             <div className="h-12 w-40 rounded-full bg-white/[0.06]" />
           </div>
-        ))}
+        )}
       </Billboard>
 
       <div className="relative z-10 -mt-6 space-y-10 tablet:space-y-14">
