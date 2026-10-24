@@ -1,11 +1,11 @@
 import { useEffect, useMemo } from 'react'
 import { useInfiniteQuery } from '@tanstack/react-query'
-import { FiArrowLeft } from 'react-icons/fi'
 import { useNavigate } from 'react-router-dom'
 
 import AlbumTile from '../components/album/AlbumTile.jsx'
 import { ALBUM_GRID_CLASS } from '../components/album/AlbumGrid.jsx'
 import LoadingSkeleton from '../components/ui/LoadingSkeleton.jsx'
+import BackButton from '../components/ui/BackButton.jsx'
 import PageTransition from '../components/ui/PageTransition.jsx'
 import { useAuth } from '../hooks/useAuth.js'
 import { fetchMyRatingsHistory } from '../services/profileDataService.js'
@@ -83,13 +83,7 @@ const ProfileHistory = () => {
   return (
     <PageTransition>
       <section className="space-y-8">
-        <button
-          type="button"
-          onClick={() => navigate('/profile')}
-          className="inline-flex items-center gap-2 rounded-full py-1 pr-3 text-sm text-muted transition-colors hover:text-paper"
-        >
-          <FiArrowLeft aria-hidden="true" /> Back to Profile
-        </button>
+        <BackButton onClick={() => navigate('/profile')} label="Back to Profile" />
 
         <header className="border-b border-white/[0.07] pb-10">
           <h1 className="font-display text-5xl leading-[0.95] text-paper tablet:text-7xl">All Rated Albums</h1>

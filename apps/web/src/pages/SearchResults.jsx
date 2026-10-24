@@ -1,10 +1,10 @@
 import { useRef } from 'react'
-import { FiArrowLeft } from 'react-icons/fi'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useInfiniteQuery } from '@tanstack/react-query'
 
 import AlbumGrid from '../components/album/AlbumGrid.jsx'
 import PageTransition from '../components/ui/PageTransition.jsx'
+import BackButton from '../components/ui/BackButton.jsx'
 import SearchBar from '../components/search/SearchBar.jsx'
 import { useAuth } from '../hooks/useAuth.js'
 import { searchReleases } from '../services/discogsService.js'
@@ -68,13 +68,7 @@ const SearchResults = () => {
 
   return (
     <PageTransition>
-      <button
-        type="button"
-        onClick={() => navigate('/discover')}
-        className="mb-10 inline-flex items-center gap-2 rounded-full py-1 pr-3 text-sm text-muted transition-colors hover:text-paper"
-      >
-        <FiArrowLeft aria-hidden="true" /> Back to Discover
-      </button>
+      <BackButton onClick={() => navigate('/discover')} label="Back to Discover" />
 
       <div className="space-y-12">
         <div className="space-y-8">

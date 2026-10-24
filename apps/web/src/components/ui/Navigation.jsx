@@ -46,7 +46,7 @@ const Navigation = () => {
 
   return (
     <header className="fixed inset-x-0 top-0 z-40 px-3 pt-3 tablet:pt-4">
-      <div className="mx-auto flex w-fit max-w-full items-center gap-1 rounded-full border border-white/[0.08] bg-black/55 p-1.5 shadow-[0_10px_40px_-10px_rgba(0,0,0,0.9)] backdrop-blur-xl backdrop-saturate-150">
+      <div className="mx-auto flex w-fit max-w-full items-center max-sm:[body:has(#back-button)_&]:mr-0 max-sm:[body:has(#back-button)_&]:max-w-[calc(100%-3.5rem)] gap-1 rounded-full border border-white/[0.08] bg-black/55 p-1.5 shadow-[0_10px_40px_-10px_rgba(0,0,0,0.9)] backdrop-blur-xl backdrop-saturate-150">
         <Link
           to="/"
           aria-label="Go to Musico home"

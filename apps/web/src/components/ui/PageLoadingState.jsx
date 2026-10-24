@@ -207,11 +207,9 @@ export const NotFoundPageSkeleton = () => {
   )
 }
 
-export const ProfilePageSkeleton = ({ withBackButton = false, showActions = false }) => {
+export const ProfilePageSkeleton = ({ showActions = false }) => {
   return (
     <section aria-busy="true" aria-label="Loading profile" className="mx-auto w-full max-w-6xl py-4 tablet:py-8">
-      {withBackButton ? <div className="h-4 w-20 rounded-full bg-outline/70" /> : null}
-
       <div className="py-8 text-center tablet:py-14">
         <div className="mx-auto mb-5 h-20 w-20 animate-pulse rounded-full bg-outline/60" />
         <div className="mx-auto h-12 w-64 max-w-[75%] rounded-full bg-gradient-to-r from-white/10 via-white/5 to-white/10 bg-[length:240px_100%] animate-shimmer tablet:h-16" />

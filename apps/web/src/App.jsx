@@ -141,7 +141,7 @@ const App = () => {
               <Route path="/search" element={withRouteFallback(<SearchResults />, <SearchResultsPageSkeleton />)} />
               <Route path="/profile" element={withRouteFallback(<Profile />, <ProfilePageSkeleton showActions />)} />
               <Route path="/profile/history" element={withRouteFallback(<ProfileHistory />, <ListeningHistoryPageSkeleton />)} />
-              <Route path="/profile/:username" element={withRouteFallback(<UserProfile />, <ProfilePageSkeleton withBackButton />)} />
+              <Route path="/profile/:username" element={withRouteFallback(<UserProfile />, <ProfilePageSkeleton />)} />
               <Route path="/feed" element={withRouteFallback(<Feed />, <FeedPageSkeleton />)} />
               <Route path="/lists/:listId" element={withRouteFallback(<PublicList />, <PublicListPageSkeleton />)} />
               <Route path="/auth" element={withRouteFallback(<Auth />, <AuthPageSkeleton />)} />

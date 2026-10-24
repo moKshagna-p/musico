@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { FiArrowLeft, FiCheck, FiPlus } from 'react-icons/fi'
+import { FiCheck, FiPlus } from 'react-icons/fi'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 
@@ -8,6 +8,7 @@ import RatingStars from '../components/ui/RatingStars.jsx'
 import ReviewInput from '../components/review/ReviewInput.jsx'
 import ReviewsList from '../components/review/ReviewsList.jsx'
 import StreamingLinks from '../components/album/StreamingLinks.jsx'
+import BackButton from '../components/ui/BackButton.jsx'
 import Billboard, { PAGE_GUTTER } from '../components/ui/Billboard.jsx'
 import VinylSleeve from '../components/ui/VinylSleeve.jsx'
 import { AlbumDetailsPageSkeleton } from '../components/ui/PageLoadingState.jsx'
@@ -246,16 +247,7 @@ const AlbumDetails = () => {
     <PageTransition bleed>
       <Billboard artist={album.artists?.[0]} cover={album.cover} className="min-h-[86svh]">
         <>
-          <div className={`absolute inset-x-0 top-24 tablet:top-28 ${PAGE_GUTTER}`}>
-            <button
-              type="button"
-              onClick={goBack}
-              aria-label="Back"
-              className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/15 bg-black/40 text-paper backdrop-blur-md transition-colors hover:bg-black/60"
-            >
-              <FiArrowLeft aria-hidden="true" />
-            </button>
-          </div>
+          <BackButton onClick={goBack} />
 
           <div className="flex flex-col gap-8 md:flex-row md:items-end md:gap-10">
             <div className="w-44 shrink-0 pr-14 tablet:w-64 tablet:pr-20">

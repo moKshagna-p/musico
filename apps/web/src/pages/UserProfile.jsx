@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react'
-import { FiArrowLeft } from 'react-icons/fi'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 
 import FollowButton from '../components/user/FollowButton.jsx'
@@ -7,6 +6,7 @@ import PageTransition from '../components/ui/PageTransition.jsx'
 import { ProfilePageSkeleton } from '../components/ui/PageLoadingState.jsx'
 import SectionHeading from '../components/ui/SectionHeading.jsx'
 import AlbumTile from '../components/album/AlbumTile.jsx'
+import BackButton from '../components/ui/BackButton.jsx'
 import ListCard from '../components/list/ListCard.jsx'
 import { useAuth } from '../hooks/useAuth.js'
 import { fetchUserProfile } from '../services/socialService.js'
@@ -55,7 +55,7 @@ const UserProfile = () => {
   if (loading) {
     return (
       <PageTransition>
-        <ProfilePageSkeleton withBackButton />
+        <ProfilePageSkeleton />
       </PageTransition>
     )
   }
@@ -83,15 +83,9 @@ const UserProfile = () => {
   return (
     <PageTransition>
       <div className="mx-auto w-full max-w-6xl py-4 tablet:py-8">
-        <button
-          type="button"
-          onClick={() => navigate(-1)}
-          className="inline-flex items-center gap-2 rounded-full py-1 pr-3 text-sm text-muted transition-colors hover:text-paper"
-        >
-          <FiArrowLeft aria-hidden="true" /> Back
-        </button>
+        <BackButton onClick={() => navigate(-1)} />
 
-        <header className="mt-8 flex flex-col gap-8 border-b border-white/[0.07] pb-10 md:flex-row md:items-end md:justify-between">
+        <header className="flex flex-col gap-8 border-b border-white/[0.07] pb-10 md:flex-row md:items-end md:justify-between">
           <div className="flex min-w-0 flex-col gap-6 sm:flex-row sm:items-end">
             {profile.image ? (
               <img src={profile.image} alt="" className="h-24 w-24 shrink-0 rounded-full object-cover ring-1 ring-white/10 tablet:h-32 tablet:w-32" />
