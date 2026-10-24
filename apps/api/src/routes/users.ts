@@ -26,6 +26,7 @@ import {
   normalizeEmail,
   avatarUrl,
   decodeAvatar,
+  toReleasePreview,
   publicUserImage,
   userImageSql,
 } from '../core/utils'
@@ -623,19 +624,23 @@ export const userRoutes = new Elysia({ prefix: '/api' })
       return { error: 'Username is required.' }
     }
 
-    const profiles = await db
-      .select({
-        userId: userProfile.userId,
-        username: userProfile.username,
-        bio: userProfile.bio,
-        isPublic: userProfile.isPublic,
-        name: user.name,
-        image: userImageSql(),
-      })
-      .from(userProfile)
-      .innerJoin(user, eq(user.id, userProfile.userId))
-      .where(eq(userProfile.username, username))
-      .limit(1)
+    // Session and profile resolve together; everything else is one batched round trip.
+    const [profiles, authUser] = await Promise.all([
+      db
+        .select({
+          userId: userProfile.userId,
+          username: userProfile.username,
+          bio: userProfile.bio,
+          isPublic: userProfile.isPublic,
+          name: user.name,
+          image: userImageSql(),
+        })
+        .from(userProfile)
+        .innerJoin(user, eq(user.id, userProfile.userId))
+        .where(eq(userProfile.username, username))
+        .limit(1),
+      getAuthUser(request),
+    ])
 
     const profile = profiles[0]
     if (!profile) {
@@ -643,7 +648,6 @@ export const userRoutes = new Elysia({ prefix: '/api' })
       return { error: 'User not found.' }
     }
 
-    const authUser = await getAuthUser(request)
     const isOwnProfile = authUser?.id === profile.userId
 
     if (!profile.isPublic && !isOwnProfile) {
@@ -651,16 +655,15 @@ export const userRoutes = new Elysia({ prefix: '/api' })
       return { error: 'This profile is private.' }
     }
 
-    const [followerCountRows, followingCountRows, isFollowingRows, ratingSummaryRows, recentRatingsRows, listsRows, ratingActivityRows, recentReviewMetaRows] = await Promise.all([
-      db.select({ count: sql<number>`count(*)` }).from(userFollow).where(eq(userFollow.followingId, profile.userId)),
-      db.select({ count: sql<number>`count(*)` }).from(userFollow).where(eq(userFollow.followerId, profile.userId)),
-      authUser?.id
-        ? db
-            .select({ id: userFollow.id })
-            .from(userFollow)
-            .where(and(eq(userFollow.followerId, authUser.id), eq(userFollow.followingId, profile.userId)))
-            .limit(1)
-        : Promise.resolve([]),
+    const [followRows, ratingSummaryRows, recentRatingsRows, listsRows, listAlbumsRows, ratingActivityRows, recentReviewMetaRows, previewRows] = await db.batch([
+      db
+        .select({
+          followerCount: sql<number>`count(*) filter (where ${userFollow.followingId} = ${profile.userId})`,
+          followingCount: sql<number>`count(*) filter (where ${userFollow.followerId} = ${profile.userId})`,
+          isFollowing: sql<boolean>`coalesce(bool_or(${userFollow.followerId} = ${authUser?.id ?? null} and ${userFollow.followingId} = ${profile.userId}), false)`,
+        })
+        .from(userFollow)
+        .where(or(eq(userFollow.followingId, profile.userId), eq(userFollow.followerId, profile.userId))),
       db
         .select({
           totalRated: sql<number>`count(*)`,
@@ -689,6 +692,19 @@ export const userRoutes = new Elysia({ prefix: '/api' })
         .orderBy(desc(userList.updatedAt)),
       db
         .select({
+          listId: userListAlbum.listId,
+          albumId: userListAlbum.albumId,
+          name: userListAlbum.name,
+          cover: userListAlbum.cover,
+          artists: userListAlbum.artists,
+          releaseYear: userListAlbum.releaseYear,
+          addedAt: userListAlbum.addedAt,
+        })
+        .from(userListAlbum)
+        .innerJoin(userList, eq(userList.id, userListAlbum.listId))
+        .where(eq(userList.userId, profile.userId)),
+      db
+        .select({
           albumId: activity.albumId,
           albumName: activity.albumName,
           albumCover: activity.albumCover,
@@ -708,23 +724,16 @@ export const userRoutes = new Elysia({ prefix: '/api' })
         .where(eq(userReview.userId, profile.userId))
         .orderBy(desc(userReview.updatedAt))
         .limit(50),
+      // Catalog metadata for the recent ratings, reused past its provider TTL (see getProfileReleasePreviewMap).
+      db
+        .select({ releaseId: releaseCache.releaseId, payload: releaseCache.payload })
+        .from(releaseCache)
+        .where(inArray(
+          releaseCache.releaseId,
+          db.select({ albumId: userRating.albumId }).from(userRating)
+            .where(eq(userRating.userId, profile.userId)).orderBy(desc(userRating.updatedAt)).limit(10),
+        )),
     ])
-
-    const listIds = listsRows.map((l) => l.id)
-    const listAlbumsRows = listIds.length
-      ? await db
-          .select({
-            listId: userListAlbum.listId,
-            albumId: userListAlbum.albumId,
-            name: userListAlbum.name,
-            cover: userListAlbum.cover,
-            artists: userListAlbum.artists,
-            releaseYear: userListAlbum.releaseYear,
-            addedAt: userListAlbum.addedAt,
-          })
-          .from(userListAlbum)
-          .where(inArray(userListAlbum.listId, listIds))
-      : []
 
     const albumsByList = new Map<string, typeof listAlbumsRows>()
     listAlbumsRows.forEach((entry) => {
@@ -733,9 +742,9 @@ export const userRoutes = new Elysia({ prefix: '/api' })
       albumsByList.set(entry.listId, group)
     })
 
-    const followerCount = Number(followerCountRows[0]?.count ?? 0)
-    const followingCount = Number(followingCountRows[0]?.count ?? 0)
-    const isFollowing = Boolean(isFollowingRows[0])
+    const followerCount = Number(followRows[0]?.followerCount ?? 0)
+    const followingCount = Number(followRows[0]?.followingCount ?? 0)
+    const isFollowing = Boolean(followRows[0]?.isFollowing)
     const ratingSummary = ratingSummaryRows[0]
 
     const latestActivityByAlbum = new Map<string, { albumName: string | null; albumCover: string | null }>()
@@ -758,8 +767,7 @@ export const userRoutes = new Elysia({ prefix: '/api' })
       })
     }
 
-    const recentRatingAlbumIds = recentRatingsRows.map((row) => row.albumId)
-    const releasePreviewMap = await getProfileReleasePreviewMap(recentRatingAlbumIds)
+    const releasePreviewMap = new Map(previewRows.map((row) => [row.releaseId, toReleasePreview(row.payload)]))
 
     const recentRatings = recentRatingsRows.map((row) => {
       const albumIdStr = String(row.albumId ?? '').trim()
@@ -939,20 +947,21 @@ export const userRoutes = new Elysia({ prefix: '/api' })
      if (!authUser) return { error: 'Unauthorized.' }
 
       try {
-        const profile = await ensureUserProfile(authUser.id)
-
-        // Fetch all data in parallel
+        // One batched round trip; a first visit creates the profile row afterwards.
         const [
+          profileRows,
           userRow,
           ratingsRows,
           ratingSummaryRows,
           recentRatingsRows,
           ratingActivityRows,
           recentReviewMetaRows,
-          followerCountRows,
-          followingCountRows,
+          followRows,
           listsRows,
-        ] = await Promise.all([
+          listAlbums,
+          previewRows,
+        ] = await db.batch([
+          db.select().from(userProfile).where(eq(userProfile.userId, authUser.id)).limit(1),
           // User data (name, image)
           db.select({ name: user.name, image: userImageSql() }).from(user).where(eq(user.id, authUser.id)),
           // Ratings
@@ -999,16 +1008,43 @@ export const userRoutes = new Elysia({ prefix: '/api' })
             .where(eq(userReview.userId, authUser.id))
             .orderBy(desc(userReview.updatedAt))
             .limit(50),
-          // Follower count
-          db.select({ count: sql<number>`count(*)` }).from(userFollow).where(eq(userFollow.followingId, authUser.id)),
-          // Following count
-          db.select({ count: sql<number>`count(*)` }).from(userFollow).where(eq(userFollow.followerId, authUser.id)),
+          // Follower and following counts
+          db
+            .select({
+              followerCount: sql<number>`count(*) filter (where ${userFollow.followingId} = ${authUser.id})`,
+              followingCount: sql<number>`count(*) filter (where ${userFollow.followerId} = ${authUser.id})`,
+            })
+            .from(userFollow)
+            .where(or(eq(userFollow.followingId, authUser.id), eq(userFollow.followerId, authUser.id))),
           // Lists
           db.select().from(userList).where(eq(userList.userId, authUser.id)),
+          // Albums in those lists
+          db
+            .select({
+              listId: userListAlbum.listId,
+              albumId: userListAlbum.albumId,
+              name: userListAlbum.name,
+              cover: userListAlbum.cover,
+              artists: userListAlbum.artists,
+              addedAt: userListAlbum.addedAt,
+            })
+            .from(userListAlbum)
+            .innerJoin(userList, eq(userList.id, userListAlbum.listId))
+            .where(eq(userList.userId, authUser.id)),
+          // Catalog metadata for the recent ratings, reused past its provider TTL (see getProfileReleasePreviewMap).
+          db
+            .select({ releaseId: releaseCache.releaseId, payload: releaseCache.payload })
+            .from(releaseCache)
+            .where(inArray(
+              releaseCache.releaseId,
+              db.select({ albumId: userRating.albumId }).from(userRating)
+                .where(eq(userRating.userId, authUser.id)).orderBy(desc(userRating.updatedAt)).limit(10),
+            )),
         ])
 
-       const followerCount = Number(followerCountRows[0]?.count ?? 0)
-       const followingCount = Number(followingCountRows[0]?.count ?? 0)
+       const profile = profileRows[0] ?? await ensureUserProfile(authUser.id)
+       const followerCount = Number(followRows[0]?.followerCount ?? 0)
+       const followingCount = Number(followRows[0]?.followingCount ?? 0)
        const ratingSummary = ratingSummaryRows[0]
 
        // Build ratings map
@@ -1044,9 +1080,7 @@ export const userRoutes = new Elysia({ prefix: '/api' })
          })
        }
 
-        // Get release previews for recent ratings
-        const recentRatingAlbumIds = recentRatingsRows.map((row) => row.albumId)
-        const releasePreviewMap = await getProfileReleasePreviewMap(recentRatingAlbumIds)
+        const releasePreviewMap = new Map(previewRows.map((row) => [row.releaseId, toReleasePreview(row.payload)]))
 
         // Build recent ratings with album details
         const recentRatings = recentRatingsRows.map((row) => {
@@ -1067,18 +1101,6 @@ export const userRoutes = new Elysia({ prefix: '/api' })
        // Process lists
        let lists = []
        if (listsRows.length) {
-         const listIds = listsRows.map((entry) => entry.id)
-         const listAlbums = await db
-           .select({
-             listId: userListAlbum.listId,
-             albumId: userListAlbum.albumId,
-             name: userListAlbum.name,
-             cover: userListAlbum.cover,
-             artists: userListAlbum.artists,
-             addedAt: userListAlbum.addedAt,
-           })
-           .from(userListAlbum)
-           .where(inArray(userListAlbum.listId, listIds))
          const albumsByList = new Map<string, typeof listAlbums>()
 
          listAlbums.forEach((entry) => {

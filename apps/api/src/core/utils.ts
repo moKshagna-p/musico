@@ -224,27 +224,19 @@ export const getCachedReleasePreviewMap = async (albumIds: unknown[], allowExpir
   return new Map(
     rows
       .filter((row) => allowExpiredMetadata || (row.expiresAt instanceof Date && row.expiresAt.getTime() > Date.now()))
-      .map((row) => {
-        const payload = (row.payload ?? {}) as {
-          name?: unknown
-          cover?: unknown
-          artists?: unknown
-          genres?: unknown
-          releaseYear?: unknown
-        }
-
-        return [
-          row.releaseId,
-          {
-            name: String(payload.name ?? '').trim(),
-            cover: String(payload.cover ?? '').trim(),
-            artists: Array.isArray(payload.artists) ? payload.artists.filter(Boolean).map(String) : [],
-            genres: Array.isArray(payload.genres) ? payload.genres.filter(Boolean).map(String) : [],
-            releaseYear: Number.isFinite(Number(payload.releaseYear)) ? Number(payload.releaseYear) : null,
-          },
-        ] as const
-      }),
+      .map((row) => [row.releaseId, toReleasePreview(row.payload)] as const),
   )
+}
+
+export const toReleasePreview = (value: unknown) => {
+  const payload = (value ?? {}) as { name?: unknown; cover?: unknown; artists?: unknown; genres?: unknown; releaseYear?: unknown }
+  return {
+    name: String(payload.name ?? '').trim(),
+    cover: String(payload.cover ?? '').trim(),
+    artists: Array.isArray(payload.artists) ? payload.artists.filter(Boolean).map(String) : [],
+    genres: Array.isArray(payload.genres) ? payload.genres.filter(Boolean).map(String) : [],
+    releaseYear: Number.isFinite(Number(payload.releaseYear)) ? Number(payload.releaseYear) : null,
+  }
 }
 
 // Profile previews contain stable catalog metadata, not mutable community stats.
