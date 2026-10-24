@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 
 import FollowButton from '../components/user/FollowButton.jsx'
@@ -9,37 +9,26 @@ import AlbumTile from '../components/album/AlbumTile.jsx'
 import BackButton from '../components/ui/BackButton.jsx'
 import ListCard from '../components/list/ListCard.jsx'
 import { useAuth } from '../hooks/useAuth.js'
-import { fetchUserProfile } from '../services/socialService.js'
+import { userProfileQueryOptions } from '../queries/userProfile.js'
 
 const UserProfile = () => {
   const { username } = useParams()
   const navigate = useNavigate()
   const { user } = useAuth()
-  const [profile, setProfile] = useState(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState(null)
+  const queryClient = useQueryClient()
+  const profileQuery = useQuery(userProfileQueryOptions(username))
+  const profile = profileQuery.data ?? null
+  const loading = profileQuery.isPending
+  const error = profileQuery.error ? (profileQuery.error.message ?? 'User not found.') : null
 
-  useEffect(() => {
-    let cancelled = false
-
-    const load = async () => {
-      setLoading(true)
-      setError(null)
-      try {
-        const data = await fetchUserProfile(username)
-        if (!cancelled) setProfile(data)
-      } catch (err) {
-        if (!cancelled) setError(err?.message ?? 'User not found.')
-      } finally {
-        if (!cancelled) setLoading(false)
-      }
-    }
-
-    void load()
-    return () => {
-      cancelled = true
-    }
-  }, [username])
+  // Keep the cached profile in step with the follow button so revisits show the right state.
+  const handleFollowToggle = (following) => {
+    queryClient.setQueryData(userProfileQueryOptions(username).queryKey, (current) =>
+      current && current.isFollowing !== following
+        ? { ...current, isFollowing: following, followerCount: Math.max(0, current.followerCount + (following ? 1 : -1)) }
+        : current,
+    )
+  }
 
   const ratedAlbumDetails = profile?.recentRatings?.map((item) => ({
     ...item,
@@ -110,7 +99,7 @@ const UserProfile = () => {
           </div>
 
           {!isOwnProfile && user && (
-            <FollowButton username={profile.username} initialFollowing={profile.isFollowing} />
+            <FollowButton username={profile.username} initialFollowing={profile.isFollowing} onToggle={handleFollowToggle} />
           )}
         </header>
 

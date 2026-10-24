@@ -21,9 +21,11 @@ test('maps feed actors and targets into the shape consumed by activity cards', (
     createdAt,
     userName: 'E2E User',
     userImage: null,
+    userUsername: 'e2e-user',
   }, {
     name: 'Following Target',
     image: 'https://images.example/target.jpg',
+    username: 'target',
   })).toEqual({
     id: 'activity-1',
     userId: 'user-1',
@@ -37,10 +39,12 @@ test('maps feed actors and targets into the shape consumed by activity cards', (
     user: {
       name: 'E2E User',
       image: null,
+      username: 'e2e-user',
     },
     targetUser: {
       name: 'Following Target',
       image: 'https://images.example/target.jpg',
+      username: 'target',
     },
   })
 })

@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom'
 import CoverImage from '../ui/CoverImage.jsx'
+import ProfileLink from './ProfileLink.jsx'
 import RatingStars from '../ui/RatingStars.jsx'
 
 const ActivityCard = ({ item }) => {
@@ -7,7 +8,7 @@ const ActivityCard = ({ item }) => {
 
   const timeAgo = formatTimeAgo(createdAt)
 
-  const userLink = <span className="font-medium text-paper">{actor?.name ?? 'Unknown'}</span>
+  const userLink = <ProfileLink username={actor?.username} className="font-medium text-paper hover:underline">{actor?.name ?? 'Unknown'}</ProfileLink>
 
   const albumLink = albumId ? (
     <Link to={`/album/${albumId}`} className="font-medium text-paper hover:underline">
@@ -15,7 +16,7 @@ const ActivityCard = ({ item }) => {
     </Link>
   ) : null
 
-  const targetLink = targetUser ? <span className="font-medium text-paper">{targetUser.name}</span> : null
+  const targetLink = targetUser ? <ProfileLink username={targetUser.username} className="font-medium text-paper hover:underline">{targetUser.name}</ProfileLink> : null
 
   const renderContent = () => {
     switch (type) {

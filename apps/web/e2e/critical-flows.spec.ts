@@ -87,6 +87,30 @@ test.describe('Critical user flows', () => {
     expect(browserErrors).toEqual([])
   })
 
+  test('feed names open profiles, prefetched on hover and cached for revisits', async ({ page }) => {
+    let profileRequests = 0
+    page.on('request', (request) => {
+      if (new URL(request.url()).pathname === '/api/users/e2e-user') profileRequests += 1
+    })
+
+    await signIn(page)
+    await page.getByRole('link', { name: 'Feed', exact: true }).click()
+    const actor = page.getByRole('link', { name: 'E2E User', exact: true })
+    await actor.hover()
+    await expect.poll(() => profileRequests).toBe(1)
+
+    await actor.click()
+    await expect(page).toHaveURL('/profile/e2e-user')
+    await expect(page.getByRole('heading', { name: 'E2E User' })).toBeVisible()
+    await expect(page.getByText('3 followers')).toBeVisible()
+
+    await page.goBack()
+    await page.goForward()
+    await expect(page.getByRole('heading', { name: 'E2E User' })).toBeVisible()
+    await expect(page.getByLabel('Loading profile')).toHaveCount(0)
+    expect(profileRequests).toBe(1)
+  })
+
   test('search flow submits query and opens album details', async ({ page }) => {
     await page.goto('/discover')
 

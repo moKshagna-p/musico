@@ -5,6 +5,7 @@ import { m, AnimatePresence, useReducedMotion } from 'framer-motion'
 
 import ActivityCard from '../components/user/ActivityCard.jsx'
 import FollowButton from '../components/user/FollowButton.jsx'
+import ProfileLink from '../components/user/ProfileLink.jsx'
 import PageLoadingState from '../components/ui/PageLoadingState.jsx'
 import PageTransition from '../components/ui/PageTransition.jsx'
 import { useAuth } from '../hooks/useAuth.js'
@@ -162,33 +163,35 @@ const UserSearchPanel = () => {
 const UserSearchResult = ({ person }) => {
   return (
     <div className="group flex items-center gap-3 rounded-xl px-3 py-2.5 transition-colors hover:bg-white/[0.04]">
-      {/* Avatar */}
-      {person.image ? (
-        <img
-          src={person.image}
-          alt=""
-          width={40}
-          height={40}
-          className="h-10 w-10 rounded-full object-cover ring-1 ring-white/10"
-        />
-      ) : (
-        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-white/[0.06] text-sm font-semibold text-white/60 ring-1 ring-white/10">
-          {person.name?.charAt(0)?.toUpperCase() ?? '?'}
-        </div>
-      )}
+      <ProfileLink username={person.username} className="flex min-w-0 flex-1 items-center gap-3 rounded-lg">
+        {/* Avatar */}
+        {person.image ? (
+          <img
+            src={person.image}
+            alt=""
+            width={40}
+            height={40}
+            className="h-10 w-10 rounded-full object-cover ring-1 ring-white/10"
+          />
+        ) : (
+          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-white/[0.06] text-sm font-semibold text-white/60 ring-1 ring-white/10">
+            {person.name?.charAt(0)?.toUpperCase() ?? '?'}
+          </div>
+        )}
 
-      {/* Info */}
-      <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-2">
-          <span className="block truncate text-sm font-medium text-white transition-colors group-hover:text-white/90">
-            {person.name}
-          </span>
-          {person.isPrivate && (
-            <FiLock className="h-3 w-3 shrink-0 text-muted/50" aria-hidden="true" title="Private account" />
-          )}
+        {/* Info */}
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2">
+            <span className="block truncate text-sm font-medium text-white transition-colors group-hover:text-white/90">
+              {person.name}
+            </span>
+            {person.isPrivate && (
+              <FiLock className="h-3 w-3 shrink-0 text-muted/50" aria-hidden="true" title="Private account" />
+            )}
+          </div>
+          <p className="truncate text-xs text-muted/60">@{person.username}</p>
         </div>
-        <p className="truncate text-xs text-muted/60">@{person.username}</p>
-      </div>
+      </ProfileLink>
 
       {/* Follow Button (don't show for self) */}
       {!person.isMe && (

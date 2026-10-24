@@ -1,7 +1,7 @@
 import { Elysia } from 'elysia'
 import { desc, eq, inArray } from 'drizzle-orm'
 import { db } from '../core/db'
-import { activity, user, userFollow } from '../core/schema'
+import { activity, user, userFollow, userProfile } from '../core/schema'
 import { ensureAuthenticated, userImageSql } from '../core/utils'
 
 type FeedRow = {
@@ -16,16 +16,18 @@ type FeedRow = {
   createdAt: Date
   userName: string
   userImage: string | null
+  userUsername?: string | null
 }
 
-type FeedUser = Pick<typeof user.$inferSelect, 'name' | 'image'>
+type FeedUser = Pick<typeof user.$inferSelect, 'name' | 'image'> & { username?: string | null }
 
-export const toFeedItem = ({ userName, userImage, createdAt, ...item }: FeedRow, targetUser?: FeedUser) => ({
+export const toFeedItem = ({ userName, userImage, userUsername = null, createdAt, ...item }: FeedRow, targetUser?: FeedUser) => ({
   ...item,
   createdAt: createdAt.getTime(),
   user: {
     name: userName,
     image: userImage,
+    username: userUsername,
   },
   ...(targetUser ? { targetUser } : {}),
 })
@@ -64,9 +66,11 @@ export const activityRoutes = new Elysia()
         createdAt: activity.createdAt,
         userName: user.name,
         userImage: userImageSql(),
+        userUsername: userProfile.username,
       })
       .from(activity)
       .innerJoin(user, eq(user.id, activity.userId))
+      .leftJoin(userProfile, eq(userProfile.userId, activity.userId))
       .where(inArray(activity.userId, followingIds))
       .orderBy(desc(activity.createdAt))
       .limit(limit)
@@ -75,8 +79,9 @@ export const activityRoutes = new Elysia()
       .map((item) => item.targetUserId)
       .filter((id): id is string => Boolean(id)))]
     const targetUsers = targetUserIds.length
-      ? await db.select({ id: user.id, name: user.name, image: userImageSql() })
+      ? await db.select({ id: user.id, name: user.name, image: userImageSql(), username: userProfile.username })
         .from(user)
+        .leftJoin(userProfile, eq(userProfile.userId, user.id))
         .where(inArray(user.id, targetUserIds))
       : []
     const targetUsersById = new Map(targetUsers.map(({ id, ...targetUser }) => [id, targetUser]))

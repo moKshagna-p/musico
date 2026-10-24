@@ -331,9 +331,29 @@ export const installApiMocks = async (page: Page) => {
           user: {
             name: user.name,
             image: user.image,
+            username: 'e2e-user',
           },
         }],
         nextCursor: null,
+      })
+    }
+
+    if (pathname === '/api/users/e2e-user' && method === 'GET') {
+      return json(route, {
+        data: {
+          id: user.id,
+          username: 'e2e-user',
+          name: user.name,
+          bio: 'E2E profile',
+          image: null,
+          isOwnProfile: signedIn,
+          isFollowing: false,
+          followerCount: 3,
+          followingCount: 1,
+          stats: { totalRated: 1, averageRating: 5 },
+          recentRatings: [{ albumId: albumCatalog[0].id, rating: 5, timestamp: Date.now(), albumName: albumCatalog[0].name, albumCover: albumCatalog[0].cover, albumArtists: albumCatalog[0].artists, genres: [] }],
+          lists: [],
+        },
       })
     }
 

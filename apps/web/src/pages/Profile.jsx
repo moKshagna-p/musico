@@ -11,6 +11,7 @@ import ListCard from '../components/list/ListCard.jsx'
 import AlbumSlotMachine from '../components/album/AlbumSlotMachine.jsx'
 import CoverImage from '../components/ui/CoverImage.jsx'
 import UsernameSetup from '../components/user/UsernameSetup.jsx'
+import ProfileLink from '../components/user/ProfileLink.jsx'
 import { useAuth } from '../hooks/useAuth.js'
 import { useDashboard } from '../hooks/useDashboard.js'
 import { fetchMyFollowers, fetchMyFollowing, updateMyProfile } from '../services/socialService.js'
@@ -33,10 +34,10 @@ const FollowListModal = ({ title, users, loading, onClose }) => (
           <UserListLoadingState />
         ) : users.length ? (
           users.map((person) => (
-            <Link
+            <ProfileLink
               key={person.id}
-              to={person.username ? `/profile/${person.username}` : '#'}
-              onClick={person.username ? onClose : undefined}
+              username={person.username}
+              onClick={onClose}
               className="flex items-center gap-3 rounded-xl border border-outline/60 bg-canvas/30 px-4 py-3 transition hover:border-outline hover:bg-canvas/40"
             >
               {person.image ? (
@@ -50,7 +51,7 @@ const FollowListModal = ({ title, users, loading, onClose }) => (
                 <p className="truncate text-sm font-semibold text-white">{person.name}</p>
                 {person.username && <p className="truncate text-xs text-muted">@{person.username}</p>}
               </div>
-            </Link>
+            </ProfileLink>
           ))
         ) : (
           <p className="text-sm text-muted">No users here yet.</p>
