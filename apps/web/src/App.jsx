@@ -39,10 +39,10 @@ const AdminDashboard = lazy(() => import('./pages/AdminDashboard.jsx'))
 const INACTIVITY_TIMEOUT_MS = 20 * 60 * 1000
 const LAST_ACTIVITY_KEY = 'musico:last-activity-at'
 
-const withRouteFallback = (element, fallback) => (
+const withRouteFallback = (element, fallback, bleed = false) => (
   <Suspense
     fallback={(
-      <PageTransition>
+      <PageTransition bleed={bleed}>
         {fallback}
       </PageTransition>
     )}
@@ -146,7 +146,7 @@ const App = () => {
               <Route path="/lists/:listId" element={withRouteFallback(<PublicList />, <PublicListPageSkeleton />)} />
               <Route path="/auth" element={withRouteFallback(<Auth />, <AuthPageSkeleton />)} />
               <Route path="/admin" element={withRouteFallback(<AdminDashboard />, <AdminDashboardPageSkeleton />)} />
-              <Route path="/album/:albumId" element={withRouteFallback(<AlbumDetails />, <AlbumDetailsPageSkeleton />)} />
+              <Route path="/album/:albumId" element={withRouteFallback(<AlbumDetails />, <AlbumDetailsPageSkeleton />, true)} />
               <Route path="*" element={withRouteFallback(<NotFound />, <NotFoundPageSkeleton />)} />
             </Routes>
           </AnimatePresence>

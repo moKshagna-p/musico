@@ -209,7 +209,7 @@ const AlbumDetails = () => {
 
   if (loading) {
     return (
-      <PageTransition>
+      <PageTransition bleed>
         <AlbumDetailsPageSkeleton />
       </PageTransition>
     )

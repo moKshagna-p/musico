@@ -102,7 +102,8 @@ const Billboard = ({ artist, cover, children, className = 'min-h-[82svh]', gutte
         <div className="absolute inset-x-0 bottom-0 h-3/5 bg-gradient-to-t from-black via-black/70 to-transparent" />
       </div>
 
-      <div className={`${gutter} pb-10 pt-32 tablet:pb-16`}>
+      {/* Stretched so its box stays put while content swaps in (no layout shift); content sits at the bottom. */}
+      <div className={`${gutter} flex flex-col justify-end self-stretch pb-10 pt-32 tablet:pb-16`}>
         {children}
       </div>
     </section>

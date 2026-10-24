@@ -1,5 +1,6 @@
 import { ALBUM_GRID_CLASS } from '../album/AlbumGrid.jsx'
 import LoadingSkeleton from './LoadingSkeleton.jsx'
+import { PAGE_GUTTER } from './Billboard.jsx'
 
 const PageLoadingState = ({ title = 'Loading content', cards = 3, compact = false }) => {
   return (
@@ -134,31 +135,33 @@ export const AuthPageSkeleton = () => {
   )
 }
 
+// Mirrors the album page (full-bleed hero, sleeve and title at its foot, then the tracklist) so nothing jumps when it loads.
 export const AlbumDetailsPageSkeleton = () => {
+  const shimmer = 'bg-gradient-to-r from-white/[0.04] via-white/[0.08] to-white/[0.04] bg-[length:400px_100%] motion-safe:animate-shimmer'
   return (
     <section aria-busy="true" aria-label="Loading album details">
-      <div className="mb-10 h-4 w-16 rounded-full bg-white/[0.05]" />
-      <div className="grid items-end gap-10 md:grid-cols-[minmax(0,26rem)_1fr] tablet:gap-16">
-        <div className="pr-[30%]">
-          <div className="aspect-square rounded-[4px] bg-gradient-to-r from-white/[0.04] via-white/[0.08] to-white/[0.04] bg-[length:400px_100%] motion-safe:animate-shimmer" />
-        </div>
-        <div className="space-y-4">
-          <div className="h-4 w-20 rounded-full bg-white/[0.05]" />
-          <div className="h-20 w-full max-w-xl rounded-2xl bg-gradient-to-r from-white/[0.04] via-white/[0.08] to-white/[0.04] bg-[length:400px_100%] motion-safe:animate-shimmer" />
-          <div className="h-5 w-48 rounded-full bg-white/[0.06]" />
-          <div className="h-4 w-36 rounded-full bg-white/[0.04]" />
-          <div className="!mt-8 flex gap-10 border-t border-white/10 pt-6">
-            <div className="h-16 w-32 rounded-2xl bg-white/[0.05]" />
-            <div className="h-16 w-44 rounded-2xl bg-white/[0.04]" />
+      <div className={`${PAGE_GUTTER} flex min-h-[86svh] flex-col justify-end pb-10 pt-32 tablet:pb-16`}>
+        <div className="flex flex-col gap-8 md:flex-row md:items-end md:gap-10">
+          <div className="w-44 shrink-0 pr-14 tablet:w-64 tablet:pr-20">
+            <div className={`aspect-square rounded-[4px] ${shimmer}`} />
+          </div>
+          <div className="min-w-0 flex-1 space-y-4">
+            <div className="h-4 w-32 rounded-full bg-white/[0.05]" />
+            <div className={`h-16 w-full max-w-xl rounded-2xl tablet:h-20 ${shimmer}`} />
+            <div className="h-6 w-48 rounded-full bg-white/[0.06]" />
+            <div className="!mt-7 flex gap-10">
+              <div className="h-14 w-32 rounded-2xl bg-white/[0.05]" />
+              <div className="h-14 w-44 rounded-2xl bg-white/[0.04]" />
+            </div>
           </div>
         </div>
+        <div className="mt-10 flex gap-2">
+          {Array.from({ length: 4 }).map((_, index) => (
+            <div key={index} className="h-9 w-28 rounded-full bg-white/[0.04]" />
+          ))}
+        </div>
       </div>
-      <div className="mt-12 flex gap-2">
-        {Array.from({ length: 4 }).map((_, index) => (
-          <div key={index} className="h-9 w-28 rounded-full bg-white/[0.04]" />
-        ))}
-      </div>
-      <div className="mt-20 grid gap-16 lg:grid-cols-[minmax(0,1fr)_22rem]">
+      <div className={`${PAGE_GUTTER} mt-10 grid gap-16 lg:grid-cols-[minmax(0,1fr)_22rem]`}>
         <div className="space-y-px">
           {Array.from({ length: 6 }).map((_, index) => (
             <div key={index} className="h-12 border-b border-white/[0.06]" />
