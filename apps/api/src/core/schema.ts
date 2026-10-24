@@ -97,6 +97,13 @@ export const releaseCache = pgTable(
   (table) => [index('release_cache_expires_at_idx').on(table.expiresAt)],
 )
 
+// High-resolution Apple Music cover per album; a null cover records that Apple has no match.
+export const albumArtwork = pgTable('album_artwork', {
+  albumId: text('albumId').primaryKey(),
+  cover: text('cover'),
+  checkedAt: timestamp('checkedAt', { withTimezone: true, mode: 'date' }).notNull(),
+})
+
 export const storedTrendingAlbum = pgTable(
   'stored_trending_album',
   {

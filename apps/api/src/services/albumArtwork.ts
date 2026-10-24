@@ -1,0 +1,127 @@
+// High-resolution album covers. Discogs serves covers at 600px at most, while
+// Apple Music has the same artwork at up to 3000px. Lookups happen on demand,
+// a few per request, and every answer (including "Apple has no match") is kept
+// in Postgres so each album is only looked up once.
+
+import { inArray, sql } from 'drizzle-orm'
+
+import { db } from '../core/db'
+import { albumArtwork } from '../core/schema'
+import { normalizeName } from './artistImages'
+
+type Fetcher = (input: string, init?: RequestInit) => Promise<Response>
+type ArtworkRow = { albumId: string; cover: string | null; checkedAt: Date }
+type AlbumLike = { id: string; name: string; artists: string[]; cover: string }
+
+export type ArtworkStore = {
+  read: (albumIds: string[]) => Promise<ArtworkRow[]>
+  write: (rows: ArtworkRow[]) => Promise<unknown>
+}
+
+const COVER_SIZE = 1200
+const LOOKUP_TIMEOUT_MS = 2500
+const RECHECK_MISS_MS = 1000 * 60 * 60 * 24 * 30
+const RATE_LIMIT_BACKOFF_MS = 1000 * 60 * 10
+
+// ponytail: per-isolate backoff after Apple rate-limits us; share it via KV if isolates keep hammering iTunes.
+let appleBackoffUntil = 0
+
+// Discogs disambiguates artists as "Name (2)" and marks name variations with "*".
+export const cleanDiscogsArtist = (name = '') => name.replace(/\s*\(\d+\)$/, '').replace(/\*$/, '').trim()
+
+// Apple appends edition notes ("(Deluxe Version)", " - Single") that Discogs titles lack.
+const normalizeTitle = (value: string) =>
+  normalizeName(value.replace(/\s*[([][^)\]]*[)\]]/g, '').replace(/\s+-\s+(single|ep)$/i, ''))
+
+// Accepts the exact artist or a collaboration led by them ("Drake & Future"), not look-alikes ("Drake Tribute").
+const artistMatches = (candidate: string, target: string) =>
+  normalizeName(candidate) === target || normalizeName(candidate.split(/\s*(?:&|,|\bfeat\.?|\bft\.?|\bwith\b)\s*/i)[0]) === target
+
+export const findAppleAlbumCover = async (artist: string, album: string, fetcher: Fetcher = fetch) => {
+  const targetArtist = normalizeName(artist)
+  const targetAlbum = normalizeTitle(album)
+  if (!targetArtist || !targetAlbum) return null
+
+  const term = encodeURIComponent(`${artist} ${album}`)
+  const response = await fetcher(`https://itunes.apple.com/search?term=${term}&entity=album&limit=10`, {
+    signal: AbortSignal.timeout(LOOKUP_TIMEOUT_MS),
+  })
+  if (!response.ok) throw Object.assign(new Error(`iTunes search failed (${response.status})`), { status: response.status })
+
+  const payload = (await response.json()) as {
+    results?: Array<{ artistName?: string; collectionName?: string; artworkUrl100?: string }>
+  }
+  const match = (payload.results ?? []).find(
+    (result) =>
+      artistMatches(String(result.artistName ?? ''), targetArtist) &&
+      normalizeTitle(String(result.collectionName ?? '')) === targetAlbum,
+  )
+  const artwork = match?.artworkUrl100 ?? ''
+  if (!/^https:\/\/[a-z0-9-]+\.mzstatic\.com\/image\/thumb\//i.test(artwork)) return null
+  return artwork.replace(/\/\d+x\d+[a-z]*\.(?:png|jpe?g|webp)$/i, `/${COVER_SIZE}x${COVER_SIZE}bb.jpg`)
+}
+
+const dbStore: ArtworkStore = {
+  read: (albumIds) => db.select().from(albumArtwork).where(inArray(albumArtwork.albumId, albumIds)),
+  write: (rows) =>
+    db
+      .insert(albumArtwork)
+      .values(rows)
+      .onConflictDoUpdate({
+        target: albumArtwork.albumId,
+        set: { cover: sql`excluded."cover"`, checkedAt: sql`excluded."checkedAt"` },
+      }),
+}
+
+// Swaps in Apple's high-resolution cover where one is known, looking up at most `maxLookups` new albums.
+export const attachHdCovers = async <T extends AlbumLike>(
+  releases: T[],
+  { maxLookups = 6, store = dbStore, fetcher = fetch }: { maxLookups?: number; store?: ArtworkStore; fetcher?: Fetcher } = {},
+): Promise<T[]> => {
+  const albumIds = [...new Set(releases.map((release) => release.id).filter(Boolean))]
+  if (!albumIds.length) return releases
+
+  let known: Map<string, ArtworkRow>
+  try {
+    known = new Map((await store.read(albumIds)).map((row) => [row.albumId, row]))
+  } catch (error) {
+    // Covers are cosmetic: keep serving Discogs art if the table is missing or the read fails.
+    console.warn('[album-artwork] read failed', error instanceof Error ? error.message : String(error))
+    return releases
+  }
+
+  const now = Date.now()
+  const needsLookup = (release: T) => {
+    const row = known.get(release.id)
+    return Boolean(release.artists?.[0] && release.name) && (!row || (!row.cover && now - row.checkedAt.getTime() > RECHECK_MISS_MS))
+  }
+  const pending = now < appleBackoffUntil
+    ? []
+    : [...new Map(releases.filter(needsLookup).map((release) => [release.id, release])).values()].slice(0, maxLookups)
+
+  const looked = await Promise.all(
+    pending.map(async (release): Promise<ArtworkRow | null> => {
+      try {
+        const cover = await findAppleAlbumCover(cleanDiscogsArtist(release.artists[0]), release.name, fetcher)
+        return { albumId: release.id, cover, checkedAt: new Date() }
+      } catch (error) {
+        // Failed lookups are not recorded, so the album is retried on a later request.
+        const status = (error as { status?: number }).status
+        if (status === 403 || status === 429) appleBackoffUntil = Date.now() + RATE_LIMIT_BACKOFF_MS
+        return null
+      }
+    }),
+  )
+  const fresh = looked.filter((row): row is ArtworkRow => row !== null)
+  if (fresh.length) {
+    fresh.forEach((row) => known.set(row.albumId, row))
+    await store.write(fresh).catch((error) => {
+      console.warn('[album-artwork] write failed', error instanceof Error ? error.message : String(error))
+    })
+  }
+
+  return releases.map((release) => {
+    const cover = known.get(release.id)?.cover
+    return cover ? { ...release, cover } : release
+  })
+}

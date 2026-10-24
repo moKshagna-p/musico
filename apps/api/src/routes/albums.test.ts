@@ -55,6 +55,7 @@ for (const failedMode of [null, 'featured', 'recent-popular']) {
           return albums.map(album => ({ ...album, communityRating: 4, reviewCount: 2 }))
         },
       }))
+      mock.module('./src/services/albumArtwork.ts', () => ({ attachHdCovers: async (albums) => albums }))
       const { albumRoutes } = await import('./src/routes/albums.ts')
       const response = await new Elysia().use(albumRoutes).handle(new Request('http://localhost/api/home'))
       console.log(JSON.stringify({ body: await response.json(), batches, cache: response.headers.get('cache-control'), status: response.status }))

@@ -3,6 +3,7 @@ import { getReleaseDetails } from '../services/discogs'
 import {
   attachMusicoCommunityStats,
 } from '../core/utils'
+import { attachHdCovers } from '../services/albumArtwork'
 import { loadStoredFeaturedSection } from '../services/trending'
 import { readIdentifier } from './validation'
 
@@ -22,7 +23,7 @@ export const albumRoutes = new Elysia({ prefix: '/api' })
       set.headers['Cache-Control'] = data.length
         ? 'public, max-age=60, s-maxage=300, stale-while-revalidate=21000'
         : 'no-store'
-      return { data: await attachMusicoCommunityStats(data) }
+      return { data: await attachHdCovers(await attachMusicoCommunityStats(data)) }
     } catch (error) {
       console.error('[featured] error', error)
       set.status = 502
@@ -44,7 +45,7 @@ export const albumRoutes = new Elysia({ prefix: '/api' })
       const happeningAlbums = mostHappening.status === 'fulfilled' ? mostHappening.value : []
       const recentAlbums = recentReleases.status === 'fulfilled' ? recentReleases.value : []
       // Hydrate both sections together so overlapping albums share one stats lookup.
-      const hydratedAlbums = await attachMusicoCommunityStats([...happeningAlbums, ...recentAlbums])
+      const hydratedAlbums = await attachHdCovers(await attachMusicoCommunityStats([...happeningAlbums, ...recentAlbums]))
       const mostHappeningData = hydratedAlbums.slice(0, happeningAlbums.length)
       const recentReleasesData = hydratedAlbums.slice(happeningAlbums.length)
 
@@ -94,7 +95,7 @@ export const albumRoutes = new Elysia({ prefix: '/api' })
      }
      try {
        const data = await getReleaseDetails(releaseId)
-       const [hydrated] = await attachMusicoCommunityStats([data])
+       const [hydrated] = await attachHdCovers(await attachMusicoCommunityStats([data]), { maxLookups: 1 })
        set.headers ??= {}
        // Catalog data is cached internally; mutable community scores must stay current.
        set.headers['Cache-Control'] = 'no-store'
