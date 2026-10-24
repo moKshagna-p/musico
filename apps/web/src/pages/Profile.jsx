@@ -16,6 +16,19 @@ import { useAuth } from '../hooks/useAuth.js'
 import { useDashboard } from '../hooks/useDashboard.js'
 import { fetchMyFollowers, fetchMyFollowing, updateMyProfile } from '../services/socialService.js'
 
+// Avatars show at 128px at most; a 256px square WebP keeps every profile, feed and list response light.
+const AVATAR_SIZE = 256
+
+const toAvatarDataUrl = async (file) => {
+  const bitmap = await createImageBitmap(file)
+  const side = Math.min(bitmap.width, bitmap.height)
+  const canvas = document.createElement('canvas')
+  canvas.width = canvas.height = Math.min(side, AVATAR_SIZE)
+  canvas.getContext('2d').drawImage(bitmap, (bitmap.width - side) / 2, (bitmap.height - side) / 2, side, side, 0, 0, canvas.width, canvas.height)
+  bitmap.close()
+  return canvas.toDataURL('image/webp', 0.85)
+}
+
 const FollowListModal = ({ title, users, loading, onClose }) => (
   <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-md">
     <div className="relative mx-4 w-full max-w-lg rounded-3xl border border-white/10 bg-[#0b0b0a]/95 shadow-[0_40px_120px_-20px_rgba(0,0,0,1)] p-6">
@@ -190,17 +203,12 @@ const Profile = () => {
       return
     }
 
-    const reader = new FileReader()
-    reader.onload = () => {
-      if (typeof reader.result === 'string') {
-        setEditImage(reader.result)
+    toAvatarDataUrl(file)
+      .then((dataUrl) => {
+        setEditImage(dataUrl)
         setProfileStatus('')
-      }
-    }
-    reader.onerror = () => {
-      setProfileStatus('Unable to read that image.')
-    }
-    reader.readAsDataURL(file)
+      })
+      .catch(() => setProfileStatus('Unable to read that image.'))
     event.target.value = ''
   }, [])
 
