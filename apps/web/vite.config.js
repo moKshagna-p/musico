@@ -23,10 +23,6 @@ export default defineConfig({
             return 'vendor-query'
           }
 
-          if (id.includes('/framer-motion/')) {
-            return 'vendor-motion'
-          }
-
           if (id.includes('/react-icons/')) {
             return 'vendor-icons'
           }

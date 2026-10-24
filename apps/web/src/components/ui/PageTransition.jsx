@@ -1,9 +1,9 @@
-import { motion, useReducedMotion } from 'framer-motion'
+import { m, useReducedMotion } from 'framer-motion'
 
 // `bleed` pages run edge to edge under the floating nav and lay out their own containers.
 const PageTransition = ({ children, bleed = false }) => {
   const shouldReduceMotion = useReducedMotion()
-  const MotionMain = motion.main
+  const MotionMain = m.main
 
   return (
     <MotionMain

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { FiSearch, FiX, FiCommand, FiClock, FiCornerDownLeft } from 'react-icons/fi'
-import { AnimatePresence, motion } from 'framer-motion'
+import { AnimatePresence, m } from 'framer-motion'
 import { useNavigate } from 'react-router-dom'
 
 import { useSearch } from '../../hooks/useSearch.js'
@@ -38,7 +38,7 @@ const SearchBar = ({
   enableHistory = true,
 }) => {
   const navigate = useNavigate()
-  const MotionDiv = motion.div
+  const MotionDiv = m.div
   const [value, setValue] = useState(query)
   const [syncedQuery, setSyncedQuery] = useState(query)
   const [pendingSubmittedQuery, setPendingSubmittedQuery] = useState(null)

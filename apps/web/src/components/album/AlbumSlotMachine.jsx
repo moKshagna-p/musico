@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { animate, motion as Motion, useMotionValue, useReducedMotion, useTransform } from 'framer-motion'
+import { animate, m as Motion, useMotionValue, useReducedMotion, useTransform } from 'framer-motion'
 import { FiArrowRight, FiShuffle } from 'react-icons/fi'
 import { useNavigate } from 'react-router-dom'
 

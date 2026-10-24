@@ -1,10 +1,10 @@
-import { motion } from 'framer-motion'
+import { m } from 'framer-motion'
 import { Link, NavLink } from 'react-router-dom'
 
 import { useAuth } from '../../hooks/useAuth.js'
 import { useAdminAccess } from '../../hooks/useAdminAccess.js'
 
-const MotionSpan = motion.span
+const MotionSpan = m.span
 
 export const MusicoMark = ({ className = '' }) => (
   <svg viewBox="0 0 32 32" aria-hidden="true" className={className}>

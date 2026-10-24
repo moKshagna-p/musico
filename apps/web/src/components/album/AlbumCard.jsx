@@ -1,11 +1,11 @@
 import { memo } from 'react'
-import { motion } from 'framer-motion'
+import { m } from 'framer-motion'
 import { FaStar } from 'react-icons/fa'
 import { useRatings } from '../../hooks/useRatings.js'
 import { formatReleaseDate } from '../../utils/helpers.js'
 import VinylSleeve from '../ui/VinylSleeve.jsx'
 
-const MotionArticle = motion.article
+const MotionArticle = m.article
 
 const AlbumCard = ({ album, onSelect }) => {
   const { getCommunityStats } = useRatings()

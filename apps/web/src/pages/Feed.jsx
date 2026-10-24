@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { FiLock, FiRefreshCw, FiSearch, FiX, FiUsers, FiMusic } from 'react-icons/fi'
-import { motion, AnimatePresence, useReducedMotion } from 'framer-motion'
+import { m, AnimatePresence, useReducedMotion } from 'framer-motion'
 
 import ActivityCard from '../components/user/ActivityCard.jsx'
 import FollowButton from '../components/user/FollowButton.jsx'
@@ -11,7 +11,7 @@ import { useAuth } from '../hooks/useAuth.js'
 import useFeed from '../hooks/useFeed.js'
 import { searchUsers } from '../services/socialService.js'
 
-const Motion = motion
+const Motion = m
 
 // ── User Search Panel ──
 

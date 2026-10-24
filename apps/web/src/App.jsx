@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect } from 'react'
-import { AnimatePresence } from 'framer-motion'
+import { AnimatePresence, LazyMotion } from 'framer-motion'
 import { Route, Routes, useLocation, useNavigate } from 'react-router-dom'
 
 import Footer from './components/ui/Footer.jsx'
@@ -38,6 +38,9 @@ const AdminDashboard = lazy(() => import('./pages/AdminDashboard.jsx'))
 
 const INACTIVITY_TIMEOUT_MS = 20 * 60 * 1000
 const LAST_ACTIVITY_KEY = 'musico:last-activity-at'
+
+// Components use `m`; the animation engine streams in after first paint instead of shipping in the entry bundle.
+const loadMotionFeatures = () => import('./motionFeatures.js').then((module) => module.default)
 
 const withRouteFallback = (element, fallback, bleed = false) => (
   <Suspense
@@ -129,31 +132,33 @@ const App = () => {
   }, [location.pathname, location.search])
 
   return (
-    <div className="isolate flex min-h-screen flex-col overflow-x-clip bg-canvas text-paper">
-      <Navigation />
-      <main className="flex-1">
-        <RouteErrorBoundary>
-          <AnimatePresence mode="wait" initial={false}>
-            <Routes location={location} key={location.pathname}>
-              {/* Home is statically imported and never suspends; it renders its own skeleton while loading */}
-              <Route path="/" element={<Home />} />
-              <Route path="/discover" element={withRouteFallback(<Discover />, <DiscoverPageSkeleton />)} />
-              <Route path="/search" element={withRouteFallback(<SearchResults />, <SearchResultsPageSkeleton />)} />
-              <Route path="/profile" element={withRouteFallback(<Profile />, <ProfilePageSkeleton showActions />)} />
-              <Route path="/profile/history" element={withRouteFallback(<ProfileHistory />, <ListeningHistoryPageSkeleton />)} />
-              <Route path="/profile/:username" element={withRouteFallback(<UserProfile />, <ProfilePageSkeleton />)} />
-              <Route path="/feed" element={withRouteFallback(<Feed />, <FeedPageSkeleton />)} />
-              <Route path="/lists/:listId" element={withRouteFallback(<PublicList />, <PublicListPageSkeleton />)} />
-              <Route path="/auth" element={withRouteFallback(<Auth />, <AuthPageSkeleton />)} />
-              <Route path="/admin" element={withRouteFallback(<AdminDashboard />, <AdminDashboardPageSkeleton />)} />
-              <Route path="/album/:albumId" element={withRouteFallback(<AlbumDetails />, <AlbumDetailsPageSkeleton />, true)} />
-              <Route path="*" element={withRouteFallback(<NotFound />, <NotFoundPageSkeleton />)} />
-            </Routes>
-          </AnimatePresence>
-        </RouteErrorBoundary>
-      </main>
-      <Footer />
-    </div>
+    <LazyMotion features={loadMotionFeatures} strict>
+      <div className="isolate flex min-h-screen flex-col overflow-x-clip bg-canvas text-paper">
+        <Navigation />
+        <main className="flex-1">
+          <RouteErrorBoundary>
+            <AnimatePresence mode="wait" initial={false}>
+              <Routes location={location} key={location.pathname}>
+                {/* Home is statically imported and never suspends; it renders its own skeleton while loading */}
+                <Route path="/" element={<Home />} />
+                <Route path="/discover" element={withRouteFallback(<Discover />, <DiscoverPageSkeleton />)} />
+                <Route path="/search" element={withRouteFallback(<SearchResults />, <SearchResultsPageSkeleton />)} />
+                <Route path="/profile" element={withRouteFallback(<Profile />, <ProfilePageSkeleton showActions />)} />
+                <Route path="/profile/history" element={withRouteFallback(<ProfileHistory />, <ListeningHistoryPageSkeleton />)} />
+                <Route path="/profile/:username" element={withRouteFallback(<UserProfile />, <ProfilePageSkeleton />)} />
+                <Route path="/feed" element={withRouteFallback(<Feed />, <FeedPageSkeleton />)} />
+                <Route path="/lists/:listId" element={withRouteFallback(<PublicList />, <PublicListPageSkeleton />)} />
+                <Route path="/auth" element={withRouteFallback(<Auth />, <AuthPageSkeleton />)} />
+                <Route path="/admin" element={withRouteFallback(<AdminDashboard />, <AdminDashboardPageSkeleton />)} />
+                <Route path="/album/:albumId" element={withRouteFallback(<AlbumDetails />, <AlbumDetailsPageSkeleton />, true)} />
+                <Route path="*" element={withRouteFallback(<NotFound />, <NotFoundPageSkeleton />)} />
+              </Routes>
+            </AnimatePresence>
+          </RouteErrorBoundary>
+        </main>
+        <Footer />
+      </div>
+    </LazyMotion>
   )
 }
 

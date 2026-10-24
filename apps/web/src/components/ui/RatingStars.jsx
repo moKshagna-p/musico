@@ -1,5 +1,5 @@
 import { memo, useState, useEffect } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
+import { m, AnimatePresence } from 'framer-motion'
 import { FaStar } from 'react-icons/fa'
 
 const STAR_VALUES = [1, 2, 3, 4, 5]
@@ -16,9 +16,9 @@ const clampRating = (value) => {
 }
 
 const RatingStars = ({ value = 0, onRate, readOnly = false, showValue = false, size = 'md', align = 'right' }) => {
-  const MotionButton = motion.button
-  const MotionSpan = motion.span
-  const MotionDiv = motion.div
+  const MotionButton = m.button
+  const MotionSpan = m.span
+  const MotionDiv = m.div
   const [hoverValue, setHoverValue] = useState(null)
   const [lastRated, setLastRated] = useState(null)
   const [showConfirmation, setShowConfirmation] = useState(false)
@@ -97,7 +97,7 @@ const RatingStars = ({ value = 0, onRate, readOnly = false, showValue = false, s
               )}
 
               <span className={`pointer-events-none absolute inset-0 flex items-center justify-center ${readOnly ? '' : 'p-1'}`}>
-                <motion.span
+                <m.span
                   className="relative inline-flex"
                   animate={{
                     scale: fill > 0 ? 1.04 : 1,
@@ -118,7 +118,7 @@ const RatingStars = ({ value = 0, onRate, readOnly = false, showValue = false, s
                       } ${isRecentlySelected ? 'drop-shadow-[0_0_8px_rgba(255,255,255,0.8)]' : ''}`}
                     />
                   </MotionSpan>
-                </motion.span>
+                </m.span>
               </span>
             </div>
           )
