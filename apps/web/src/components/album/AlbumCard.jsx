@@ -1,16 +1,17 @@
 import { memo } from 'react'
 import { motion } from 'framer-motion'
+import { FaStar } from 'react-icons/fa'
 import { useRatings } from '../../hooks/useRatings.js'
 import { formatReleaseDate } from '../../utils/helpers.js'
-import RatingStars from '../ui/RatingStars.jsx'
-import CoverImage from '../ui/CoverImage.jsx'
+import VinylSleeve from '../ui/VinylSleeve.jsx'
+
+const MotionArticle = motion.article
 
 const AlbumCard = ({ album, onSelect }) => {
-  const MotionArticle = motion.article
   const { getCommunityStats } = useRatings()
   const community = getCommunityStats(album)
   const genres = Array.isArray(album.genres) ? album.genres.filter(Boolean) : []
-  const genreLabel = genres.slice(0, 2).join(' • ')
+  const meta = [formatReleaseDate(album.releaseDate, album.releaseYear), genres[0]].filter(Boolean).join(', ')
 
   const handleNavigate = () => {
     onSelect?.(album.id)
@@ -19,9 +20,9 @@ const AlbumCard = ({ album, onSelect }) => {
   return (
     <MotionArticle
       layout
-      initial={{ opacity: 0, y: 30 }}
+      initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
-      whileHover={{ y: -6 }}
+      transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
       onClick={handleNavigate}
       onKeyDown={(event) => {
         if (event.key === 'Enter') handleNavigate()
@@ -29,48 +30,32 @@ const AlbumCard = ({ album, onSelect }) => {
       role={onSelect ? 'link' : undefined}
       tabIndex={onSelect ? 0 : undefined}
       aria-label={onSelect ? `Open ${album.name}` : undefined}
-      className="group relative flex cursor-pointer flex-col gap-4 rounded-3xl border border-outline bg-panel p-4 text-white transition hover:border-white/40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
+      className="group relative flex cursor-pointer flex-col gap-3 rounded-md text-paper focus-visible:outline-offset-4"
     >
-      <div className="relative aspect-square overflow-hidden rounded-2xl bg-black/40">
-        <CoverImage
-          src={album.cover}
-          alt={album.name}
-          width={320}
-          height={320}
-          sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
-          loading="lazy"
-          className="h-full w-full rounded-2xl object-contain p-2 transition duration-500 group-hover:scale-[1.02]"
-        />
-      </div>
+      <VinylSleeve
+        src={album.cover}
+        alt={album.name}
+        pull="up"
+        size={600}
+        sizes="(max-width: 768px) 50vw, (max-width: 1280px) 25vw, 18vw"
+      />
 
-      <div className="flex flex-col gap-1">
-        <h3 className="font-display text-xl">{album.name}</h3>
-        <p className="text-sm text-muted">{album.artists?.join(', ')}</p>
-        {genreLabel ? (
-          <p className="text-xs uppercase tracking-[0.22em] text-muted">{genreLabel}</p>
-        ) : null}
-        <p className="text-xs uppercase tracking-[0.22em] text-muted">
-          {formatReleaseDate(album.releaseDate, album.releaseYear)}
+      <div className="min-w-0">
+        <h3 className="truncate font-display text-[17px] leading-tight" title={album.name}>{album.name}</h3>
+        <p className="mt-0.5 truncate text-sm text-paper/65">{album.artists?.join(', ')}</p>
+        <p className="mt-1.5 flex items-center gap-2.5 text-xs text-muted">
+          {community.total > 0 && (
+            <span
+              className="inline-flex shrink-0 items-center gap-1 font-medium text-paper/85"
+              title={`${community.total.toLocaleString()} ratings`}
+            >
+              <FaStar aria-hidden="true" className="h-2.5 w-2.5" />
+              {community.average.toFixed(1)}
+              <span className="sr-only">average from {community.total.toLocaleString()} ratings</span>
+            </span>
+          )}
+          <span className="truncate">{meta}</span>
         </p>
-      </div>
-
-      <div className="flex items-end justify-between gap-4">
-        <div>
-          <p className="text-xs uppercase tracking-[0.4em] text-muted">Community</p>
-          <p className="text-xl font-semibold text-white tablet:text-2xl">
-            {community.average.toFixed(1)}
-          </p>
-          <p className="text-xs text-muted">
-            {community.total.toLocaleString()} ratings
-          </p>
-        </div>
-
-        <RatingStars
-          value={community.average}
-          readOnly
-          showValue={community.total > 0}
-          size="sm"
-        />
       </div>
     </MotionArticle>
   )
