@@ -69,23 +69,21 @@ const AlbumSlotMachine = ({ lists = [], userId }) => {
   }
 
   return (
-    <section className="relative isolate mt-14 overflow-hidden border-y border-outline/60 py-8 tablet:mt-16 tablet:py-10">
-      <div className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(circle_at_34%_50%,rgba(255,255,255,0.08),rgba(0,0,0,0)_30%),linear-gradient(90deg,rgba(255,255,255,0.035)_1px,transparent_1px)] bg-[length:auto,5rem_5rem]" />
-      <div className="pointer-events-none absolute inset-x-0 top-1/2 -z-10 h-px bg-gradient-to-r from-transparent via-white/18 to-transparent" />
+    <section className="relative isolate mt-24">
 
       <div className="mx-auto max-w-6xl">
-        <div className="mb-5 flex flex-col gap-2 tablet:mb-6 tablet:flex-row tablet:items-end tablet:justify-between">
+        <div className="mb-8 flex flex-wrap items-end justify-between gap-x-6 gap-y-3 border-b border-white/[0.07] pb-4">
           <div>
-            <p className="text-[0.65rem] font-bold uppercase tracking-[0.46em] text-muted">Your next listen</p>
-            <h2 className="mt-1 font-display text-3xl font-bold leading-none text-white tablet:text-5xl">
+            <h2 className="font-display text-3xl leading-none text-paper tablet:text-4xl">
               The Listening Wheel
             </h2>
+            <p className="mt-2 text-sm text-muted">Can&rsquo;t pick? Spin it and play what lands.</p>
           </div>
-          <button type="button" onClick={() => setEditing(!editing)} disabled={isSpinning} aria-expanded={editing} aria-controls="wheel-pool-editor" className="self-start rounded-full border border-outline px-4 py-2 text-xs font-semibold hover:bg-white/10 disabled:opacity-40">{editing ? 'Done editing' : 'Edit wheel'} · {safeAlbums.length} records</button>
+          <button type="button" onClick={() => setEditing(!editing)} disabled={isSpinning} aria-expanded={editing} aria-controls="wheel-pool-editor" className="rounded-full border border-white/12 px-4 py-2 text-sm text-paper/80 transition-colors hover:border-white/30 hover:text-paper disabled:opacity-40">{editing ? 'Done editing' : 'Edit wheel'} · {safeAlbums.length} records</button>
         </div>
 
-        <div className="grid items-center gap-5 overflow-hidden rounded-[2rem] border border-outline/70 bg-[linear-gradient(135deg,rgba(255,255,255,0.06),rgba(255,255,255,0.012)_42%,rgba(0,0,0,0.36))] p-4 shadow-[0_24px_90px_rgba(0,0,0,0.42)] tablet:grid-cols-[20rem_1fr] tablet:p-5 desktop:grid-cols-[24rem_1fr]">
-          <div className="relative h-[18.5rem] overflow-hidden rounded-[1.55rem] border border-white/10 bg-black/50 tablet:h-[20rem] desktop:h-[23rem]">
+        <div className="grid items-center gap-5 overflow-hidden rounded-3xl border border-white/[0.07] bg-white/[0.02] p-3 md:grid-cols-[20rem_1fr] desktop:grid-cols-[24rem_1fr]">
+          <div className="relative h-[18.5rem] overflow-hidden rounded-2xl bg-black/60 tablet:h-[20rem] desktop:h-[23rem]">
             <div className="absolute left-1/2 top-1/2 h-[14.25rem] w-[14.25rem] -translate-x-1/2 -translate-y-1/2 tablet:h-[15.75rem] tablet:w-[15.75rem] desktop:h-[18rem] desktop:w-[18rem]">
               <div className={`h-full w-full rounded-full border border-white/10 bg-[radial-gradient(circle,rgba(255,255,255,0.26)_0_1px,transparent_2px_10px,rgba(255,255,255,0.1)_11px_12px,transparent_13px_24px,rgba(255,255,255,0.07)_25px_26px,transparent_27px_40px),conic-gradient(from_22deg,rgba(255,255,255,0.12),rgba(255,255,255,0.015)_14%,rgba(255,255,255,0.1)_28%,rgba(0,0,0,0)_52%,rgba(255,255,255,0.08)_72%,rgba(0,0,0,0)_100%)] shadow-[inset_0_0_60px_rgba(255,255,255,0.05),inset_0_0_0_1px_rgba(255,255,255,0.05),0_28px_72px_rgba(0,0,0,0.55)] transition duration-500 `} />
             </div>
@@ -134,30 +132,30 @@ const AlbumSlotMachine = ({ lists = [], userId }) => {
               type="button"
               onClick={handleSpin}
               disabled={isSpinning || !safeAlbums.length}
-              className="absolute bottom-4 left-4 z-50 inline-flex items-center gap-2 rounded-full border border-white/15 bg-black/75 px-4 py-2.5 text-[0.62rem] font-bold uppercase tracking-[0.24em] text-white shadow-[0_16px_35px_rgba(0,0,0,0.45)] backdrop-blur transition hover:border-white/40 hover:bg-white hover:text-canvas disabled:cursor-wait disabled:opacity-60"
+              className="absolute bottom-4 left-4 z-50 inline-flex items-center gap-2 rounded-full bg-paper px-4 py-2 text-sm font-medium text-black shadow-[0_16px_35px_rgba(0,0,0,0.45)] transition-opacity hover:opacity-90 disabled:cursor-wait disabled:opacity-50"
               aria-label="Spin listening wheel"
             >
               <FiShuffle aria-hidden="true" />
               {isSpinning ? 'Picking' : 'Spin'}
             </button>
 
-            <div className="pointer-events-none absolute bottom-4 right-4 z-50 rounded-full border border-white/10 bg-black/55 px-3 py-2 text-[0.6rem] font-bold uppercase tracking-[0.22em] text-muted backdrop-blur">
-              <span className="text-white">{wheelSize}</span>
+            <div className="pointer-events-none absolute bottom-4 right-4 z-50 rounded-full border border-white/10 bg-black/55 px-3 py-1.5 text-xs text-muted backdrop-blur">
+              <span className="text-paper">{wheelSize}</span>
               <span className="mx-1">/</span>
               <span>{safeAlbums.length} shown</span>
             </div>
           </div>
 
-          <div className="relative flex min-h-[15rem] flex-col justify-end overflow-hidden rounded-[1.55rem] border border-white/10 bg-black/48 p-5 tablet:min-h-[20rem] tablet:p-7 desktop:min-h-[23rem]">
+          <div className="relative flex min-h-[15rem] flex-col justify-end overflow-hidden rounded-2xl bg-black/50 p-5 tablet:min-h-[20rem] tablet:p-7 desktop:min-h-[23rem]">
             <CoverImage
               src={currentAlbum?.cover}
               alt=""
-              className="absolute inset-0 block h-full w-full scale-110 object-cover opacity-[0.18] blur-2xl"
+              className="absolute inset-0 block h-full w-full scale-110 object-cover opacity-30 blur-3xl saturate-150"
             />
             <div className="absolute inset-0 bg-gradient-to-t from-black via-black/86 to-black/25" />
             <div className="relative" role="status" aria-live="polite" aria-atomic="true">
-              <p className="text-[0.65rem] font-bold uppercase tracking-[0.42em] text-muted">{isSpinning ? 'Finding your next listen…' : selectedAlbum ? 'Your next listen' : 'Leave it to chance'}</p>
-              <h3 className="mt-3 line-clamp-2 font-display text-3xl font-bold leading-[0.96] text-white tablet:text-5xl">
+              <p className="text-sm text-muted">{isSpinning ? 'Finding your next listen…' : selectedAlbum ? 'Your next listen' : 'Leave it to chance'}</p>
+              <h3 className="mt-3 line-clamp-2 font-display text-4xl leading-[0.96] text-paper tablet:text-6xl">
                 {isSpinning ? 'Let it spin.' : currentAlbum?.name ?? 'Build your wheel'}
               </h3>
               <p className="mt-3 line-clamp-1 text-sm text-muted tablet:text-base">{isSpinning ? 'Every record has an equal chance.' : artistName || 'Add a Musico list or choose albums below.'}</p>
@@ -167,7 +165,7 @@ const AlbumSlotMachine = ({ lists = [], userId }) => {
                   type="button"
                   onClick={handleOpenAlbum}
                   disabled={!currentAlbum?.id || isSpinning}
-                  className="inline-flex items-center gap-2 rounded-full border border-outline px-4 py-2.5 text-[0.65rem] uppercase tracking-[0.22em] text-muted transition hover:border-white/30 hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
+                  className="inline-flex items-center gap-2 rounded-full bg-paper px-4 py-2 text-sm font-medium text-black transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-30"
                 >
                   Open Album
                   <FiArrowRight aria-hidden="true" />
