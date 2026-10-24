@@ -6,6 +6,7 @@ import {
   ensureAuthenticated,
   getCanonicalAlbumMetadata,
   recordActivity,
+  userImageSql,
 } from '../core/utils'
 import { MAX_REVIEW_LENGTH } from '../core/constants'
 import { isRecord, readBoundedText, readIdentifier } from './validation'
@@ -130,7 +131,7 @@ export const reviewRoutes = new Elysia()
         content: userReview.content,
         updatedAt: userReview.updatedAt,
         userName: user.name,
-        userImage: user.image,
+        userImage: userImageSql(),
       })
       .from(userReview)
       .innerJoin(user, eq(user.id, userReview.userId))

@@ -2,7 +2,7 @@ import { Elysia } from 'elysia'
 import { desc, eq, inArray } from 'drizzle-orm'
 import { db } from '../core/db'
 import { activity, user, userFollow } from '../core/schema'
-import { ensureAuthenticated } from '../core/utils'
+import { ensureAuthenticated, userImageSql } from '../core/utils'
 
 type FeedRow = {
   id: string
@@ -63,7 +63,7 @@ export const activityRoutes = new Elysia()
         metadata: activity.metadata,
         createdAt: activity.createdAt,
         userName: user.name,
-        userImage: user.image,
+        userImage: userImageSql(),
       })
       .from(activity)
       .innerJoin(user, eq(user.id, activity.userId))
@@ -75,7 +75,7 @@ export const activityRoutes = new Elysia()
       .map((item) => item.targetUserId)
       .filter((id): id is string => Boolean(id)))]
     const targetUsers = targetUserIds.length
-      ? await db.select({ id: user.id, name: user.name, image: user.image })
+      ? await db.select({ id: user.id, name: user.name, image: userImageSql() })
         .from(user)
         .where(inArray(user.id, targetUserIds))
       : []

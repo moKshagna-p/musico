@@ -17,6 +17,7 @@ import {
   isAdminIdentity,
   isMissingAdminTableError,
   recordActivity,
+  userImageSql,
 } from '../core/utils'
 import { readBoundedText, readIdentifier } from './validation'
 
@@ -52,7 +53,7 @@ export const adminRoutes = new Elysia({ prefix: '/api/admin' })
               id: user.id,
               name: user.name,
               email: user.email,
-              image: user.image,
+              image: userImageSql(),
               createdAt: user.createdAt,
             })
             .from(user)
@@ -69,7 +70,7 @@ export const adminRoutes = new Elysia({ prefix: '/api/admin' })
               id: user.id,
               name: user.name,
               email: user.email,
-              image: user.image,
+              image: userImageSql(),
               createdAt: user.createdAt,
             })
             .from(user)
@@ -92,7 +93,7 @@ export const adminRoutes = new Elysia({ prefix: '/api/admin' })
               id: user.id,
               name: user.name,
               email: user.email,
-              image: user.image,
+              image: userImageSql(),
               createdAt: user.createdAt,
             })
             .from(user)
@@ -165,7 +166,7 @@ export const adminRoutes = new Elysia({ prefix: '/api/admin' })
             id: user.id,
             name: user.name,
             email: user.email,
-            image: user.image,
+            image: userImageSql(),
             createdAt: user.createdAt,
           })
           .from(user)
@@ -218,7 +219,7 @@ export const adminRoutes = new Elysia({ prefix: '/api/admin' })
         id: user.id,
         name: user.name,
         email: user.email,
-        image: user.image,
+        image: userImageSql(),
         createdAt: user.createdAt,
       })
       .from(user)
@@ -324,7 +325,7 @@ export const adminRoutes = new Elysia({ prefix: '/api/admin' })
             content: userReview.content,
             updatedAt: userReview.updatedAt,
             userName: user.name,
-            userImage: user.image,
+            userImage: userImageSql(),
           })
           .from(userReview)
           .innerJoin(user, eq(user.id, userReview.userId))
@@ -423,7 +424,7 @@ export const adminRoutes = new Elysia({ prefix: '/api/admin' })
         createdAt: userReview.createdAt,
         updatedAt: userReview.updatedAt,
         userName: user.name,
-        userImage: user.image,
+        userImage: userImageSql(),
       })
       .from(userReview)
       .innerJoin(user, eq(user.id, userReview.userId))

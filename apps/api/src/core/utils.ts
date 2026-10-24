@@ -1,3 +1,5 @@
+import { Buffer } from 'node:buffer'
+import { createHash } from 'node:crypto'
 import { sql, eq, inArray } from 'drizzle-orm'
 import { db } from './db'
 import { auth } from '../auth'
@@ -7,6 +9,7 @@ import {
   activity,
   adminUser,
   releaseCache,
+  user,
   userProfile,
   userRating,
 } from './schema'
@@ -135,6 +138,29 @@ export const parseProfileImage = (value: unknown) => {
   } catch {
     return null
   }
+}
+
+// Uploaded avatars are stored inline as data URLs (up to ~2MB). Responses link to /api/avatars/:userId instead,
+// versioned by a content hash, so payloads stay small and browsers cache each avatar indefinitely.
+const avatarBaseUrl = () => `${env.BETTER_AUTH_URL.replace(/\/$/, '')}/api/avatars/`
+export const avatarUrl = (userId: string) => `${avatarBaseUrl()}${userId}`
+const AVATAR_VERSION_LENGTH = 12
+
+export const publicUserImage = (userId: string, image: string | null | undefined) =>
+  image?.startsWith('data:')
+    ? `${avatarUrl(userId)}?v=${createHash('md5').update(image).digest('hex').slice(0, AVATAR_VERSION_LENGTH)}`
+    : image ?? null
+
+// Same URL as publicUserImage, computed in SQL so the inline image never leaves the database.
+export const userImageSql = () =>
+  sql<string | null>`case when ${user.image} like 'data:%' then ${avatarBaseUrl()} || ${user.id} || '?v=' || left(md5(${user.image}), ${AVATAR_VERSION_LENGTH}) else ${user.image} end`
+
+// Raster types only: an SVG served from the API origin could carry script.
+const AVATAR_DATA_URL = /^data:(image\/(?:png|jpeg|webp|gif|avif));base64,([a-z0-9+/=]+)$/i
+
+export const decodeAvatar = (image: string | null | undefined) => {
+  const match = image?.match(AVATAR_DATA_URL)
+  return match ? { contentType: match[1].toLowerCase(), bytes: Buffer.from(match[2], 'base64') } : null
 }
 
 export const normalizeAlbumId = (value: unknown) => String(value ?? '').trim()
