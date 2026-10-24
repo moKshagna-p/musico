@@ -5,8 +5,9 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 import FollowButton from '../components/user/FollowButton.jsx'
 import PageTransition from '../components/ui/PageTransition.jsx'
 import { ProfilePageSkeleton } from '../components/ui/PageLoadingState.jsx'
-import RatingStars from '../components/ui/RatingStars.jsx'
-import CoverImage from '../components/ui/CoverImage.jsx'
+import SectionHeading from '../components/ui/SectionHeading.jsx'
+import AlbumTile from '../components/album/AlbumTile.jsx'
+import ListCard from '../components/list/ListCard.jsx'
 import { useAuth } from '../hooks/useAuth.js'
 import { fetchUserProfile } from '../services/socialService.js'
 
@@ -63,12 +64,12 @@ const UserProfile = () => {
     return (
       <PageTransition>
         <div className="mx-auto max-w-5xl py-16 text-center">
-          <h1 className="font-display text-3xl font-bold">User Not Found</h1>
+          <h1 className="font-display text-5xl text-paper">User not found</h1>
           <p className="mt-3 text-muted">{error ?? "This user doesn't exist."}</p>
           <button
             type="button"
             onClick={() => navigate('/feed')}
-            className="mt-6 rounded-full border border-outline px-5 py-2 text-xs uppercase tracking-[0.2em] text-muted hover:text-white"
+            className="mt-6 rounded-full border border-white/15 px-5 py-2 text-sm text-paper transition-colors hover:bg-white/[0.06]"
           >
             Back to Feed
           </button>
@@ -85,80 +86,67 @@ const UserProfile = () => {
         <button
           type="button"
           onClick={() => navigate(-1)}
-          className="inline-flex items-center gap-2 text-xs uppercase tracking-[0.28em] text-muted hover:text-white"
+          className="inline-flex items-center gap-2 rounded-full py-1 pr-3 text-sm text-muted transition-colors hover:text-paper"
         >
-          <FiArrowLeft /> Back
+          <FiArrowLeft aria-hidden="true" /> Back
         </button>
 
-        <header className="py-8 text-center tablet:py-14">
-          {profile.image ? (
-            <img src={profile.image} alt="" className="mx-auto mb-6 h-20 w-20 rounded-full object-cover ring-1 ring-white/10" />
-          ) : (
-            <div className="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-outline/60 text-3xl font-bold text-muted ring-1 ring-white/10">
-              {profile.name?.charAt(0)?.toUpperCase() ?? '?'}
-            </div>
-          )}
-
-          <h1 className="mx-auto max-w-4xl break-words font-display text-4xl font-bold leading-tight tablet:text-7xl">
-            {profile.name}
-          </h1>
-          <p className="mt-2 text-lg text-muted">@{profile.username}</p>
-
-          {profile.bio && <p className="mx-auto mt-4 max-w-md text-sm text-white/70">{profile.bio}</p>}
-
-          <div className="mt-6 flex items-center justify-center gap-8 text-sm">
-            <div>
-              <span className="font-semibold tabular-nums text-white">{profile.followerCount}</span>
-              <span className="ml-1 text-muted">followers</span>
-            </div>
-            <div>
-              <span className="font-semibold tabular-nums text-white">{profile.followingCount}</span>
-              <span className="ml-1 text-muted">following</span>
+        <header className="mt-8 flex flex-col gap-8 border-b border-white/[0.07] pb-10 md:flex-row md:items-end md:justify-between">
+          <div className="flex min-w-0 flex-col gap-6 sm:flex-row sm:items-end">
+            {profile.image ? (
+              <img src={profile.image} alt="" className="h-24 w-24 shrink-0 rounded-full object-cover ring-1 ring-white/10 tablet:h-32 tablet:w-32" />
+            ) : (
+              <div className="vinyl relative flex h-24 w-24 shrink-0 items-center justify-center tablet:h-32 tablet:w-32">
+                <span className="relative flex h-[40%] w-[40%] items-center justify-center rounded-full bg-paper font-display text-2xl text-black">
+                  {profile.name?.charAt(0)?.toUpperCase() ?? '?'}
+                </span>
+              </div>
+            )}
+            <div className="min-w-0">
+              <h1 className="break-words font-display text-5xl leading-[0.95] text-paper tablet:text-7xl">
+                {profile.name}
+              </h1>
+              <p className="mt-3 text-sm text-muted">@{profile.username}</p>
+              {profile.bio && <p className="mt-3 max-w-md text-paper/75">{profile.bio}</p>}
+              <div className="mt-4 flex items-center gap-5 text-sm text-muted">
+                <span><span className="font-medium text-paper">{profile.followerCount}</span> followers</span>
+                <span><span className="font-medium text-paper">{profile.followingCount}</span> following</span>
+              </div>
             </div>
           </div>
 
           {!isOwnProfile && user && (
-            <div className="mt-6 flex items-center justify-center gap-3">
-              <FollowButton username={profile.username} initialFollowing={profile.isFollowing} />
-            </div>
+            <FollowButton username={profile.username} initialFollowing={profile.isFollowing} />
           )}
         </header>
 
         {profile.isPrivate ? (
-          <div className="mx-auto max-w-md rounded-2xl border border-outline/40 bg-panel/30 px-8 py-12 text-center">
-            <h2 className="font-display text-xl font-bold">This account is private</h2>
+          <div className="mx-auto mt-14 max-w-md rounded-3xl border border-dashed border-white/10 px-8 py-12 text-center">
+            <h2 className="font-display text-3xl text-paper">This account is private</h2>
             <p className="mt-3 text-sm text-muted/70">You can still follow this user, but their music activity is hidden.</p>
           </div>
         ) : (
-          <section className="space-y-10">
+          <section className="mt-14 space-y-24">
             {ratedAlbumDetails.length > 0 && (
               <div>
-                <h2 className="mb-8 text-center font-display text-3xl font-bold tablet:text-4xl">Recently Rated</h2>
-                <div className="grid grid-cols-1 gap-4 tablet:grid-cols-2 laptop:grid-cols-3">
+                <div className="mb-10"><SectionHeading title="Recently Rated" /></div>
+                <div className="grid grid-cols-2 gap-x-5 gap-y-10 md:grid-cols-3 lg:grid-cols-4 tablet:gap-x-8 tablet:gap-y-14">
                   {displayedRatings.map((album) => (
-                    <Link to={`/album/${album.albumId}`} key={album.albumId}>
-                      <div className="group relative overflow-hidden rounded-lg">
-                        <CoverImage src={album.cover} alt={album.name} className="aspect-square w-full object-cover transition-transform duration-300 group-hover:scale-[1.03]" />
-                        <div className="absolute inset-0 bg-black/50 opacity-0 transition-opacity duration-300 group-hover:opacity-100">
-                          <div className="flex h-full items-center justify-center text-center">
-                            <div>
-                              <h3 className="font-bold text-white">{album.name}</h3>
-                              <p className="text-white">{album.artist ?? album.artists?.[0] ?? 'Unknown artist'}</p>
-                              <div className="mt-2 flex justify-center">
-                                <RatingStars value={Number(album.rating ?? 0)} readOnly size="sm" align="left" />
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </Link>
+                    <AlbumTile
+                      key={album.albumId}
+                      to={`/album/${album.albumId}`}
+                      cover={album.cover}
+                      name={album.name}
+                      artist={album.artist ?? album.artists?.[0]}
+                      rating={Number(album.rating ?? 0)}
+                    />
                   ))}
                 </div>
                 {hasMoreRatings && (
-                  <div className="mt-6 text-center">
+                  <div className="mt-10 text-center">
                     <Link
                       to={`/${profile.username}/history`}
-                      className="inline-block rounded-full border border-outline px-6 py-2 text-xs uppercase tracking-[0.2em] text-muted transition hover:text-white hover:border-white"
+                      className="inline-block rounded-full border border-white/15 px-6 py-3 text-sm text-paper transition hover:border-white/35 hover:bg-white/[0.06]"
                     >
                       View All {ratedAlbumDetails.length} Ratings
                     </Link>
@@ -169,17 +157,10 @@ const UserProfile = () => {
 
             {profile.lists?.length > 0 && (
               <div>
-                <h2 className="mb-8 text-center font-display text-3xl font-bold tablet:text-4xl">Lists</h2>
-                <div className="grid grid-cols-1 gap-6 tablet:grid-cols-2">
+                <div className="mb-10"><SectionHeading title="Lists" /></div>
+                <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
                   {profile.lists.map((list) => (
-                    <Link key={list.id} to={`/lists/${list.id}`} className="rounded-lg border border-outline p-4 transition hover:border-outline/80">
-                      <h3 className="text-lg font-bold">{list.name}</h3>
-                      <div className="mt-4 grid grid-cols-3 gap-2">
-                        {list.albums.slice(0, 6).map((album) => (
-                          <CoverImage key={album.id} src={album.cover} alt={album.name} className="aspect-square w-full rounded-md object-cover" />
-                        ))}
-                      </div>
-                    </Link>
+                    <ListCard key={list.id} list={list} />
                   ))}
                 </div>
               </div>

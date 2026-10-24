@@ -71,10 +71,10 @@ const UserSearchPanel = () => {
     <div className="relative">
       {/* Search Input */}
       <div
-        className={`flex items-center gap-3 rounded-2xl border px-4 py-3 transition-all duration-300 ${
+        className={`flex items-center gap-3 rounded-full border px-5 py-3 transition-all duration-300 ${
           focused
-            ? 'border-white/25 bg-white/[0.04] shadow-[0_0_20px_rgba(255,255,255,0.03)]'
-            : 'border-outline/60 bg-panel/30'
+            ? 'border-white/30 bg-white/[0.06] shadow-[0_0_0_6px_rgba(238,234,227,0.05)]'
+            : 'border-white/10 bg-white/[0.03]'
         }`}
       >
         <FiSearch
@@ -91,7 +91,7 @@ const UserSearchPanel = () => {
           onChange={handleChange}
           onFocus={() => setFocused(true)}
           onBlur={() => setFocused(false)}
-          placeholder="Search for people to follow\u2026"
+          placeholder="Search for people to follow…"
           aria-label="Search for users"
           spellCheck={false}
           autoComplete="off"
@@ -117,7 +117,7 @@ const UserSearchPanel = () => {
             animate={{ opacity: 1, y: 0 }}
             exit={shouldReduceMotion ? { opacity: 0 } : { opacity: 0, y: -4 }}
             transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
-            className="mt-3 overflow-hidden rounded-2xl border border-outline/60 bg-panel/60 backdrop-blur-sm"
+            className="mt-3 overflow-hidden rounded-3xl border border-white/10 bg-white/[0.02] backdrop-blur-sm"
             role="region"
             aria-label="Search results"
             aria-live="polite"
@@ -213,7 +213,7 @@ const EmptyFeed = ({ navigate }) => {
       initial={shouldReduceMotion ? false : { opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
-      className="mt-4 overflow-hidden rounded-2xl border border-outline/40"
+      className="mt-4 overflow-hidden rounded-3xl border border-white/[0.07]"
     >
       {/* Decorative header band */}
       <div className="relative overflow-hidden bg-gradient-to-br from-white/[0.03] to-transparent px-8 pb-2 pt-10">
@@ -225,8 +225,8 @@ const EmptyFeed = ({ navigate }) => {
             <FiMusic className="h-6 w-6 text-white/50" aria-hidden="true" />
           </div>
           <div>
-            <h2 className="font-display text-xl font-bold text-white" style={{ textWrap: 'balance' }}>
-              Your Feed Is Quiet
+            <h2 className="font-display text-3xl leading-none text-paper">
+              Your feed is quiet
             </h2>
             <p className="mt-0.5 text-sm text-muted/70">
               Follow music lovers to see what they&rsquo;re listening to
@@ -258,7 +258,7 @@ const EmptyFeed = ({ navigate }) => {
         <button
           type="button"
           onClick={() => navigate('/discover')}
-          className="inline-flex items-center gap-2 rounded-full bg-white px-5 py-2.5 text-xs font-semibold uppercase tracking-[0.2em] text-canvas transition-all hover:opacity-90 hover:shadow-[0_0_20px_rgba(255,255,255,0.1)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
+          className="inline-flex items-center gap-2 rounded-full bg-paper px-5 py-2.5 text-sm font-medium text-black transition-opacity hover:opacity-90"
         >
           <FiUsers className="h-3.5 w-3.5" aria-hidden="true" />
           Discover Music
@@ -271,7 +271,7 @@ const EmptyFeed = ({ navigate }) => {
 const Step = ({ number, title, description }) => (
   <div className="flex items-start gap-4 py-3">
     <span
-      className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-white/[0.06] font-display text-xs font-bold text-white/50 ring-1 ring-white/10"
+      className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full font-display text-lg text-paper/50 ring-1 ring-white/10"
       aria-hidden="true"
     >
       {number}
@@ -286,7 +286,7 @@ const Step = ({ number, title, description }) => (
 // ── Feed Skeleton ──
 
 const FeedSkeleton = () => (
-  <div className="mt-6 space-y-3" aria-label="Loading feed\u2026" role="status">
+  <div className="mt-6 space-y-3" aria-label="Loading feed…" role="status">
     {Array.from({ length: 5 }).map((_, i) => (
       <div
         key={i}
@@ -331,11 +331,11 @@ const Feed = () => {
         {/* Header */}
         <header className="flex items-end justify-between pb-8 pt-4 tablet:pb-10 tablet:pt-6">
           <div>
-            <h1 className="font-display text-3xl font-bold tracking-tight tablet:text-5xl" style={{ textWrap: 'balance' }}>
+            <h1 className="font-display text-6xl leading-none text-paper tablet:text-7xl">
               Feed
             </h1>
-            <p className="mt-2 text-sm text-muted/70">
-              See what your people are listening to
+            <p className="mt-3 text-muted">
+              What the people you follow are rating, reviewing, and saving.
             </p>
           </div>
           <button
@@ -343,7 +343,7 @@ const Feed = () => {
             onClick={refresh}
             disabled={loading}
             aria-label="Refresh feed"
-            className="group inline-flex items-center gap-2 rounded-full border border-outline/60 px-4 py-2 text-[0.65rem] uppercase tracking-[0.2em] text-muted transition-all hover:border-white/20 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas disabled:opacity-40"
+            className="group inline-flex shrink-0 items-center gap-2 rounded-full border border-white/12 px-4 py-2 text-sm text-paper/80 transition-colors hover:border-white/30 hover:text-paper disabled:opacity-40"
           >
             <FiRefreshCw
               className={`h-3.5 w-3.5 transition-transform ${loading ? 'animate-spin' : 'group-hover:rotate-45'}`}
@@ -366,14 +366,14 @@ const Feed = () => {
             <Motion.div
               initial={shouldReduceMotion ? false : { opacity: 0 }}
               animate={{ opacity: 1 }}
-              className="rounded-2xl border border-outline/40 bg-panel/30 p-8 text-center"
+              className="rounded-3xl border border-white/[0.07] p-8 text-center"
               role="alert"
             >
               <p className="text-sm text-muted/70">{error}</p>
               <button
                 type="button"
                 onClick={refresh}
-                className="mt-4 rounded-full border border-outline/60 px-5 py-2 text-xs uppercase tracking-[0.2em] text-muted transition-colors hover:border-white/20 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
+                className="mt-4 rounded-full border border-white/15 px-5 py-2 text-sm text-paper transition-colors hover:bg-white/[0.06]"
               >
                 Try Again
               </button>
@@ -381,7 +381,7 @@ const Feed = () => {
           ) : items.length === 0 ? (
             <EmptyFeed navigate={navigate} />
           ) : (
-            <div className="space-y-3">
+            <div className="divide-y divide-white/[0.06] border-y border-white/[0.06]">
               <AnimatePresence mode="popLayout">
                 {items.map((item, i) => (
                   <Motion.div
@@ -408,7 +408,7 @@ const Feed = () => {
                   disabled={loadingMore}
                   initial={shouldReduceMotion ? false : { opacity: 0 }}
                   animate={{ opacity: 1 }}
-                  className="w-full rounded-2xl border border-outline/40 py-4 text-xs uppercase tracking-[0.2em] text-muted/60 transition-all hover:border-white/20 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas disabled:opacity-40"
+                  className="w-full rounded-full border border-white/10 py-3.5 text-sm text-muted transition-colors hover:border-white/25 hover:text-paper disabled:opacity-40"
                 >
                   {loadingMore ? (
                     <span className="inline-flex items-center gap-2">
