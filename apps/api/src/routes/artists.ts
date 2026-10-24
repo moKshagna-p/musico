@@ -10,7 +10,12 @@ export const artistRoutes = new Elysia({ prefix: '/api' })
     set.headers['Cache-Control'] = result
       ? 'public, max-age=86400, s-maxage=604800'
       : 'public, max-age=3600, s-maxage=21600'
-    return { image: result?.image ?? null, source: result?.source ?? null, kind: result?.kind ?? null }
+    return {
+      image: result?.image ?? null,
+      source: result?.source ?? null,
+      kind: result?.kind ?? null,
+      video: result?.video ?? null,
+    }
   }, {
     query: t.Object({ name: t.String({ minLength: 1, maxLength: 200 }) }),
   })

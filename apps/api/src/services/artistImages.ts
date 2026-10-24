@@ -1,15 +1,25 @@
-// Artist photos for album heroes. Apple Music has the best editorial shots but
-// no public image API, so we read the og:image off the artist's public page.
-// Deezer's open API is the fallback.
+// Artist photos for album heroes. Apple Music has the best editorial shots and
+// motion heroes but no public image API, so we read the artist's public page.
+// fanart.tv (with an API key) fills in wide backgrounds, and Deezer's open API
+// is the last resort.
+
+import { env } from '../core/env'
 
 // `editorial` art is a wide, art-directed hero; `portrait` is a plain artist photo.
-export type ArtistImage = { image: string; source: 'apple' | 'deezer'; kind: 'editorial' | 'portrait' }
+// `video` is Apple's looping HLS motion hero, when the artist has one.
+export type ArtistImage = {
+  image: string
+  source: 'apple' | 'fanart' | 'deezer'
+  kind: 'editorial' | 'portrait'
+  video: string | null
+}
 
 type Fetcher = (input: string, init?: RequestInit) => Promise<Response>
 
 const CACHE_TTL_MS = 1000 * 60 * 60 * 24
 const CACHE_MAX_ENTRIES = 2000
 const REQUEST_TIMEOUT_MS = 4000
+const MUSICBRAINZ_UA = 'musico/1.0 ( https://musico-web.vercel.app )'
 const BROWSER_UA = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36'
 
 // ponytail: per-isolate memory cache; edge Cache-Control on the route does the heavy lifting. Move to Postgres if hit rate is poor.
@@ -52,17 +62,24 @@ export const resolveAppleTemplate = (artwork: AppleArtwork | undefined, maxWidth
   return url.replace('{w}x{h}{c}.{f}', `${outWidth}x${outHeight}bb.webp`)
 }
 
-// Prefers art-directed heroes: editorial banners, then motion-hero stills.
+const APPLE_MOTION_VIDEO = /^https:\/\/mvod\.itunes\.apple\.com\/itunes-assets\/.+\.m3u8$/i
+
+// Prefers art-directed heroes: motion heroes (still plus video), then editorial banners.
 export const pickEditorialArtwork = (pageData: unknown) => {
+  const motions = findAllByKey(pageData, 'motionArtistFullscreen16x9')
+    .map((value) => value as { previewFrame?: AppleArtwork; video?: unknown })
+    .map(({ previewFrame, video }) => ({
+      artwork: previewFrame,
+      video: typeof video === 'string' && APPLE_MOTION_VIDEO.test(video) ? video : null,
+    }))
   const banners = findAllByKey(pageData, 'wideArtwork')
     .map((value) => (value as { dictionary?: AppleArtwork }).dictionary)
     .filter((artwork) => typeof artwork?.url === 'string' && /\/thumb\/Features/i.test(artwork.url))
-  const motionStills = findAllByKey(pageData, 'motionArtistFullscreen16x9')
-    .map((value) => (value as { previewFrame?: AppleArtwork }).previewFrame)
+    .map((artwork) => ({ artwork, video: null }))
 
-  for (const artwork of [...banners, ...motionStills]) {
+  for (const { artwork, video } of [...motions, ...banners]) {
     const image = resolveAppleTemplate(artwork)
-    if (image) return image
+    if (image) return { image, video }
   }
   return null
 }
@@ -73,7 +90,9 @@ export const appleArtworkUrl = (ogImage: string, size = 1800) => {
   return ogImage.replace(/\/\d+x\d+[a-z]*\.(?:png|jpe?g|webp)$/i, `/${size}x${size}bb.webp`)
 }
 
-const findOnApple = async (name: string, fetcher: Fetcher): Promise<ArtistImage | null> => {
+type AppleArt = { wide: ArtistImage | null; portrait: ArtistImage | null }
+
+const findOnApple = async (name: string, fetcher: Fetcher): Promise<AppleArt | null> => {
   const searchUrl = `https://itunes.apple.com/search?term=${encodeURIComponent(name)}&entity=musicArtist&limit=5`
   const searchResponse = await fetchWithTimeout(fetcher, searchUrl)
   if (!searchResponse.ok) return null
@@ -86,11 +105,12 @@ const findOnApple = async (name: string, fetcher: Fetcher): Promise<ArtistImage 
   if (!pageResponse.ok) return null
   const html = await pageResponse.text()
 
+  let wide: ArtistImage | null = null
   const serialized = html.match(/<script[^>]+id=["']serialized-server-data["'][^>]*>([\s\S]*?)<\/script>/i)?.[1]
   if (serialized) {
     try {
       const editorial = pickEditorialArtwork(JSON.parse(serialized))
-      if (editorial) return { image: editorial, source: 'apple', kind: 'editorial' }
+      if (editorial) wide = { ...editorial, source: 'apple', kind: 'editorial' }
     } catch {
       // Apple changed the page payload; the og:image below still works.
     }
@@ -98,7 +118,29 @@ const findOnApple = async (name: string, fetcher: Fetcher): Promise<ArtistImage 
 
   const ogImage = html.match(/<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i)?.[1]
   const image = ogImage ? appleArtworkUrl(ogImage) : null
-  return image ? { image, source: 'apple', kind: 'portrait' } : null
+  return { wide, portrait: image ? { image, source: 'apple', kind: 'portrait', video: null } : null }
+}
+
+// fanart.tv keys artists by MusicBrainz id and has 1920x1080 backgrounds for many smaller artists.
+const findOnFanart = async (name: string, fetcher: Fetcher, apiKey?: string): Promise<ArtistImage | null> => {
+  if (!apiKey) return null
+  const query = encodeURIComponent(`artist:"${name.replace(/"/g, '')}"`)
+  const search = await fetchWithTimeout(fetcher, `https://musicbrainz.org/ws/2/artist/?query=${query}&fmt=json&limit=5`, {
+    headers: { 'User-Agent': MUSICBRAINZ_UA, Accept: 'application/json' },
+  })
+  if (!search.ok) return null
+  const { artists = [] } = (await search.json()) as { artists?: Array<{ id?: string; name?: string }> }
+  const mbid = pickByName(artists, name, (item) => item.name)?.id
+  if (!mbid || !/^[0-9a-f-]{36}$/i.test(mbid)) return null
+
+  const response = await fetchWithTimeout(fetcher, `https://webservice.fanart.tv/v3/music/${mbid}?api_key=${encodeURIComponent(apiKey)}`)
+  if (!response.ok) return null
+  const { artistbackground = [] } = (await response.json()) as { artistbackground?: Array<{ url?: string; likes?: string }> }
+  const url = [...artistbackground]
+    .sort((a, b) => Number(b.likes ?? 0) - Number(a.likes ?? 0))
+    .map((background) => String(background.url ?? '').replace(/^http:\/\//, 'https://'))
+    .find((candidate) => candidate.startsWith('https://assets.fanart.tv/'))
+  return url ? { image: url, source: 'fanart', kind: 'editorial', video: null } : null
 }
 
 const findOnDeezer = async (name: string, fetcher: Fetcher): Promise<ArtistImage | null> => {
@@ -109,10 +151,23 @@ const findOnDeezer = async (name: string, fetcher: Fetcher): Promise<ArtistImage
   const image = artist?.picture_xl
   // Deezer serves a blank silhouette at /images/artist//... for artists without a photo.
   if (!image?.startsWith('https://') || image.includes('/images/artist//')) return null
-  return { image, source: 'deezer', kind: 'portrait' }
+  return { image, source: 'deezer', kind: 'portrait', video: null }
 }
 
-export const findArtistImage = async (rawName: string, fetcher: Fetcher = fetch): Promise<ArtistImage | null> => {
+const attempt = async <T>(source: string, name: string, lookup: () => Promise<T | null>) => {
+  try {
+    return await lookup()
+  } catch (error) {
+    console.warn('[artist-image] source failed', { source, name, error: error instanceof Error ? error.message : String(error) })
+    return null
+  }
+}
+
+export const findArtistImage = async (
+  rawName: string,
+  fetcher: Fetcher = fetch,
+  fanartKey: string | undefined = env.FANART_API_KEY,
+): Promise<ArtistImage | null> => {
   const name = rawName.trim()
   const key = normalizeName(name)
   if (!key) return null
@@ -120,15 +175,13 @@ export const findArtistImage = async (rawName: string, fetcher: Fetcher = fetch)
   const cached = cache.get(key)
   if (cached && cached.expiresAt > Date.now()) return cached.value
 
-  let value: ArtistImage | null = null
-  for (const source of [findOnApple, findOnDeezer]) {
-    try {
-      value = await source(name, fetcher)
-    } catch (error) {
-      console.warn('[artist-image] source failed', { name, error: error instanceof Error ? error.message : String(error) })
-    }
-    if (value) break
-  }
+  // Wide art beats a square photo, whichever source it comes from.
+  const apple = await attempt('apple', name, () => findOnApple(name, fetcher))
+  const value =
+    apple?.wide ??
+    (await attempt('fanart', name, () => findOnFanart(name, fetcher, fanartKey))) ??
+    apple?.portrait ??
+    (await attempt('deezer', name, () => findOnDeezer(name, fetcher)))
 
   if (cache.size >= CACHE_MAX_ENTRIES) cache.delete(cache.keys().next().value as string)
   cache.set(key, { value, expiresAt: Date.now() + CACHE_TTL_MS })
