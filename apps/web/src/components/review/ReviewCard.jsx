@@ -8,14 +8,14 @@ const ReviewCard = ({ review }) => {
   const username = reviewer?.username
 
   return (
-    <div className="rounded-xl border border-outline/60 bg-panel/30 p-4">
+    <article className="border-b border-white/[0.07] py-6">
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-center gap-3">
-          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-outline/60 text-xs font-bold text-muted">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-sm font-semibold text-paper/70 ring-1 ring-white/10">
             {displayName.charAt(0).toUpperCase()}
           </div>
           <div>
-            <span className="text-sm font-semibold text-white">{displayName}</span>
+            <span className="text-sm font-medium text-paper">{displayName}</span>
             {username && (
               <span className="ml-1.5 text-xs text-muted">@{username}</span>
             )}
@@ -27,9 +27,9 @@ const ReviewCard = ({ review }) => {
         )}
       </div>
 
-      <p className="mt-3 text-sm leading-relaxed text-white/80">{content}</p>
-      {timeAgo && <p className="mt-2 text-xs text-muted">{timeAgo}</p>}
-    </div>
+      <p className="mt-4 text-[17px] leading-relaxed text-paper/90">{content}</p>
+      {timeAgo && <p className="mt-3 text-xs text-muted">{timeAgo}</p>}
+    </article>
   )
 }
 

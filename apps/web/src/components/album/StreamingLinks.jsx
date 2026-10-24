@@ -1,4 +1,4 @@
-import { FiExternalLink } from 'react-icons/fi'
+import { FiArrowUpRight } from 'react-icons/fi'
 
 const platforms = [
   { key: 'spotify', label: 'Spotify' },
@@ -9,7 +9,8 @@ const platforms = [
 
 const StreamingLinks = ({ links = {} }) => {
   return (
-    <div className="grid gap-2 tablet:grid-cols-2">
+    <div className="flex flex-wrap items-center gap-2">
+      <span className="mr-2 text-sm text-muted">Listen on</span>
       {platforms.map((platform) => {
         const href = links[platform.key]
         if (!href) {
@@ -17,10 +18,9 @@ const StreamingLinks = ({ links = {} }) => {
             <span
               key={platform.key}
               aria-disabled="true"
-              className="flex items-center justify-between rounded-xl border border-outline/80 px-4 py-3 text-xs uppercase tracking-[0.24em] text-muted/70"
+              className="rounded-full border border-white/[0.06] px-4 py-2 text-[13px] text-muted/60"
             >
               {platform.label}
-              <FiExternalLink aria-hidden="true" />
             </span>
           )
         }
@@ -31,10 +31,10 @@ const StreamingLinks = ({ links = {} }) => {
             href={href}
             target="_blank"
             rel="noreferrer"
-            className="group flex items-center justify-between rounded-xl border border-outline px-4 py-3 text-xs uppercase tracking-[0.24em] text-white transition-colors duration-200 hover:border-white/35 hover:bg-white/[0.03] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
+            className="group inline-flex items-center gap-1.5 rounded-full border border-white/15 bg-white/[0.03] px-4 py-2 text-[13px] text-paper backdrop-blur-sm transition-colors duration-200 hover:border-white/35 hover:bg-white/[0.08]"
           >
             {platform.label}
-            <FiExternalLink aria-hidden="true" className="transition-transform duration-200 group-hover:translate-x-0.5" />
+            <FiArrowUpRight aria-hidden="true" className="text-muted transition-transform duration-200 group-hover:-translate-y-0.5 group-hover:translate-x-0.5 group-hover:text-paper" />
           </a>
         )
       })}
