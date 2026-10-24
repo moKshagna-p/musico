@@ -249,6 +249,10 @@ export const installApiMocks = async (page: Page) => {
       return json(route, { ok: true })
     }
 
+    if (pathname === '/api/artist-image' && method === 'GET') {
+      return json(route, { image: null, source: null, kind: null })
+    }
+
     if (pathname === '/api/featured' && method === 'GET') {
       return json(route, { data: albumCatalog.map(toSummary) })
     }

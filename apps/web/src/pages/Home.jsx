@@ -1,23 +1,16 @@
-import { useState, useCallback } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { useNavigate } from 'react-router-dom'
+import { FaStar } from 'react-icons/fa'
+import { FiArrowUpRight } from 'react-icons/fi'
+import { Link, useNavigate } from 'react-router-dom'
 
-import AlbumGrid from '../components/album/AlbumGrid.jsx'
-import Hero from '../components/ui/Hero.jsx'
+import AlbumRow from '../components/album/AlbumRow.jsx'
+import Billboard, { WIDE_GUTTER } from '../components/ui/Billboard.jsx'
 import PageTransition from '../components/ui/PageTransition.jsx'
+import VinylSleeve from '../components/ui/VinylSleeve.jsx'
 import { homeSectionsQueryOptions } from '../queries/homeSections.js'
-import { useInfiniteScroll } from '../hooks/useInfiniteScroll.js'
-
-// Initial load: 12 albums per section (reduced from 24)
-const HOME_SECTION_INITIAL_LIMIT = 12
-// Load 12 more albums when user scrolls to the bottom
-const HOME_SECTION_PAGE_SIZE = 12
 
 const Home = () => {
   const navigate = useNavigate()
-  const [showAllHappeningAlbums, setShowAllHappeningAlbums] = useState(false)
-  const [displayRecentCount, setDisplayRecentCount] = useState(HOME_SECTION_INITIAL_LIMIT)
-
   const homeSectionsQuery = useQuery(homeSectionsQueryOptions)
 
   const mostHappeningAlbums = Array.isArray(homeSectionsQuery.data?.mostHappening?.data)
@@ -29,75 +22,72 @@ const Home = () => {
   const requestErrorMessage = homeSectionsQuery.error?.message ?? null
   const happeningError = requestErrorMessage ?? homeSectionsQuery.data?.mostHappening?.error ?? null
   const recentError = requestErrorMessage ?? homeSectionsQuery.data?.recentReleases?.error ?? null
-  const visibleMostHappeningAlbums = showAllHappeningAlbums ? mostHappeningAlbums : mostHappeningAlbums.slice(0, 6)
-  const visibleRecentAlbums = recentAlbums.slice(0, displayRecentCount)
-  const hasMoreRecent = displayRecentCount < recentAlbums.length
-
-  // Lazy load handler: fetches more recent albums when user scrolls to bottom
-  const handleLoadMoreRecent = useCallback(async () => {
-    if (!hasMoreRecent) return
-    setDisplayRecentCount((prev) => Math.min(prev + HOME_SECTION_PAGE_SIZE, recentAlbums.length))
-  }, [hasMoreRecent, recentAlbums.length])
-
-  const { observerTarget: recentLoadMoreTarget, isLoading: isLoadingMore } = useInfiniteScroll(
-    handleLoadMoreRecent,
-    { enabled: hasMoreRecent, rootMargin: '200px' }
-  )
+  const loading = homeSectionsQuery.isLoading && !homeSectionsQuery.data
+  const topAlbum = mostHappeningAlbums[0]
 
   const handleAlbumSelect = (id) => {
     navigate(`/album/${id}`, { state: { from: '/', query: '' } })
   }
 
   return (
-    <PageTransition>
-      <Hero />
-
-      <div className="mt-12 space-y-10">
-        <section className="space-y-6">
-          <div className="flex flex-col gap-3 tablet:flex-row tablet:items-center tablet:justify-between">
-            <div>
-              <p className="text-xs uppercase tracking-[0.4em] text-muted">Weekly Chart Pulse</p>
-              <h2 className="font-display text-2xl tablet:text-3xl">Most Happening Right Now</h2>
+    <PageTransition bleed>
+      <Billboard artist={topAlbum?.artists?.[0]} cover={topAlbum?.cover} gutter={WIDE_GUTTER}>
+        {({ hasArtistPhoto, isResolving }) => (topAlbum ? (
+          <div className="flex items-end justify-between gap-10">
+            <div className="max-w-2xl">
+              <p className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-black/30 px-3 py-1 text-xs font-medium text-paper/90 backdrop-blur">
+                No. 1 on this week&rsquo;s chart
+              </p>
+              <h1 className="mt-5 text-balance font-display text-5xl leading-[0.92] text-paper tablet:text-7xl">{topAlbum.name}</h1>
+              <p className="mt-4 text-lg font-medium text-paper/85 tablet:text-xl">{topAlbum.artists?.join(', ')}</p>
+              <p className="mt-1 flex items-center gap-2 text-sm text-paper/60">
+                {topAlbum.releaseYear ?? ''}
+                {topAlbum.communityRating ? (
+                  <span className="inline-flex items-center gap-1"><FaStar aria-hidden="true" className="h-3 w-3" /> {Number(topAlbum.communityRating).toFixed(1)}</span>
+                ) : null}
+              </p>
+              <Link
+                to={`/album/${topAlbum.id}`}
+                state={{ from: '/', query: '' }}
+                className="mt-8 inline-flex items-center gap-2 rounded-full bg-paper px-6 py-3 text-sm font-semibold text-black transition-transform hover:scale-[1.03]"
+              >
+                Open album <FiArrowUpRight aria-hidden="true" />
+              </Link>
             </div>
-            <button
-              type="button"
-              onClick={() => setShowAllHappeningAlbums((prev) => !prev)}
-              className="w-fit text-xs uppercase tracking-[0.35em] text-muted transition hover:text-white tablet:tracking-[0.5em]"
-            >
-              {showAllHappeningAlbums ? 'Show less' : 'See all'}
-            </button>
-          </div>
-          <AlbumGrid
-            albums={visibleMostHappeningAlbums}
-            loading={homeSectionsQuery.isLoading && !homeSectionsQuery.data}
-            error={happeningError}
-            onSelect={handleAlbumSelect}
-          />
-        </section>
-
-        <section className="space-y-6">
-          <div className="flex flex-col gap-3 tablet:flex-row tablet:items-center tablet:justify-between">
-            <div>
-              <p className="text-xs uppercase tracking-[0.4em] text-muted">Weekly Fresh Pull</p>
-              <h2 className="font-display text-2xl tablet:text-3xl">Recent Releases</h2>
-            </div>
-          </div>
-          <AlbumGrid
-            albums={visibleRecentAlbums}
-            loading={homeSectionsQuery.isLoading && !homeSectionsQuery.data}
-            error={recentError}
-            onSelect={handleAlbumSelect}
-          />
-          
-          {/* Lazy load trigger: appears when user scrolls near the bottom */}
-          {hasMoreRecent && (
-            <div ref={recentLoadMoreTarget} className="flex justify-center py-8">
-              <div className="text-sm text-muted">
-                {isLoadingMore ? 'Loading more albums...' : 'Scroll for more'}
+            {!hasArtistPhoto && !isResolving && (
+              <div className="hidden w-64 shrink-0 pr-[4.5rem] md:block lg:w-80">
+                <VinylSleeve src={topAlbum.cover} alt={topAlbum.name} out spin loading="eager" />
               </div>
-            </div>
-          )}
-        </section>
+            )}
+          </div>
+        ) : (
+          <div aria-hidden="true" className="max-w-xl space-y-5">
+            <div className="h-6 w-44 rounded-full bg-white/[0.06]" />
+            <div className="h-16 w-full rounded-2xl bg-gradient-to-r from-white/[0.04] via-white/[0.08] to-white/[0.04] bg-[length:400px_100%] motion-safe:animate-shimmer" />
+            <div className="h-5 w-40 rounded-full bg-white/[0.05]" />
+            <div className="h-12 w-40 rounded-full bg-white/[0.06]" />
+          </div>
+        ))}
+      </Billboard>
+
+      <div className="relative z-10 -mt-6 space-y-10 tablet:space-y-14">
+        <AlbumRow
+          title="Most Happening Right Now"
+          note="This week's chart, ranked."
+          albums={mostHappeningAlbums}
+          loading={loading}
+          error={happeningError}
+          onSelect={handleAlbumSelect}
+          ranked
+        />
+        <AlbumRow
+          title="Recent Releases"
+          note="Fresh pressings from the past few weeks."
+          albums={recentAlbums}
+          loading={loading}
+          error={recentError}
+          onSelect={handleAlbumSelect}
+        />
       </div>
     </PageTransition>
   )

@@ -209,7 +209,6 @@ test.describe('Critical user flows', () => {
     const homeRequest = page.waitForRequest((request) => new URL(request.url()).pathname === '/api/home')
     await page.goto('/')
     await homeRequest
-    await expect(page.getByText('Listening Room')).toBeVisible()
     await expect(page.getByRole('heading', { name: /most happening right now/i })).toBeVisible()
     releaseHome?.()
 
