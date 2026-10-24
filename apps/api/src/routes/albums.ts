@@ -7,6 +7,12 @@ import { attachHdCovers } from '../services/albumArtwork'
 import { loadStoredFeaturedSection } from '../services/trending'
 import { readIdentifier } from './validation'
 
+// Community stats and HD covers are independent lookups, so they run side by side.
+const hydrateAlbums = async <T extends { id: string; name: string; artists: string[]; cover: string }>(albums: T[], maxLookups?: number) => {
+  const [withStats, withCovers] = await Promise.all([attachMusicoCommunityStats(albums), attachHdCovers(albums, { maxLookups })])
+  return withStats.map((album, index) => ({ ...album, cover: withCovers[index].cover }))
+}
+
 export const albumRoutes = new Elysia({ prefix: '/api' })
   .get('/featured', async ({ query, set }) => {
     try {
@@ -23,7 +29,7 @@ export const albumRoutes = new Elysia({ prefix: '/api' })
       set.headers['Cache-Control'] = data.length
         ? 'public, max-age=60, s-maxage=300, stale-while-revalidate=21000'
         : 'no-store'
-      return { data: await attachHdCovers(await attachMusicoCommunityStats(data)) }
+      return { data: await hydrateAlbums(data) }
     } catch (error) {
       console.error('[featured] error', error)
       set.status = 502
@@ -45,7 +51,7 @@ export const albumRoutes = new Elysia({ prefix: '/api' })
       const happeningAlbums = mostHappening.status === 'fulfilled' ? mostHappening.value : []
       const recentAlbums = recentReleases.status === 'fulfilled' ? recentReleases.value : []
       // Hydrate both sections together so overlapping albums share one stats lookup.
-      const hydratedAlbums = await attachHdCovers(await attachMusicoCommunityStats([...happeningAlbums, ...recentAlbums]))
+      const hydratedAlbums = await hydrateAlbums([...happeningAlbums, ...recentAlbums])
       const mostHappeningData = hydratedAlbums.slice(0, happeningAlbums.length)
       const recentReleasesData = hydratedAlbums.slice(happeningAlbums.length)
 
@@ -95,7 +101,7 @@ export const albumRoutes = new Elysia({ prefix: '/api' })
      }
      try {
        const data = await getReleaseDetails(releaseId)
-       const [hydrated] = await attachHdCovers(await attachMusicoCommunityStats([data]), { maxLookups: 1 })
+       const [hydrated] = await hydrateAlbums([data], 1)
        set.headers ??= {}
        // Catalog data is cached internally; mutable community scores must stay current.
        set.headers['Cache-Control'] = 'no-store'
