@@ -129,7 +129,7 @@ const App = () => {
   }, [location.pathname, location.search])
 
   return (
-    <div className="flex min-h-screen flex-col bg-canvas text-white">
+    <div className="isolate flex min-h-screen flex-col overflow-x-clip bg-canvas text-paper">
       <Navigation />
       <main className="flex-1">
         <RouteErrorBoundary>
