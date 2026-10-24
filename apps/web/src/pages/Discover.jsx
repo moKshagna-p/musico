@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom'
 import AlbumGrid from '../components/album/AlbumGrid.jsx'
 import PageTransition from '../components/ui/PageTransition.jsx'
 import SearchBar from '../components/search/SearchBar.jsx'
+import SectionHeading from '../components/ui/SectionHeading.jsx'
 import { useAuth } from '../hooks/useAuth.js'
 import { getRecentPopularReleases } from '../services/discogsService.js'
 import { recordSearchSignal } from '../services/searchSignalService.js'
@@ -38,25 +39,26 @@ const Discover = () => {
 
   return (
     <PageTransition>
-      <div className="space-y-8">
-        <div>
-          <p className="text-xs uppercase tracking-[0.4em] text-muted">Catalog Explorer</p>
-          <h1 className="font-display text-3xl tablet:text-4xl">Dig through the vault</h1>
-        </div>
+      <div className="space-y-20">
+        <header className="mx-auto max-w-3xl pt-6 text-center tablet:pt-14">
+          <h1 className="font-display text-5xl leading-[0.95] text-paper tablet:text-7xl">Dig through the vault</h1>
+          <p className="mx-auto mt-5 max-w-md text-muted">Search millions of releases by artist or album.</p>
+          <div className="mt-10 text-left">
+            <SearchBar
+              query=""
+              onSearch={handleSearch}
+              placeholder="Search artists or albums..."
+              enablePredictive
+              historyScope={historyScope}
+              enableHistory={enableHistory}
+            />
+          </div>
+        </header>
 
-        <SearchBar
-          query=""
-          onSearch={handleSearch}
-          placeholder="Search artists or albums..."
-          enablePredictive
-          historyScope={historyScope}
-          enableHistory={enableHistory}
-        />
-
-        <div>
-          <p className="mb-4 text-xs uppercase tracking-[0.4em] text-muted">Recent Releases</p>
+        <section className="space-y-10">
+          <SectionHeading title="Recent releases" note="Popular pressings that just landed." />
           <AlbumGrid albums={albums} loading={recentReleasesQuery.isLoading && !recentReleasesQuery.data} error={error} onSelect={handleAlbumSelect} />
-        </div>
+        </section>
       </div>
     </PageTransition>
   )

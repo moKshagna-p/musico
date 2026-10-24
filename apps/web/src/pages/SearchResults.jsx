@@ -71,29 +71,33 @@ const SearchResults = () => {
       <button
         type="button"
         onClick={() => navigate('/discover')}
-        className="mb-6 inline-flex items-center gap-2 text-xs uppercase tracking-[0.28em] text-muted hover:text-white tablet:tracking-[0.4em]"
+        className="mb-10 inline-flex items-center gap-2 rounded-full py-1 pr-3 text-sm text-muted transition-colors hover:text-paper"
       >
-        <FiArrowLeft /> Back to Discover
+        <FiArrowLeft aria-hidden="true" /> Back to Discover
       </button>
 
-      <div className="space-y-8">
-        <div>
-          <p className="text-xs uppercase tracking-[0.45em] text-muted font-bold">Search Results</p>
-          <h1 className="mt-2 break-words font-display text-3xl tablet:text-5xl font-bold tracking-tight">
-            {query ? `“${query}”` : 'Start searching'}
-          </h1>
+      <div className="space-y-12">
+        <div className="space-y-8">
+          <div>
+            <p className="text-sm text-muted">Results for</p>
+            <h1 className="mt-2 break-words font-display text-5xl leading-[0.95] text-paper tablet:text-7xl">
+              {query ? `“${query}”` : 'Start searching'}
+            </h1>
+          </div>
+
+          <div className="max-w-2xl">
+            <SearchBar
+              query={query}
+              onSearch={handleSearch}
+              autoFocus={!query}
+              historyScope={user?.id ?? 'guest'}
+              enablePredictive={false}
+            />
+          </div>
         </div>
 
-        <SearchBar
-          query={query}
-          onSearch={handleSearch}
-          autoFocus={!query}
-          historyScope={user?.id ?? 'guest'}
-          enablePredictive={false}
-        />
-
         {query && (
-          <div className="mt-12">
+          <div className="border-t border-white/[0.07] pt-12">
             <AlbumGrid
               albums={albums}
               loading={isPending}
@@ -112,7 +116,7 @@ const SearchResults = () => {
                   type="button"
                   onClick={() => fetchNextPage()}
                   disabled={isFetchingNextPage}
-                  className="rounded-full border border-outline px-6 py-3 text-xs font-bold uppercase tracking-[0.24em] text-white transition hover:border-white/40 hover:bg-white/10 disabled:cursor-wait disabled:opacity-60"
+                  className="rounded-full border border-white/15 px-6 py-3 text-sm text-paper transition hover:border-white/35 hover:bg-white/[0.06] disabled:cursor-wait disabled:opacity-60"
                 >
                   {isFetchingNextPage ? 'Loading' : isFetchNextPageError ? 'Retry Load More' : 'Load More'}
                 </button>
