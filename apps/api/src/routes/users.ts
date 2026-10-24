@@ -1,5 +1,5 @@
 import { Elysia } from 'elysia'
-import { and, desc, eq, inArray, lt, sql, ilike, or } from 'drizzle-orm'
+import { and, desc, eq, gte, inArray, lt, sql, ilike, or } from 'drizzle-orm'
 import { db } from '../core/db'
 import {
   user,
@@ -32,6 +32,8 @@ import {
 } from '../core/utils'
 import { USERNAME_REGEX, MAX_BIO_LENGTH } from '../core/constants'
 import { isRecord, readBoolean, readBoundedText, readIdentifier, readRating } from './validation'
+
+const RERATE_WINDOW_MS = 1000 * 60 * 60
 
 export const userRoutes = new Elysia({ prefix: '/api' })
   .get('/me/ratings', async ({ request, set }) => {
@@ -244,41 +246,52 @@ export const userRoutes = new Elysia({ prefix: '/api' })
     })
 
     const now = new Date()
-    await db
-      .insert(userRating)
-      .values({
+    // One round trip, one transaction: save the rating, swap this album's recent feed event (re-rating within
+    // the hour updates it instead of adding a row per click), and read the new community score.
+    const [, , , [communityStats]] = await db.batch([
+      db
+        .insert(userRating)
+        .values({
+          id: crypto.randomUUID(),
+          userId: authUser.id,
+          albumId,
+          rating,
+          createdAt: now,
+          updatedAt: now,
+        })
+        .onConflictDoUpdate({
+          target: [userRating.userId, userRating.albumId],
+          set: {
+            rating,
+            updatedAt: now,
+          },
+        }),
+      db
+        .delete(activity)
+        .where(and(
+          eq(activity.userId, authUser.id),
+          eq(activity.albumId, albumId),
+          eq(activity.type, 'rated'),
+          gte(activity.createdAt, new Date(now.getTime() - RERATE_WINDOW_MS)),
+        )),
+      db.insert(activity).values({
         id: crypto.randomUUID(),
         userId: authUser.id,
+        type: 'rated',
         albumId,
-        rating,
+        albumName: albumMeta.name || null,
+        albumCover: albumMeta.cover || null,
+        metadata: { rating },
         createdAt: now,
-        updatedAt: now,
-      })
-      .onConflictDoUpdate({
-        target: [userRating.userId, userRating.albumId],
-        set: {
-          rating,
-          updatedAt: now,
-        },
-      })
-
-    const [communityStats] = await db
-      .select({
-        averageRating: sql<number>`coalesce(avg(${userRating.rating}), 0)`,
-        ratingCount: sql<number>`count(*)`,
-      })
-      .from(userRating)
-      .where(eq(userRating.albumId, albumId))
-
-    // Record activity for the feed
-    await recordActivity({
-      userId: authUser.id,
-      type: 'rated',
-      albumId,
-      albumName: albumMeta.name || null,
-      albumCover: albumMeta.cover || null,
-      metadata: { rating },
-    })
+      }),
+      db
+        .select({
+          averageRating: sql<number>`coalesce(avg(${userRating.rating}), 0)`,
+          ratingCount: sql<number>`count(*)`,
+        })
+        .from(userRating)
+        .where(eq(userRating.albumId, albumId)),
+    ])
 
     set.headers ??= {}
     set.headers['Cache-Control'] = 'no-store'
