@@ -26,6 +26,8 @@ bunx wrangler secret put DATABASE_URL
 bunx wrangler secret put BETTER_AUTH_SECRET
 bunx wrangler secret put DISCOGS_TOKEN
 bunx wrangler secret put CRON_SECRET
+# Optional: wide artist backgrounds from fanart.tv
+bunx wrangler secret put FANART_API_KEY
 ```
 
 Use `wrangler.toml` `[vars]` for non-secret config like `ALLOWED_ORIGIN`,
@@ -47,6 +49,7 @@ Secrets:
 - `BETTER_AUTH_SECRET`: same value you used before.
 - `DISCOGS_TOKEN`: Discogs token.
 - `CRON_SECRET`: dedicated long random value for manual refresh endpoints. Do not reuse the Better Auth secret.
+- `FANART_API_KEY`: optional fanart.tv personal API key for wide artist backgrounds. Without it, artist heroes use Apple Music and Deezer images only.
 
 Plain variables:
 
