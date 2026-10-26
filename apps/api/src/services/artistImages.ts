@@ -93,13 +93,51 @@ export const appleArtworkUrl = (ogImage: string, size = 1800) => {
 
 type AppleArt = { wide: ArtistImage | null; portrait: ArtistImage | null }
 
+const readServerData = (html: string) => html.match(/<script[^>]+id=["']serialized-server-data["'][^>]*>([\s\S]*?)<\/script>/i)?.[1]
+
+// One search result, e.g. { kind: 'album', title: 'Take Care', artist: 'Drake', ... }.
+export type AppleSearchItem = { kind: string; title: string; artist: string; url: string; artwork?: AppleArtwork }
+
+type Link = { title?: unknown }
+const linkTitles = (links: Link[]) => links.map((link) => String(link?.title ?? '')).join(', ')
+
+const collectSearchItems = (node: unknown, out: AppleSearchItem[] = []) => {
+  if (Array.isArray(node)) node.forEach((item) => collectSearchItems(item, out))
+  else if (node && typeof node === 'object') {
+    const { title, titleLinks, subtitle, subtitleLinks, contentDescriptor, artwork } = node as {
+      title?: unknown
+      titleLinks?: unknown
+      subtitle?: unknown
+      subtitleLinks?: unknown
+      contentDescriptor?: { kind?: unknown; url?: unknown }
+      artwork?: { dictionary?: AppleArtwork }
+    }
+    // Top results use plain text ("Album · Drake"); the per-kind sections link the title and each artist instead.
+    const name = typeof title === 'string' ? title : Array.isArray(titleLinks) ? linkTitles(titleLinks) : ''
+    const artist = Array.isArray(subtitleLinks) ? linkTitles(subtitleLinks) : String(subtitle ?? '').split(/\s+·\s+/).slice(1).join(' · ')
+    if (name && typeof contentDescriptor?.url === 'string') {
+      out.push({ kind: String(contentDescriptor.kind), title: name, artist, url: contentDescriptor.url, artwork: artwork?.dictionary })
+    }
+    Object.values(node).forEach((value) => collectSearchItems(value, out))
+  }
+  return out
+}
+
+// The iTunes Search API rate-limits Cloudflare's shared egress IPs (HTTP 429), so we read Apple Music's own search page.
+export const searchAppleMusic = async (term: string, fetcher: Fetcher, timeoutMs = REQUEST_TIMEOUT_MS) => {
+  const response = await fetcher(`https://music.apple.com/us/search?term=${encodeURIComponent(term)}`, {
+    headers: { 'User-Agent': BROWSER_UA },
+    signal: AbortSignal.timeout(timeoutMs),
+  })
+  if (!response.ok) throw Object.assign(new Error(`Apple Music search failed (${response.status})`), { status: response.status })
+  const serialized = readServerData(await response.text())
+  if (!serialized) throw new Error('Apple Music search page has no server data')
+  return collectSearchItems(JSON.parse(serialized))
+}
+
 const findOnApple = async (name: string, fetcher: Fetcher): Promise<AppleArt | null> => {
-  const searchUrl = `https://itunes.apple.com/search?term=${encodeURIComponent(name)}&entity=musicArtist&limit=5`
-  const searchResponse = await fetchWithTimeout(fetcher, searchUrl)
-  if (!searchResponse.ok) return null
-  const payload = (await searchResponse.json()) as { results?: Array<{ artistName?: string; artistLinkUrl?: string }> }
-  const artist = pickByName(payload.results ?? [], name, (item) => item.artistName)
-  const pageUrl = artist?.artistLinkUrl?.split('?')[0]
+  const artists = (await searchAppleMusic(name, fetcher)).filter((item) => item.kind === 'artist')
+  const pageUrl = pickByName(artists, name, (item) => item.title)?.url.split('?')[0]
   if (!pageUrl?.startsWith('https://music.apple.com/')) return null
 
   const pageResponse = await fetchWithTimeout(fetcher, pageUrl, { headers: { 'User-Agent': BROWSER_UA } })
@@ -107,7 +145,7 @@ const findOnApple = async (name: string, fetcher: Fetcher): Promise<AppleArt | n
   const html = await pageResponse.text()
 
   let wide: ArtistImage | null = null
-  const serialized = html.match(/<script[^>]+id=["']serialized-server-data["'][^>]*>([\s\S]*?)<\/script>/i)?.[1]
+  const serialized = readServerData(html)
   if (serialized) {
     try {
       const editorial = pickEditorialArtwork(JSON.parse(serialized))
