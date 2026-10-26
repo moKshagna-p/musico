@@ -26,7 +26,8 @@ const BROWSER_UA = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/
 const cache = new Map<string, { value: ArtistImage | null; expiresAt: number }>()
 
 export const normalizeName = (value: string) =>
-  value.normalize('NFKD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()
+  // Drops Latin accents (é -> e) but keeps every script's letters and marks, so 宇多田ヒカル or ビ survive intact.
+  value.normalize('NFKD').replace(/[̀-ͯ]/g, '').normalize('NFC').toLowerCase().replace(/[^\p{L}\p{M}\p{N}]+/gu, ' ').trim()
 
 const pickByName = <T>(items: T[], name: string, getName: (item: T) => unknown) => {
   const target = normalizeName(name)
