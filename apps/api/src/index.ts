@@ -30,6 +30,12 @@ export const createApp = (options?: ConstructorParameters<typeof Elysia>[0]) => 
     return { requestId, requestStartedAt: Date.now(), requestPath: new URL(request.url).pathname }
   })
   .onAfterHandle(({ request, set, requestId, requestStartedAt, requestPath }) => {
+    // Vercel's CDN keeps whatever encoding Cloudflare sent the first visitor (often zstd) and serves it to every
+    // browser, and Safari can't decode zstd. no-transform stops Cloudflare compressing edge-cacheable responses.
+    const cacheControl = set.headers?.['Cache-Control']
+    if (typeof cacheControl === 'string' && cacheControl.includes('s-maxage')) {
+      set.headers['Cache-Control'] = `${cacheControl}, no-transform`
+    }
     log('info', 'request.completed', {
       requestId,
       method: request.method,
