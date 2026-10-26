@@ -194,6 +194,16 @@ test.describe('Critical user flows', () => {
     await expect(page).toHaveURL(/\/album\/m:1001$/)
   })
 
+  test('an empty chart swaps the home hero placeholder for a way into discover', async ({ page }) => {
+    await page.route('**/api/home*', (route) =>
+      route.fulfill({ json: { mostHappening: { data: [], error: null }, recentReleases: { data: [], error: null } } }),
+    )
+    await page.goto('/')
+    await expect(page.getByRole('heading', { name: /dig through the vault/i })).toBeVisible()
+    await page.getByRole('link', { name: /discover albums/i }).click()
+    await expect(page).toHaveURL('/discover')
+  })
+
   test('home and discover controls render while album sections load', async ({ page }) => {
     let releaseHome: (() => void) | undefined
     let releaseFeatured: (() => void) | undefined
