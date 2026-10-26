@@ -4,10 +4,10 @@ import { FiArrowLeft } from 'react-icons/fi'
 import { PAGE_GUTTER } from './Billboard.jsx'
 
 // Pinned in the nav row, on the page's left edge. Portaled: the page transition's transform would otherwise pin it to the page instead of the viewport.
-// On phones the nav pill moves right to make room (see Navigation).
+// Hidden on phones: the system back gesture covers it.
 const BackButton = ({ onClick, label = 'Back' }) =>
   createPortal(
-    <div id="back-button" className="pointer-events-none fixed inset-x-0 top-3 z-40 tablet:top-4">
+    <div id="back-button" className="pointer-events-none fixed inset-x-0 top-3 z-40 hidden sm:block tablet:top-4">
       <div className={PAGE_GUTTER}>
         <button
           type="button"
