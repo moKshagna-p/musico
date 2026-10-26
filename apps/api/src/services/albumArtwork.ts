@@ -106,6 +106,7 @@ export const attachHdCovers = async <T extends AlbumLike>(
         return { albumId: release.id, cover, checkedAt: new Date() }
       } catch (error) {
         // Failed lookups are not recorded, so the album is retried on a later request.
+        console.warn('[album-artwork] lookup failed', release.id, error instanceof Error ? error.message : String(error))
         const status = (error as { status?: number }).status
         if (status === 403 || status === 429) appleBackoffUntil = Date.now() + RATE_LIMIT_BACKOFF_MS
         return null
