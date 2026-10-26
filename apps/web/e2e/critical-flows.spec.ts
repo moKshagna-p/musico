@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test'
 
-import { installApiMocks } from './support/mockApi'
+import { albumCatalog, installApiMocks } from './support/mockApi'
 
 test.describe('Critical user flows', () => {
   const signIn = async (page) => {
@@ -194,6 +194,16 @@ test.describe('Critical user flows', () => {
     await expect(page).toHaveURL(/\/album\/m:1001$/)
   })
 
+  test('an empty chart swaps the home hero placeholder for a way into discover', async ({ page }) => {
+    await page.route('**/api/home*', (route) =>
+      route.fulfill({ json: { mostHappening: { data: [], error: null }, recentReleases: { data: [], error: null } } }),
+    )
+    await page.goto('/')
+    await expect(page.getByRole('heading', { name: /dig through the vault/i })).toBeVisible()
+    await page.getByRole('link', { name: /discover albums/i }).click()
+    await expect(page).toHaveURL('/discover')
+  })
+
   test('home and discover controls render while album sections load', async ({ page }) => {
     let releaseHome: (() => void) | undefined
     let releaseFeatured: (() => void) | undefined
@@ -209,7 +219,6 @@ test.describe('Critical user flows', () => {
     const homeRequest = page.waitForRequest((request) => new URL(request.url()).pathname === '/api/home')
     await page.goto('/')
     await homeRequest
-    await expect(page.getByText('Listening Room')).toBeVisible()
     await expect(page.getByRole('heading', { name: /most happening right now/i })).toBeVisible()
     releaseHome?.()
 
@@ -331,6 +340,16 @@ test.describe('Critical user flows', () => {
     await expect(durations).toHaveCount(3)
     const positions = await durations.evaluateAll((nodes) => nodes.map((node) => node.getBoundingClientRect().left))
     expect(Math.max(...positions) - Math.min(...positions)).toBeLessThan(2)
+  })
+
+  test('unrated albums say so instead of showing a zero score', async ({ page }) => {
+    await page.route(
+      (url) => url.pathname === '/api/releases/m:1001',
+      (route) => route.fulfill({ json: { ...albumCatalog[0], communityRating: 0, reviewCount: 0 } }),
+    )
+    await page.goto('/album/m:1001')
+    await expect(page.getByText('No ratings yet')).toBeVisible()
+    await expect(page.getByText('0.0')).toHaveCount(0)
   })
 
   test('vinyl side numbers do not restart the displayed track sequence', async ({ page }) => {

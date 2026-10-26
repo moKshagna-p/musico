@@ -127,17 +127,17 @@ const AdminDashboard = () => {
 
   return (
     <PageTransition>
-      <section className="space-y-5">
-        <header className="flex flex-col gap-4 border-b border-outline/70 pb-5 tablet:flex-row tablet:items-end tablet:justify-between">
+      <section className="space-y-8">
+        <header className="flex flex-col gap-6 border-b border-white/[0.07] pb-8 tablet:flex-row tablet:items-end tablet:justify-between">
           <div>
-            <p className="text-[0.65rem] uppercase tracking-[0.34em] text-muted">Admin</p>
-            <h1 className="mt-1 font-display text-3xl leading-tight tablet:text-5xl">Operations</h1>
+            <h1 className="font-display text-5xl leading-none text-paper tablet:text-7xl">Operations</h1>
+            <p className="mt-3 text-sm text-muted">Manage admins and moderate reviews.</p>
           </div>
           <div className="grid grid-cols-2 gap-2 tablet:flex">
             {stats.map(([label, value]) => (
               <div key={label} className="rounded-2xl border border-outline/60 bg-panel/30 px-4 py-3">
-                <p className="text-[0.62rem] uppercase tracking-[0.22em] text-muted">{label}</p>
-                <p className="mt-1 text-xl font-semibold tabular-nums text-white">{Number(value ?? 0).toLocaleString()}</p>
+                <p className="text-xs text-muted">{label}</p>
+                <p className="mt-1 font-display text-3xl leading-none text-paper">{Number(value ?? 0).toLocaleString()}</p>
               </div>
             ))}
           </div>
@@ -145,7 +145,7 @@ const AdminDashboard = () => {
 
         {status ? (
           <p
-            className="break-words rounded-xl border border-outline/60 bg-canvas/35 px-3 py-2 text-xs uppercase tracking-[0.14em] text-white/80"
+            className="break-words rounded-xl border border-outline/60 bg-canvas/35 px-3 py-2 text-xs text-white/80"
             aria-live="polite"
           >
             {status}
@@ -155,7 +155,7 @@ const AdminDashboard = () => {
         <section className="grid gap-4 laptop:grid-cols-2">
           <div className="rounded-2xl border border-outline/70 bg-panel/35 p-4 tablet:p-5">
             <div className="flex flex-col gap-3 tablet:flex-row tablet:items-center tablet:justify-between">
-              <h2 className="font-display text-2xl">Users</h2>
+              <h2 className="font-display text-3xl text-paper">Users</h2>
               <label className="flex w-full items-center gap-2 rounded-full border border-outline/60 bg-canvas/40 px-3 py-2 text-sm tablet:w-72">
                 <FiSearch className="text-white/60" aria-hidden="true" />
                 <input
@@ -185,7 +185,7 @@ const AdminDashboard = () => {
 
                       <div className="flex shrink-0 items-center gap-2">
                         <span
-                          className={`hidden rounded-full border px-2.5 py-1 text-[0.6rem] uppercase tracking-[0.16em] tablet:inline-flex ${
+                          className={`hidden rounded-full border px-2.5 py-1 text-[0.6rem] tablet:inline-flex ${
                             person.isAdmin ? 'border-white/35 text-white' : 'border-outline/70 text-muted'
                           }`}
                         >
@@ -195,7 +195,7 @@ const AdminDashboard = () => {
                           type="button"
                           onClick={() => handleToggleAdmin(person)}
                           disabled={isPending || person.isBootstrapAdmin}
-                          className="inline-flex items-center gap-2 rounded-full border border-outline/70 px-3 py-2 text-[0.65rem] uppercase tracking-[0.14em] text-white/85 transition hover:border-white/45 hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-50"
+                          className="inline-flex items-center gap-2 rounded-full border border-outline/70 px-3 py-2 text-xs text-white/85 transition hover:border-white/45 hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-50"
                         >
                           {person.isAdmin ? <FiUserX aria-hidden="true" /> : <FiUserCheck aria-hidden="true" />}
                           {isPending ? 'Updating' : person.isAdmin ? 'Remove' : 'Admin'}
@@ -212,7 +212,7 @@ const AdminDashboard = () => {
 
           <div className="rounded-2xl border border-outline/70 bg-panel/35 p-4 tablet:p-5">
             <div className="flex flex-col gap-3 tablet:flex-row tablet:items-center tablet:justify-between">
-              <h2 className="font-display text-2xl">Reviews</h2>
+              <h2 className="font-display text-3xl text-paper">Reviews</h2>
               <div className="flex rounded-full border border-outline/70 bg-canvas/35 p-1">
                 {[
                   ['all', 'All'],
@@ -223,7 +223,7 @@ const AdminDashboard = () => {
                     key={key}
                     type="button"
                     onClick={() => setReviewFilter(key)}
-                    className={`rounded-full px-3 py-1.5 text-[0.62rem] uppercase tracking-[0.16em] transition ${
+                    className={`rounded-full px-3 py-1.5 text-xs transition ${
                       reviewFilter === key ? 'bg-white text-canvas' : 'text-white/75 hover:bg-white/10'
                     }`}
                   >
@@ -248,7 +248,7 @@ const AdminDashboard = () => {
                           <div className="flex items-center gap-2">
                             <p className="truncate text-sm font-medium text-white">{review.albumName}</p>
                             {review.isFlagged ? (
-                              <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-[#c6aa7e]/45 px-2 py-0.5 text-[0.55rem] uppercase tracking-[0.14em] text-[#e6d5b2]">
+                              <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-[#c6aa7e]/45 px-2 py-0.5 text-xs text-[#e6d5b2]">
                                 <FiAlertTriangle aria-hidden="true" /> Flag
                               </span>
                             ) : null}
@@ -261,7 +261,7 @@ const AdminDashboard = () => {
                           type="button"
                           onClick={() => handleDeleteReview(review)}
                           disabled={isPending}
-                          className="inline-flex shrink-0 items-center gap-2 rounded-full border border-outline/70 px-3 py-2 text-[0.65rem] uppercase tracking-[0.14em] text-white/85 transition hover:border-white/45 hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-50"
+                          className="inline-flex shrink-0 items-center gap-2 rounded-full border border-outline/70 px-3 py-2 text-xs text-white/85 transition hover:border-white/45 hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-50"
                         >
                           {review.isFlagged ? <FiShield aria-hidden="true" /> : <FiTrash2 aria-hidden="true" />}
                           {isPending ? 'Removing' : 'Remove'}

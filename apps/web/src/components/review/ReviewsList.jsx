@@ -54,7 +54,7 @@ const ReviewsList = ({ albumId }) => {
     return (
       <div className="space-y-3">
         {Array.from({ length: 3 }).map((_, i) => (
-          <div key={i} className="h-24 rounded-xl bg-gradient-to-r from-white/10 via-white/5 to-white/10 bg-[length:240px_100%] motion-safe:animate-shimmer" />
+          <div key={i} className="h-24 rounded-2xl bg-gradient-to-r from-white/[0.06] via-white/[0.03] to-white/[0.06] bg-[length:240px_100%] motion-safe:animate-shimmer" />
         ))}
       </div>
     )
@@ -66,14 +66,14 @@ const ReviewsList = ({ albumId }) => {
 
   if (!reviews.length) {
     return (
-      <p className="py-6 text-center text-sm text-muted">
+      <p className="py-6 text-sm text-muted">
         No reviews yet. Be the first to share your thoughts.
       </p>
     )
   }
 
   return (
-    <div className="space-y-3">
+    <div className="border-t border-white/[0.07]">
       {reviews.map((review) => (
         <ReviewCard key={review.id} review={review} />
       ))}
@@ -83,7 +83,7 @@ const ReviewsList = ({ albumId }) => {
           type="button"
           onClick={loadMore}
           disabled={loadingMore}
-          className="w-full rounded-xl border border-outline py-3 text-xs uppercase tracking-[0.2em] text-muted transition-colors hover:text-white disabled:opacity-50"
+          className="mt-6 w-full rounded-full border border-white/10 py-3 text-sm text-muted transition-colors hover:border-white/25 hover:text-paper disabled:opacity-50"
         >
           {loadingMore ? (
             <span className="inline-flex items-center gap-2">

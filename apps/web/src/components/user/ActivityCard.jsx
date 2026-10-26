@@ -7,22 +7,22 @@ const ActivityCard = ({ item }) => {
 
   const timeAgo = formatTimeAgo(createdAt)
 
-  const userLink = <span className="font-semibold text-white">{actor?.name ?? 'Unknown'}</span>
+  const userLink = <span className="font-medium text-paper">{actor?.name ?? 'Unknown'}</span>
 
   const albumLink = albumId ? (
-    <Link to={`/album/${albumId}`} className="font-semibold text-white hover:underline">
+    <Link to={`/album/${albumId}`} className="font-medium text-paper hover:underline">
       {albumName || 'an album'}
     </Link>
   ) : null
 
-  const targetLink = targetUser ? <span className="font-semibold text-white">{targetUser.name}</span> : null
+  const targetLink = targetUser ? <span className="font-medium text-paper">{targetUser.name}</span> : null
 
   const renderContent = () => {
     switch (type) {
       case 'rated': {
         const rating = Number(metadata?.rating ?? 0)
         return (
-          <div className="text-sm text-white/80">
+          <div className="text-[15px] leading-relaxed text-paper/75">
             {userLink} rated {albumLink}{' '}
             <span className="inline-flex align-middle">
               <RatingStars value={rating} readOnly size="sm" align="left" />
@@ -33,24 +33,24 @@ const ActivityCard = ({ item }) => {
       case 'reviewed':
         return (
           <div>
-            <p className="text-sm text-white/80">
+            <p className="text-[15px] leading-relaxed text-paper/75">
               {userLink} reviewed {albumLink}
             </p>
             {metadata?.snippet && (
-              <p className="mt-1 text-sm italic text-muted">&ldquo;{metadata.snippet}&rdquo;</p>
+              <p className="mt-2 border-l border-white/15 pl-3 italic leading-snug text-paper/80">&ldquo;{metadata.snippet}&rdquo;</p>
             )}
           </div>
         )
       case 'listed':
         return (
-          <p className="text-sm text-white/80">
+          <p className="text-[15px] leading-relaxed text-paper/75">
             {userLink} added {albumLink} to{' '}
             <span className="font-medium text-white/90">{metadata?.listName ?? 'a list'}</span>
           </p>
         )
       case 'followed':
         return (
-          <p className="text-sm text-white/80">
+          <p className="text-[15px] leading-relaxed text-paper/75">
             {userLink} started following {targetLink}
           </p>
         )
@@ -60,7 +60,7 @@ const ActivityCard = ({ item }) => {
   }
 
   return (
-    <div className="flex gap-4 rounded-2xl border border-outline/40 bg-panel/30 p-4 transition-all hover:border-outline/60 hover:bg-panel/50">
+    <div className="flex gap-4 px-1 py-5 transition-colors hover:bg-white/[0.02]">
       {albumCover && (type === 'rated' || type === 'reviewed' || type === 'listed') ? (
         <Link to={`/album/${albumId}`} className="shrink-0">
           <CoverImage
@@ -69,7 +69,7 @@ const ActivityCard = ({ item }) => {
             width={56}
             height={56}
             loading="lazy"
-            className="h-14 w-14 rounded-xl object-cover ring-1 ring-white/10"
+            className="h-16 w-16 rounded-[3px] object-cover shadow-sleeve"
           />
         </Link>
       ) : actor?.image ? (
@@ -79,17 +79,17 @@ const ActivityCard = ({ item }) => {
           width={56}
           height={56}
           loading="lazy"
-          className="h-14 w-14 shrink-0 rounded-xl object-cover ring-1 ring-white/10"
+          className="h-16 w-16 shrink-0 rounded-full object-cover ring-1 ring-white/10"
         />
       ) : (
-        <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-white/[0.06] text-lg font-bold text-white/40 ring-1 ring-white/10" aria-hidden="true">
+        <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-white/[0.04] text-xl font-semibold text-paper/50 ring-1 ring-white/10" aria-hidden="true">
           {actor?.name?.charAt(0)?.toUpperCase() ?? '?'}
         </div>
       )}
 
       <div className="min-w-0 flex-1">
         {renderContent()}
-        <p className="mt-1.5 text-xs text-muted/50">{timeAgo}</p>
+        <p className="mt-1.5 text-xs text-muted">{timeAgo}</p>
       </div>
     </div>
   )

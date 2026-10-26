@@ -2,6 +2,7 @@ import { Elysia } from 'elysia'
 import { activityRoutes } from './activity'
 import { adminRoutes } from './admin'
 import { albumRoutes } from './albums'
+import { artistRoutes } from './artists'
 import { cronRoutes } from './cron'
 import { listRoutes } from './lists'
 import { reviewRoutes } from './reviews'
@@ -12,6 +13,7 @@ export const apiRoutes = new Elysia()
   .use(activityRoutes)
   .use(adminRoutes)
   .use(albumRoutes)
+  .use(artistRoutes)
   .use(cronRoutes)
   .use(listRoutes)
   .use(reviewRoutes)

@@ -36,10 +36,10 @@ const FollowButton = ({ username, initialFollowing = false, onToggle }) => {
       onClick={handleClick}
       disabled={loading}
       aria-label={following ? `Unfollow ${username}` : `Follow ${username}`}
-      className={`inline-flex items-center gap-2 rounded-full px-5 py-2 text-xs font-semibold uppercase tracking-[0.2em] transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas disabled:opacity-60 ${
+      className={`inline-flex items-center gap-2 rounded-full px-5 py-2 text-sm font-medium transition-all duration-200 disabled:opacity-60 ${
         following
-          ? 'border border-outline bg-transparent text-muted hover:border-red-400/50 hover:text-red-400'
-          : 'bg-white text-canvas hover:opacity-90'
+          ? 'border border-white/15 bg-transparent text-paper/80 hover:border-red-400/50 hover:text-red-300'
+          : 'bg-paper text-black hover:opacity-90'
       }`}
     >
       {loading ? 'Wait\u2026' : following ? 'Following' : 'Follow'}

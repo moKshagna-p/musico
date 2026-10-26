@@ -28,24 +28,22 @@ const Stats = ({ ratedAlbums, totalRated, averageRating }) => {
     return { avg: calculatedAvg, topArtistName: calculatedTopArtistName }
   }, [ratedAlbums, safeTotal, averageRating])
 
+  const items = [
+    { label: 'Albums rated', value: safeTotal },
+    { label: 'Average rating', value: avg.toFixed(2) },
+    { label: 'Recent top artist', value: topArtistName },
+  ]
+
   return (
-    <section className="my-16">
-      <div className="grid grid-cols-1 gap-8 md:grid-cols-3">
-        <div className="flex min-h-[9rem] flex-col items-center justify-center text-center">
-          <p className="font-display text-4xl font-bold tablet:text-6xl">{safeTotal}</p>
-          <p className="mt-2 text-base text-muted tablet:text-lg">Albums Rated</p>
-        </div>
-        <div className="flex min-h-[9rem] flex-col items-center justify-center text-center">
-          <p className="font-display text-4xl font-bold tablet:text-6xl">{avg.toFixed(2)}</p>
-          <p className="mt-2 text-base text-muted tablet:text-lg">Average Rating</p>
-        </div>
-        <div className="flex min-h-[9rem] flex-col items-center justify-center text-center">
-          <p className="max-w-[14ch] text-balance break-words font-display text-3xl font-bold leading-[1.05] tablet:text-5xl">
-            {topArtistName}
-          </p>
-          <p className="mt-2 text-base text-muted tablet:text-lg">Recent Top Artist</p>
-        </div>
-      </div>
+    <section className="my-14">
+      <dl className="grid grid-cols-1 divide-y divide-white/[0.07] border-y border-white/[0.07] md:grid-cols-3 md:divide-x md:divide-y-0">
+        {items.map((item) => (
+          <div key={item.label} className="flex flex-col-reverse gap-2 px-1 py-8 md:px-8 md:first:pl-0">
+            <dt className="text-sm text-muted">{item.label}</dt>
+            <dd className="break-words font-display text-5xl leading-none text-paper tablet:text-6xl">{item.value}</dd>
+          </div>
+        ))}
+      </dl>
     </section>
   )
 }

@@ -36,7 +36,7 @@ const parseBody = async (route: Route) => {
   }
 }
 
-const albumCatalog: MockAlbum[] = [
+export const albumCatalog: MockAlbum[] = [
   {
     id: 'm:1001',
     name: 'Discovery',
@@ -247,6 +247,10 @@ export const installApiMocks = async (page: Page) => {
 
     if (pathname === '/api/search-events' && method === 'POST') {
       return json(route, { ok: true })
+    }
+
+    if (pathname === '/api/artist-image' && method === 'GET') {
+      return json(route, { image: null, source: null, kind: null, video: null })
     }
 
     if (pathname === '/api/featured' && method === 'GET') {

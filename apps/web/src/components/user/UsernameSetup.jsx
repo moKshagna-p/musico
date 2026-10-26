@@ -78,16 +78,16 @@ const UsernameSetup = ({ onComplete, onSkip }) => {
             : ''
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm">
-      <div className="mx-4 w-full max-w-md rounded-2xl border border-outline bg-panel p-8">
-        <h2 className="font-display text-2xl font-bold">Choose your username</h2>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-md">
+      <div className="mx-4 w-full max-w-md rounded-3xl border border-white/10 bg-[#0b0b0a]/95 shadow-[0_40px_120px_-20px_rgba(0,0,0,1)] p-8">
+        <h2 className="font-display text-3xl text-paper">Choose your username</h2>
         <p className="mt-2 text-sm text-muted">
           This helps other users find and follow you. You can change it later.
         </p>
 
         <form onSubmit={handleSubmit} className="mt-6 space-y-4">
           <div>
-            <label htmlFor="username-input" className="block text-xs uppercase tracking-[0.2em] text-muted">
+            <label htmlFor="username-input" className="block text-sm text-muted">
               Username
             </label>
             <div className="relative mt-2">
@@ -101,7 +101,7 @@ const UsernameSetup = ({ onComplete, onSkip }) => {
                 autoComplete="off"
                 autoFocus
                 maxLength={24}
-                className="w-full rounded-lg border border-outline bg-canvas py-3 pl-8 pr-10 text-white placeholder:text-muted/60 focus:border-white/30 focus:outline-none"
+                className="w-full rounded-2xl border border-white/10 bg-white/[0.03] py-3 pl-8 pr-10 text-white placeholder:text-muted/60 focus:border-white/30 focus:outline-none"
               />
               {statusIcon && (
                 <span className="absolute right-3 top-1/2 -translate-y-1/2">{statusIcon}</span>
@@ -129,14 +129,14 @@ const UsernameSetup = ({ onComplete, onSkip }) => {
             <button
               type="submit"
               disabled={status !== 'available' || saving}
-              className="flex-1 rounded-full bg-white py-3 text-xs font-semibold uppercase tracking-[0.2em] text-canvas transition-opacity hover:opacity-90 disabled:opacity-40"
+              className="flex-1 rounded-full bg-paper py-3 text-sm font-medium text-black transition-opacity hover:opacity-90 disabled:opacity-40"
             >
               {saving ? 'Saving...' : 'Set Username'}
             </button>
             <button
               type="button"
               onClick={onSkip}
-              className="rounded-full border border-outline px-5 py-3 text-xs uppercase tracking-[0.2em] text-muted transition-colors hover:text-white"
+              className="rounded-full border border-white/12 px-5 py-3 text-sm text-paper/80 transition-colors hover:border-white/30 hover:text-paper"
             >
               Skip
             </button>

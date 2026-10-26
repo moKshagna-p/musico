@@ -18,7 +18,7 @@ const HighlightMatch = ({ text, match }) => {
     <>
       {parts.map((part, i) => 
         part.toLowerCase() === match.toLowerCase() ? (
-          <span key={i} className="font-black text-white">{part}</span>
+          <span key={i} className="font-semibold text-paper">{part}</span>
         ) : (
           <span key={i}>{part}</span>
         )
@@ -124,15 +124,15 @@ const SearchBar = ({
         if (!event.currentTarget.contains(event.relatedTarget)) setIsFocused(false)
       }}
     >
-      <div 
-        className={`relative flex items-center gap-3 rounded-2xl border transition-all duration-300 ${
-          isFocused 
-            ? 'border-white/40 bg-panel shadow-[0_0_0_4px_rgba(255,255,255,0.05)]' 
-            : 'border-outline bg-panel/60 hover:border-outline-hover'
-        } p-4`}
+      <div
+        className={`relative flex items-center gap-3 rounded-full border px-5 py-3.5 backdrop-blur-xl transition-all duration-300 tablet:py-4 ${
+          isFocused
+            ? 'border-white/30 bg-white/[0.06] shadow-[0_0_0_6px_rgba(238,234,227,0.05)]'
+            : 'border-white/10 bg-white/[0.03] hover:border-white/20'
+        }`}
       >
-        <FiSearch className={`text-xl transition-colors ${isFocused ? 'text-white' : 'text-muted'}`} />
-        
+        <FiSearch aria-hidden="true" className={`shrink-0 text-lg transition-colors ${isFocused ? 'text-paper' : 'text-muted'}`} />
+
         <input
           ref={inputRef}
           value={value}
@@ -149,7 +149,7 @@ const SearchBar = ({
           placeholder={placeholder ?? 'Search music, artists, vibes...'}
           aria-label="Search music"
           autoFocus={autoFocus}
-          className="flex-1 bg-transparent text-base text-white placeholder:text-muted/60 focus:outline-none"
+          className="min-w-0 flex-1 bg-transparent text-base text-paper placeholder:text-muted focus:outline-none focus-visible:outline-none tablet:text-lg"
         />
 
         <div className="flex items-center gap-2">
@@ -158,14 +158,14 @@ const SearchBar = ({
               type="button"
               aria-label="Clear search"
               onClick={() => applyValue('')}
-              className="p-1 text-muted hover:text-white"
+              className="rounded-full p-1 text-muted hover:text-paper"
             >
               <FiX />
             </button>
           )}
-          <div className="hidden items-center gap-1 rounded-md border border-outline bg-canvas/50 px-1.5 py-0.5 text-[10px] font-bold text-muted tablet:flex">
-            <FiCommand /> K
-          </div>
+          <kbd className="hidden items-center gap-0.5 rounded-md border border-white/10 px-1.5 py-0.5 font-sans text-[11px] text-muted md:flex">
+            <FiCommand aria-hidden="true" /> K
+          </kbd>
         </div>
       </div>
 
@@ -175,13 +175,13 @@ const SearchBar = ({
             initial={{ opacity: 0, y: 10, scale: 0.98 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 10, scale: 0.98 }}
-            className="absolute left-0 right-0 top-[calc(100%+0.5rem)] overflow-hidden rounded-2xl border border-outline bg-panel/95 shadow-2xl backdrop-blur-xl"
+            className="absolute left-0 right-0 top-[calc(100%+0.5rem)] overflow-hidden rounded-3xl border border-white/10 bg-black/80 shadow-[0_30px_80px_-20px_rgba(0,0,0,0.9)] backdrop-blur-2xl"
           >
             {/* Quick Results */}
             {showSuggestions && (
               <div className="p-2">
                 <div className="flex items-center justify-between px-3 py-2">
-                  <p className="text-[10px] font-bold uppercase tracking-[0.3em] text-muted">Suggestions</p>
+                  <p className="text-xs font-bold text-muted">Suggestions</p>
                   {(isLoading || isFetching) && (
                     <div className="h-3 w-3 animate-spin rounded-full border-2 border-white/20 border-t-white" />
                   )}
@@ -195,20 +195,20 @@ const SearchBar = ({
                         onClick={() => navigate(`/album/${item.id}`)}
                         onMouseEnter={() => setActiveSuggestionIndex(i)}
                         className={`flex w-full items-center gap-4 rounded-xl p-2 text-left transition-colors ${
-                          activeSuggestionIndex === i ? 'bg-white/10' : 'hover:bg-white/5'
+                          activeSuggestionIndex === i ? 'bg-white/[0.08]' : 'hover:bg-white/[0.04]'
                         }`}
                       >
                         <img 
                           src={item.cover} 
                           alt="" 
-                          className="h-10 w-10 rounded-lg object-cover bg-black/40"
+                          className="h-11 w-11 rounded-[3px] bg-white/5 object-cover"
                         />
                         <div className="min-w-0 flex-1">
                           <p className="truncate text-sm font-semibold text-white/90">
                             <HighlightMatch text={item.name} match={value} />
                           </p>
                           <p className="truncate text-xs text-muted">
-                            <HighlightMatch text={item.artists?.join(', ')} match={value} /> • {item.releaseYear}
+                            <HighlightMatch text={item.artists?.join(', ')} match={value} />{item.releaseYear ? `, ${item.releaseYear}` : ''}
                           </p>
                         </div>
                         {activeSuggestionIndex === i && (
@@ -227,7 +227,7 @@ const SearchBar = ({
             {showRecentSearches && (
               <div className="p-2">
                 <div className="flex items-center justify-between px-3 py-2">
-                  <p className="text-[10px] font-bold uppercase tracking-[0.3em] text-muted text-center">Recent Searches</p>
+                  <p className="text-xs font-bold text-muted text-center">Recent Searches</p>
                   <button
                     type="button"
                     aria-label="Clear recent searches"
@@ -236,7 +236,7 @@ const SearchBar = ({
                       clearSearchHistory(historyScope)
                       setRecentSearches([])
                     }}
-                    className="text-[10px] font-bold uppercase tracking-widest text-muted hover:text-white"
+                    className="text-xs font-bold text-muted hover:text-white"
                   >
                     Clear
                   </button>

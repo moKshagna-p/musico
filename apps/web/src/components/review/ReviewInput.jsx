@@ -35,10 +35,10 @@ const ReviewInput = ({ initialContent = '', onSave, disabled = false }) => {
           placeholder="Write a short review..."
           disabled={disabled || saving}
           rows={3}
-          className="w-full resize-none rounded-xl border border-outline bg-canvas/50 p-4 text-sm text-white placeholder:text-muted/50 focus:border-white/30 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+          className="w-full resize-none rounded-2xl border border-white/10 bg-white/[0.03] p-4 pb-8 text-[15px] text-paper placeholder:text-muted focus:border-white/30 focus:outline-none focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
         />
         <span
-          className={`absolute bottom-3 right-3 text-xs tabular-nums ${
+          className={`absolute bottom-3 right-3 text-xs ${
             content.length > maxLength - 20 ? 'text-red-400' : 'text-muted/60'
           }`}
         >
@@ -53,7 +53,7 @@ const ReviewInput = ({ initialContent = '', onSave, disabled = false }) => {
         <button
           type="submit"
           disabled={!content.trim() || saving || disabled}
-          className="rounded-full bg-white px-5 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-canvas transition-opacity hover:opacity-90 disabled:opacity-40"
+          className="rounded-full bg-paper px-5 py-2 text-sm font-medium text-black transition-opacity hover:opacity-90 disabled:opacity-30"
         >
           {saving ? 'Saving...' : initialContent ? 'Update' : 'Post'}
         </button>

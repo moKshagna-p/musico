@@ -10,12 +10,12 @@ const WheelPoolEditor = ({ albums, lists, onAdd, onRemove, onClear }) => {
   const list = lists.find(item => String(item.id) === listId)
   const ids = new Set(albums.map(album => album.id))
   return (
-    <div id="wheel-pool-editor" className="mt-5 rounded-2xl border border-outline bg-panel/60 p-5">
+    <div id="wheel-pool-editor" className="mt-3 rounded-3xl border border-white/[0.07] bg-white/[0.02] p-5">
       <div className="grid gap-6 tablet:grid-cols-2">
         <div>
           <label htmlFor="wheel-list" className="text-sm font-semibold">Add a Musico list</label>
           <div className="mt-2 flex gap-2">
-            <select id="wheel-list" value={listId} onChange={event => setListId(event.target.value)} className="min-w-0 flex-1 rounded-xl border border-outline bg-canvas p-3 text-sm">
+            <select id="wheel-list" value={listId} onChange={event => setListId(event.target.value)} className="min-w-0 flex-1 rounded-xl border border-white/10 bg-black/40 p-3 text-sm text-paper">
               <option value="">Choose a list</option>
               {lists.map(item => <option key={item.id} value={item.id}>{item.name} ({item.albums?.length ?? 0})</option>)}
             </select>
@@ -26,7 +26,7 @@ const WheelPoolEditor = ({ albums, lists, onAdd, onRemove, onClear }) => {
         </div>
         <div>
           <label htmlFor="wheel-search" className="text-sm font-semibold">Add individual albums</label>
-          <input id="wheel-search" type="search" value={query} onChange={event => setQuery(event.target.value)} placeholder="Search an album or artist…" className="mt-2 w-full rounded-xl border border-outline bg-canvas p-3 text-sm" />
+          <input id="wheel-search" type="search" value={query} onChange={event => setQuery(event.target.value)} placeholder="Search an album or artist…" className="mt-2 w-full rounded-xl border border-white/10 bg-black/40 p-3 text-sm text-paper" />
           {query.trim().length >= 3 && (
             <div className="mt-2 max-h-64 overflow-y-auto" aria-live="polite">
               {search.isFetching ? <p className="p-3 text-sm text-muted">Searching…</p> : search.isError ? <p className="p-3 text-sm">Search unavailable. <button type="button" onClick={() => search.refetch()} className="underline">Try again</button></p> : search.suggestions.length ? search.suggestions.map(album => (

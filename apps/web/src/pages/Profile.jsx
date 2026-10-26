@@ -4,6 +4,7 @@ import { Link, useNavigate } from 'react-router-dom'
 
 import PageTransition from '../components/ui/PageTransition.jsx'
 import { ProfilePageSkeleton, UserListLoadingState } from '../components/ui/PageLoadingState.jsx'
+import SectionHeading from '../components/ui/SectionHeading.jsx'
 import Stats from '../components/user/Stats.jsx'
 import TopGenres from '../components/user/TopGenres.jsx'
 import ListCard from '../components/list/ListCard.jsx'
@@ -15,8 +16,8 @@ import { useDashboard } from '../hooks/useDashboard.js'
 import { fetchMyFollowers, fetchMyFollowing, updateMyProfile } from '../services/socialService.js'
 
 const FollowListModal = ({ title, users, loading, onClose }) => (
-  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm">
-    <div className="relative mx-4 w-full max-w-lg rounded-2xl border border-outline bg-panel p-6">
+  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-md">
+    <div className="relative mx-4 w-full max-w-lg rounded-3xl border border-white/10 bg-[#0b0b0a]/95 shadow-[0_40px_120px_-20px_rgba(0,0,0,1)] p-6">
       <button
         type="button"
         onClick={onClose}
@@ -26,7 +27,7 @@ const FollowListModal = ({ title, users, loading, onClose }) => (
         <FiX className="h-5 w-5" />
       </button>
 
-      <h2 className="font-display text-2xl font-bold">{title}</h2>
+      <h2 className="font-display text-3xl text-paper">{title}</h2>
       <div className="mt-5 max-h-[60vh] space-y-3 overflow-y-auto pr-1">
         {loading ? (
           <UserListLoadingState />
@@ -309,8 +310,8 @@ const Profile = () => {
 
       {/* Edit Profile Modal */}
       {showEditModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm">
-          <div className="relative mx-4 w-full max-w-md rounded-2xl border border-outline bg-panel p-8">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-md">
+          <div className="relative mx-4 w-full max-w-md rounded-3xl border border-white/10 bg-[#0b0b0a]/95 shadow-[0_40px_120px_-20px_rgba(0,0,0,1)] p-8">
             <button
               type="button"
               onClick={() => setShowEditModal(false)}
@@ -320,19 +321,19 @@ const Profile = () => {
               <FiX className="h-5 w-5" />
             </button>
 
-            <h2 className="font-display text-2xl font-bold">Edit Profile</h2>
+            <h2 className="font-display text-3xl text-paper">Edit Profile</h2>
             <p className="mt-1 text-sm text-muted">Update your bio and profile picture.</p>
 
             <div className="mt-6 space-y-5">
               {socialProfile?.username && (
                 <div>
-                  <label className="block text-xs uppercase tracking-[0.2em] text-muted">Username</label>
+                  <label className="block text-sm text-muted">Username</label>
                   <p className="mt-1.5 text-sm text-white/80">@{socialProfile.username}</p>
                 </div>
               )}
 
               <div>
-                <label htmlFor="edit-bio" className="block text-xs uppercase tracking-[0.2em] text-muted">
+                <label htmlFor="edit-bio" className="block text-sm text-muted">
                   Bio
                 </label>
                 <textarea
@@ -341,13 +342,13 @@ const Profile = () => {
                   onChange={(e) => setEditBio(e.target.value.slice(0, 160))}
                   placeholder="Tell people about yourself..."
                   rows={3}
-                  className="mt-2 w-full resize-none rounded-lg border border-outline bg-canvas/60 p-3 text-sm text-white placeholder:text-muted/50 focus:border-white/30 focus:outline-none"
+                  className="mt-2 w-full resize-none rounded-2xl border border-white/10 bg-white/[0.03] p-3 text-sm text-white placeholder:text-muted/50 focus:border-white/30 focus:outline-none"
                 />
-                <p className="mt-1 text-right text-xs tabular-nums text-muted/60">{editBio.length}/160</p>
+                <p className="mt-1 text-right text-xs text-muted/60">{editBio.length}/160</p>
               </div>
 
               <div>
-                <label className="block text-xs uppercase tracking-[0.2em] text-muted">Profile Picture</label>
+                <label className="block text-sm text-muted">Profile Picture</label>
                 <div className="mt-2 flex items-center gap-4 rounded-lg border border-outline/60 bg-canvas/30 p-4">
                   {editImage ? (
                     <img src={editImage} alt="" className="h-16 w-16 rounded-full object-cover ring-1 ring-white/10" />
@@ -360,7 +361,7 @@ const Profile = () => {
                     <button
                       type="button"
                       onClick={() => fileInputRef.current?.click()}
-                      className="inline-flex items-center gap-2 rounded-full border border-outline px-4 py-2 text-xs uppercase tracking-[0.2em] text-muted transition-colors hover:text-white"
+                      className="inline-flex items-center gap-2 rounded-full border border-white/12 px-4 py-2 text-sm text-paper/80 transition-colors hover:border-white/30 hover:text-paper"
                     >
                       <FiUpload aria-hidden="true" />
                       Upload From Device
@@ -369,7 +370,7 @@ const Profile = () => {
                       <button
                         type="button"
                         onClick={() => setEditImage('')}
-                        className="rounded-full border border-outline px-4 py-2 text-xs uppercase tracking-[0.2em] text-muted transition-colors hover:text-white"
+                        className="rounded-full border border-white/12 px-4 py-2 text-sm text-paper/80 transition-colors hover:border-white/30 hover:text-paper"
                       >
                         Remove
                       </button>
@@ -396,14 +397,14 @@ const Profile = () => {
                   type="button"
                   onClick={handleProfileSave}
                   disabled={savingProfile}
-                  className="flex-1 rounded-full bg-white py-3 text-xs font-semibold uppercase tracking-[0.2em] text-canvas transition-opacity hover:opacity-90 disabled:opacity-40"
+                  className="flex-1 rounded-full bg-paper py-3 text-sm font-medium text-black transition-opacity hover:opacity-90 disabled:opacity-40"
                 >
                   {savingProfile ? 'Saving...' : 'Save Changes'}
                 </button>
                 <button
                   type="button"
                   onClick={() => setShowEditModal(false)}
-                  className="rounded-full border border-outline px-5 py-3 text-xs uppercase tracking-[0.2em] text-muted transition-colors hover:text-white"
+                  className="rounded-full border border-white/12 px-5 py-3 text-sm text-paper/80 transition-colors hover:border-white/30 hover:text-paper"
                 >
                   Cancel
                 </button>
@@ -414,72 +415,61 @@ const Profile = () => {
       )}
 
       <div className="mx-auto w-full max-w-6xl py-4 tablet:py-8">
-        <header className="py-8 text-center tablet:py-14">
-          {/* Avatar circle */}
-          {socialProfile?.image ? (
-            <img
-              src={socialProfile.image}
-              alt=""
-              className="mx-auto mb-5 h-20 w-20 rounded-full object-cover ring-1 ring-white/10"
-            />
-          ) : (
-            <div className="mx-auto mb-5 flex h-20 w-20 items-center justify-center rounded-full bg-outline/60 text-3xl font-bold text-muted">
-              {(user.name ?? user.email)?.charAt(0)?.toUpperCase() ?? '?'}
+        <header className="flex flex-col gap-8 border-b border-white/[0.07] pb-10 md:flex-row md:items-end md:justify-between">
+          <div className="flex min-w-0 flex-col gap-6 sm:flex-row sm:items-end">
+            {socialProfile?.image ? (
+              <img
+                src={socialProfile.image}
+                alt=""
+                className="h-24 w-24 shrink-0 rounded-full object-cover ring-1 ring-white/10 tablet:h-32 tablet:w-32"
+              />
+            ) : (
+              <div className="vinyl relative flex h-24 w-24 shrink-0 items-center justify-center tablet:h-32 tablet:w-32">
+                <span className="relative flex h-[40%] w-[40%] items-center justify-center rounded-full bg-paper font-display text-2xl text-black">
+                  {(user.name ?? user.email)?.charAt(0)?.toUpperCase() ?? '?'}
+                </span>
+              </div>
+            )}
+
+            <div className="min-w-0">
+              <h1 className="break-words font-display text-5xl leading-[0.95] text-paper tablet:text-7xl">
+                {user.name || user.email}
+              </h1>
+              <p className="mt-3 break-all text-sm text-muted">
+                {socialProfile?.username ? `@${socialProfile.username}` : user.email}
+              </p>
+              {socialProfile?.bio && (
+                <p className="mt-3 max-w-md text-paper/75">{socialProfile.bio}</p>
+              )}
+
+              {socialProfile && (
+                <div className="mt-4 flex items-center gap-5 text-sm">
+                  <button type="button" onClick={openFollowers} className="text-muted transition-colors hover:text-paper">
+                    <span className="font-medium text-paper">{socialProfile.followerCount ?? 0}</span> followers
+                  </button>
+                  <button type="button" onClick={openFollowing} className="text-muted transition-colors hover:text-paper">
+                    <span className="font-medium text-paper">{socialProfile.followingCount ?? 0}</span> following
+                  </button>
+                </div>
+              )}
             </div>
-          )}
+          </div>
 
-          <h1 className="mx-auto max-w-4xl break-words font-display text-4xl font-bold leading-tight tablet:text-7xl">
-            {user.name || user.email}
-          </h1>
-          <p className="mt-3 break-all text-sm text-muted tablet:mt-4 tablet:text-lg">{user.email}</p>
-
-          {socialProfile?.username && (
-            <p className="mt-2 text-sm text-muted">@{socialProfile.username}</p>
-          )}
-
-          {socialProfile?.bio && (
-            <p className="mx-auto mt-3 max-w-md text-sm text-white/70">{socialProfile.bio}</p>
-          )}
-
-          {/* Follower / Following counts */}
-          {socialProfile && (
-            <div className="mt-5 flex items-center justify-center gap-8 text-sm">
-              <button type="button" onClick={openFollowers} className="transition hover:text-white">
-                <span className="font-semibold text-white">{socialProfile.followerCount ?? 0}</span>
-                <span className="ml-1 text-muted">followers</span>
-              </button>
-              <button type="button" onClick={openFollowing} className="transition hover:text-white">
-                <span className="font-semibold text-white">{socialProfile.followingCount ?? 0}</span>
-                <span className="ml-1 text-muted">following</span>
-              </button>
-            </div>
-          )}
-
-          {/* Action buttons */}
-          <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
-            <button
-              type="button"
-              onClick={openEditModal}
-              className="inline-flex items-center gap-2 rounded-full border border-outline px-4 py-2 text-xs uppercase tracking-[0.24em] text-muted transition-colors duration-200 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas tablet:tracking-[0.3em]"
-            >
-              <FiEdit2 aria-hidden="true" />
-              Edit Profile
-            </button>
-
+          <div className="flex flex-wrap items-center gap-2">
             {!socialProfile?.username && !dashboardLoading && (
               <button
                 type="button"
                 onClick={() => setShowUsernameSetup(true)}
-                className="inline-flex items-center gap-2 rounded-full bg-white px-4 py-2 text-xs font-semibold uppercase tracking-[0.24em] text-canvas transition-opacity hover:opacity-90"
+                className="inline-flex items-center gap-2 rounded-full bg-paper px-4 py-2 text-sm font-medium text-black transition-opacity hover:opacity-90"
               >
                 Set Username
               </button>
             )}
-            <button
-              type="button"
-              onClick={handleSignOut}
-              className="inline-flex items-center gap-2 rounded-full border border-outline px-4 py-2 text-xs uppercase tracking-[0.24em] text-muted transition-colors duration-200 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas tablet:px-5 tablet:tracking-[0.3em]"
-            >
+            <button type="button" onClick={openEditModal} className="inline-flex items-center gap-2 rounded-full border border-white/12 px-4 py-2 text-sm text-paper/80 transition-colors hover:border-white/30 hover:text-paper">
+              <FiEdit2 aria-hidden="true" />
+              Edit Profile
+            </button>
+            <button type="button" onClick={handleSignOut} className="inline-flex items-center gap-2 rounded-full border border-white/12 px-4 py-2 text-sm text-paper/80 transition-colors hover:border-white/30 hover:text-paper">
               <FiLogOut aria-hidden="true" />
               Sign Out
             </button>
@@ -491,49 +481,44 @@ const Profile = () => {
           <TopGenres ratedAlbums={statsSourceAlbums} />
 
           <section>
-            <div className="mb-10 text-center">
-              <p className="text-xs font-bold uppercase tracking-[0.45em] text-muted">Listening History</p>
-              <h2 className="mt-2 font-display text-3xl font-bold tablet:text-4xl">Recently Rated</h2>
-              <div className="mt-4 flex items-center justify-center">
-                <Link
-                  to="/profile/history"
-                  className="inline-flex items-center gap-2 rounded-full border border-outline px-4 py-2 text-xs uppercase tracking-[0.22em] text-muted transition-colors hover:text-white"
-                >
-                  View Full History
-                </Link>
-              </div>
+            <div className="mb-8">
+              <SectionHeading
+                title="Recently Rated"
+                note="The last records you scored."
+                action={(
+                  <Link to="/profile/history" className="rounded-full px-3 py-1.5 text-sm text-muted transition-colors hover:bg-white/[0.06] hover:text-paper">
+                    View Full History
+                  </Link>
+                )}
+              />
             </div>
             <div className="flex snap-x snap-mandatory gap-4 overflow-x-auto pb-3 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+              {!recentlyRated.length && (
+                <p className="w-full rounded-2xl border border-dashed border-white/10 px-6 py-10 text-center text-sm text-muted">
+                  Nothing rated yet. <Link to="/discover" className="text-paper underline underline-offset-4">Find an album</Link> and give it some stars.
+                </p>
+              )}
               {recentlyRated.map((album) => (
                 <Link
                   to={`/album/${album.albumId}`}
                   key={album.albumId}
-                  className="group min-w-[220px] max-w-[220px] flex-none snap-start transition-transform duration-300 hover:-translate-y-1.5"
+                  className="group w-[180px] flex-none snap-start tablet:w-[200px]"
                 >
-                  <div className="overflow-hidden rounded-2xl border border-outline/70 bg-panel/70 transition-colors duration-200 group-hover:border-white/20">
-                    <div className="relative">
-                      <CoverImage
-                        src={album.cover}
-                        alt={album.name || 'Album cover'}
-                        className="block aspect-square w-full object-cover"
-                      />
-                      <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-black/80 via-black/15 to-transparent" />
-                      <div className="absolute bottom-3 left-3 rounded-full bg-black/70 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.24em] text-white/80">
-                        {album.rating.toFixed(1)} / 5
-                      </div>
-                    </div>
-                      <div className="space-y-2 px-4 py-4">
-                        <div>
-                        <h3 className="line-clamp-1 text-base font-semibold text-white">{album.name || 'Untitled album'}</h3>
-                        <p className="line-clamp-1 text-sm text-muted">
-                          {album.artists?.[0] ?? 'Unknown artist'}
-                        </p>
-                        </div>
-                      <p className="text-right text-[11px] uppercase tracking-[0.2em] text-muted/80">
-                        {formatReviewedAt(album.timestamp)}
-                      </p>
-                    </div>
+                  <div className="relative overflow-hidden rounded-[4px] shadow-sleeve transition-transform duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] group-hover:-translate-y-1">
+                    <CoverImage
+                      src={album.cover}
+                      alt={album.name || 'Album cover'}
+                      className="block aspect-square w-full object-cover"
+                    />
+                    <span className="absolute bottom-2 left-2 rounded-full bg-black/70 px-2.5 py-1 text-xs text-paper backdrop-blur">
+                      {album.rating.toFixed(1)}
+                    </span>
                   </div>
+                  <h3 className="mt-3 line-clamp-1 font-display text-lg leading-tight text-paper">{album.name || 'Untitled album'}</h3>
+                  <p className="flex justify-between gap-2 text-sm text-muted">
+                    <span className="truncate">{album.artists?.[0] ?? 'Unknown artist'}</span>
+                    <span className="shrink-0 text-xs">{formatReviewedAt(album.timestamp)}</span>
+                  </p>
                 </Link>
               ))}
             </div>
@@ -541,19 +526,18 @@ const Profile = () => {
 
           {!dashboardLoading && <AlbumSlotMachine key={user.id} userId={user.id} lists={dashboard?.lists ?? []} />}
 
-          <section className="mt-20">
-            <div className="mb-12 text-center">
-              <p className="text-xs font-bold uppercase tracking-[0.45em] text-muted">Personal Library</p>
-              <h2 className="mt-2 font-display text-3xl font-bold tablet:text-5xl">Your Collections</h2>
+          <section className="mt-24">
+            <div className="mb-10">
+              <SectionHeading title="Your Collections" note="Lists you've built, newest first." />
             </div>
-            
+
             <div className="grid grid-cols-1 gap-8 tablet:grid-cols-2 lg:grid-cols-2">
               {dashboard?.lists?.length ? (
                 dashboard.lists.map((list) => (
                   <ListCard key={list.id} list={list} />
                 ))
               ) : (
-                <div className="col-span-full rounded-[2.5rem] border border-dashed border-outline/60 bg-panel/20 p-12 text-center text-muted/60 uppercase tracking-widest text-[10px] font-bold">
+                <div className="col-span-full rounded-2xl border border-dashed border-white/10 p-12 text-center text-sm text-muted">
                   No lists created yet.
                 </div>
               )}

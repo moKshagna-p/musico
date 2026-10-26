@@ -1,4 +1,5 @@
-const shimmerDelays = ['0ms', '90ms', '180ms']
+import { ALBUM_GRID_CLASS } from '../album/AlbumGrid.jsx'
+import LoadingSkeleton from './LoadingSkeleton.jsx'
 
 const PageLoadingState = ({ title = 'Loading content', cards = 3, compact = false }) => {
   return (
@@ -14,22 +15,8 @@ const PageLoadingState = ({ title = 'Loading content', cards = 3, compact = fals
           <div className="h-4 w-80 max-w-[85%] rounded-full bg-outline/60" />
         </div>
 
-        <div className="grid gap-6 tablet:grid-cols-2 laptop:grid-cols-3">
-          {Array.from({ length: cards }).map((_, index) => (
-            <div
-              key={index}
-              className="space-y-4 rounded-3xl border border-outline/50 bg-panel/60 p-4"
-              style={{ animationDelay: shimmerDelays[index % shimmerDelays.length] }}
-            >
-              <div className="aspect-square rounded-2xl bg-gradient-to-r from-black via-neutral-800 to-black bg-[length:400px_100%] animate-shimmer" />
-              <div className="h-6 w-3/4 rounded-full bg-outline" />
-              <div className="h-4 w-1/2 rounded-full bg-outline/80" />
-              <div className="flex gap-3">
-                <div className="h-4 w-20 rounded-full bg-outline/70" />
-                <div className="h-4 w-14 rounded-full bg-outline/60" />
-              </div>
-            </div>
-          ))}
+        <div className={ALBUM_GRID_CLASS}>
+          <LoadingSkeleton count={cards} />
         </div>
       </div>
     </section>
@@ -68,18 +55,8 @@ export const DiscoverPageSkeleton = () => {
       </div>
       <div className="space-y-4">
         <div className="h-3 w-28 rounded-full bg-outline/70" />
-        <div className="grid gap-6 tablet:grid-cols-2 laptop:grid-cols-3">
-          {Array.from({ length: 6 }).map((_, index) => (
-            <div key={index} className="space-y-4 rounded-3xl border border-outline/50 bg-panel/60 p-4">
-              <div className="aspect-square rounded-2xl bg-gradient-to-r from-black via-neutral-800 to-black bg-[length:400px_100%] animate-shimmer" />
-              <div className="h-6 w-3/4 rounded-full bg-outline" />
-              <div className="h-4 w-1/2 rounded-full bg-outline/80" />
-              <div className="flex gap-3">
-                <div className="h-4 w-20 rounded-full bg-outline/70" />
-                <div className="h-4 w-14 rounded-full bg-outline/60" />
-              </div>
-            </div>
-          ))}
+        <div className={ALBUM_GRID_CLASS}>
+          <LoadingSkeleton count={8} />
         </div>
       </div>
     </section>
@@ -101,19 +78,9 @@ export const SearchResultsPageSkeleton = () => {
           <div className="h-7 w-14 rounded-lg bg-outline/45" />
         </div>
       </div>
-      <div className="grid gap-6 tablet:grid-cols-2 laptop:grid-cols-3">
-        {Array.from({ length: 6 }).map((_, index) => (
-          <div key={index} className="space-y-4 rounded-3xl border border-outline/50 bg-panel/60 p-4">
-            <div className="aspect-square rounded-2xl bg-gradient-to-r from-black via-neutral-800 to-black bg-[length:400px_100%] animate-shimmer" />
-            <div className="h-6 w-3/4 rounded-full bg-outline" />
-            <div className="h-4 w-1/2 rounded-full bg-outline/80" />
-            <div className="flex gap-3">
-              <div className="h-4 w-20 rounded-full bg-outline/70" />
-              <div className="h-4 w-14 rounded-full bg-outline/60" />
-            </div>
-          </div>
-        ))}
-      </div>
+      <div className={ALBUM_GRID_CLASS}>
+          <LoadingSkeleton count={8} />
+        </div>
     </section>
   )
 }
@@ -151,30 +118,17 @@ export const FeedPageSkeleton = () => {
 
 export const AuthPageSkeleton = () => {
   return (
-    <section aria-busy="true" aria-label="Loading auth" className="mx-auto w-full max-w-xl px-2 py-8 tablet:py-14">
-      <div className="overflow-hidden rounded-3xl border border-white/15 bg-panel/95 shadow-[0_24px_84px_rgba(0,0,0,0.5)]">
-        <div className="border-b border-outline/80 px-5 py-6 tablet:px-8 tablet:py-8">
-          <div className="h-3 w-28 rounded-full bg-outline/70" />
-          <div className="mt-4 h-12 w-52 rounded-[1rem] bg-gradient-to-r from-white/10 via-white/5 to-white/10 bg-[length:220px_100%] animate-shimmer" />
-          <div className="mt-4 h-4 w-full max-w-sm rounded-full bg-outline/60" />
-        </div>
-        <div className="p-5 tablet:p-8">
-          <div className="mb-6 grid grid-cols-2 gap-2 rounded-full border border-outline bg-canvas p-1">
-            <div className="h-10 rounded-full bg-outline/60" />
-            <div className="h-10 rounded-full bg-outline/35" />
-          </div>
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <div className="h-3 w-16 rounded-full bg-outline/70" />
-              <div className="h-12 rounded-xl bg-outline/45" />
-            </div>
-            <div className="space-y-2">
-              <div className="h-3 w-20 rounded-full bg-outline/70" />
-              <div className="h-12 rounded-xl bg-outline/45" />
-            </div>
-            <div className="h-12 rounded-full bg-outline/60" />
-          </div>
-        </div>
+    <section aria-busy="true" aria-label="Loading auth" className="mx-auto grid w-full max-w-5xl items-center gap-12 py-6 md:grid-cols-[1fr_minmax(0,26rem)] tablet:py-16">
+      <div className="hidden md:block">
+        <div className="vinyl relative mx-auto aspect-square w-[85%] opacity-60" />
+      </div>
+      <div className="space-y-4">
+        <div className="h-14 w-48 rounded-2xl bg-gradient-to-r from-white/[0.04] via-white/[0.08] to-white/[0.04] bg-[length:400px_100%] motion-safe:animate-shimmer" />
+        <div className="h-4 w-full max-w-sm rounded-full bg-white/[0.05]" />
+        <div className="!mt-8 h-12 rounded-full bg-white/[0.04]" />
+        <div className="h-14 rounded-2xl bg-white/[0.04]" />
+        <div className="h-14 rounded-2xl bg-white/[0.04]" />
+        <div className="h-12 rounded-full bg-white/[0.08]" />
       </div>
     </section>
   )
@@ -182,61 +136,35 @@ export const AuthPageSkeleton = () => {
 
 export const AlbumDetailsPageSkeleton = () => {
   return (
-    <section aria-busy="true" aria-label="Loading album details" className="space-y-8">
-      <div className="h-3 w-20 rounded-full bg-outline/60" />
-      <div className="grid gap-10 tablet:grid-cols-[360px,1fr]">
-        <aside className="space-y-6">
-          <div className="rounded-2xl border border-white/10 bg-panel p-2">
-            <div className="aspect-square rounded-xl bg-gradient-to-r from-black via-neutral-800 to-black bg-[length:400px_100%] animate-shimmer" />
+    <section aria-busy="true" aria-label="Loading album details">
+      <div className="mb-10 h-4 w-16 rounded-full bg-white/[0.05]" />
+      <div className="grid items-end gap-10 md:grid-cols-[minmax(0,26rem)_1fr] tablet:gap-16">
+        <div className="pr-[30%]">
+          <div className="aspect-square rounded-[4px] bg-gradient-to-r from-white/[0.04] via-white/[0.08] to-white/[0.04] bg-[length:400px_100%] motion-safe:animate-shimmer" />
+        </div>
+        <div className="space-y-4">
+          <div className="h-4 w-20 rounded-full bg-white/[0.05]" />
+          <div className="h-20 w-full max-w-xl rounded-2xl bg-gradient-to-r from-white/[0.04] via-white/[0.08] to-white/[0.04] bg-[length:400px_100%] motion-safe:animate-shimmer" />
+          <div className="h-5 w-48 rounded-full bg-white/[0.06]" />
+          <div className="h-4 w-36 rounded-full bg-white/[0.04]" />
+          <div className="!mt-8 flex gap-10 border-t border-white/10 pt-6">
+            <div className="h-16 w-32 rounded-2xl bg-white/[0.05]" />
+            <div className="h-16 w-44 rounded-2xl bg-white/[0.04]" />
           </div>
-          <div className="rounded-2xl border border-outline/50 bg-panel/40 p-5">
-            <div className="space-y-3">
-              <div className="h-4 w-24 rounded-full bg-outline/65" />
-              <div className="h-10 rounded-xl bg-outline/45" />
-              <div className="h-10 rounded-xl bg-outline/35" />
-              <div className="h-10 rounded-xl bg-outline/30" />
-            </div>
-          </div>
-        </aside>
-        <section className="space-y-10">
-          <header className="space-y-3 border-b border-outline pb-7">
-            <div className="h-3 w-14 rounded-full bg-outline/70" />
-            <div className="h-14 w-full max-w-2xl rounded-[1.2rem] bg-gradient-to-r from-white/10 via-white/5 to-white/10 bg-[length:320px_100%] animate-shimmer" />
-            <div className="h-5 w-72 rounded-full bg-outline/60" />
-            <div className="h-3 w-56 rounded-full bg-outline/50" />
-            <div className="h-3 w-44 rounded-full bg-outline/50" />
-          </header>
-          <div className="grid gap-10 tablet:grid-cols-[0.62fr,1fr]">
-            <section className="space-y-4 border-b border-outline pb-8 tablet:border-b-0 tablet:border-r tablet:pb-0 tablet:pr-8">
-              <div className="h-3 w-16 rounded-full bg-outline/70" />
-              <div className="h-16 w-28 rounded-[1rem] bg-gradient-to-r from-white/10 via-white/5 to-white/10 bg-[length:220px_100%] animate-shimmer" />
-              <div className="h-3 w-20 rounded-full bg-outline/55" />
-              <div className="space-y-2 pt-3">
-                <div className="flex gap-2">
-                  {Array.from({ length: 5 }).map((_, index) => (
-                    <div key={index} className="h-8 w-8 rounded-full bg-outline/40" />
-                  ))}
-                </div>
-                <div className="h-3 w-20 rounded-full bg-outline/50" />
-              </div>
-            </section>
-            <section className="rounded-[2rem] bg-panel/45 p-5 tablet:p-6">
-              <div className="space-y-4">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="space-y-2">
-                    <div className="h-3 w-16 rounded-full bg-outline/60" />
-                    <div className="h-4 w-24 rounded-full bg-outline/45" />
-                  </div>
-                  <div className="h-3 w-16 rounded-full bg-outline/45" />
-                </div>
-                <div className="h-10 rounded-xl bg-outline/35" />
-                {Array.from({ length: 3 }).map((_, index) => (
-                  <div key={index} className="h-14 rounded-xl bg-outline/25" />
-                ))}
-              </div>
-            </section>
-          </div>
-        </section>
+        </div>
+      </div>
+      <div className="mt-12 flex gap-2">
+        {Array.from({ length: 4 }).map((_, index) => (
+          <div key={index} className="h-9 w-28 rounded-full bg-white/[0.04]" />
+        ))}
+      </div>
+      <div className="mt-20 grid gap-16 lg:grid-cols-[minmax(0,1fr)_22rem]">
+        <div className="space-y-px">
+          {Array.from({ length: 6 }).map((_, index) => (
+            <div key={index} className="h-12 border-b border-white/[0.06]" />
+          ))}
+        </div>
+        <div className="h-64 rounded-2xl border border-white/[0.06] bg-white/[0.02]" />
       </div>
     </section>
   )
@@ -279,11 +207,9 @@ export const NotFoundPageSkeleton = () => {
   )
 }
 
-export const ProfilePageSkeleton = ({ withBackButton = false, showActions = false }) => {
+export const ProfilePageSkeleton = ({ showActions = false }) => {
   return (
     <section aria-busy="true" aria-label="Loading profile" className="mx-auto w-full max-w-6xl py-4 tablet:py-8">
-      {withBackButton ? <div className="h-4 w-20 rounded-full bg-outline/70" /> : null}
-
       <div className="py-8 text-center tablet:py-14">
         <div className="mx-auto mb-5 h-20 w-20 animate-pulse rounded-full bg-outline/60" />
         <div className="mx-auto h-12 w-64 max-w-[75%] rounded-full bg-gradient-to-r from-white/10 via-white/5 to-white/10 bg-[length:240px_100%] animate-shimmer tablet:h-16" />
@@ -337,15 +263,9 @@ export const ProfilePageSkeleton = ({ withBackButton = false, showActions = fals
             <div className="mx-auto mt-3 h-10 w-64 rounded-full bg-gradient-to-r from-white/10 via-white/5 to-white/10 bg-[length:220px_100%] animate-shimmer" />
           </div>
 
-          <div className="grid gap-6 tablet:grid-cols-2 laptop:grid-cols-3">
-            {Array.from({ length: 6 }).map((_, index) => (
-              <div key={index} className="space-y-4 rounded-3xl border border-outline/50 bg-panel/60 p-4">
-                <div className="aspect-square rounded-2xl bg-gradient-to-r from-black via-neutral-800 to-black bg-[length:400px_100%] animate-shimmer" />
-                <div className="h-5 w-3/4 rounded-full bg-outline" />
-                <div className="h-4 w-1/2 rounded-full bg-outline/80" />
-              </div>
-            ))}
-          </div>
+          <div className={ALBUM_GRID_CLASS}>
+          <LoadingSkeleton count={8} />
+        </div>
         </section>
 
         <section className="mt-16">

@@ -133,7 +133,7 @@ const RatingStars = ({ value = 0, onRate, readOnly = false, showValue = false, s
             exit={{ opacity: 0, y: -40 }}
             className="absolute -top-4 right-0 pointer-events-none"
           >
-            <span className="text-[10px] font-bold uppercase tracking-[0.3em] text-white">
+            <span className="text-xs font-bold text-white">
               {confirmationLabel}
             </span>
           </MotionDiv>
@@ -141,7 +141,7 @@ const RatingStars = ({ value = 0, onRate, readOnly = false, showValue = false, s
       </AnimatePresence>
 
       {showValue && (
-        <p className="text-xs uppercase tracking-[0.3em] text-muted">
+        <p className="text-xs text-muted">
           {displayValue ? `${displayValue.toFixed(1)} / 5` : readOnly ? 'Unrated' : 'Rate'}
         </p>
       )}

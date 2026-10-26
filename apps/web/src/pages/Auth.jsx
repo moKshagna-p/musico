@@ -84,114 +84,121 @@ const Auth = () => {
 
   if (user) return null
 
+  const tabClass = (active) =>
+    `relative rounded-full px-3 py-2 text-sm transition-colors ${active ? 'text-black' : 'text-muted hover:text-paper'}`
+
   return (
     <PageTransition>
-      <section className="mx-auto w-full max-w-xl px-2 py-8 tablet:py-14">
-        <div className="overflow-hidden rounded-3xl border border-white/15 bg-panel/95 shadow-[0_24px_84px_rgba(0,0,0,0.5)]">
-          <div className="border-b border-outline/80 bg-[linear-gradient(120deg,rgba(255,255,255,0.11),rgba(255,255,255,0.02)_52%,rgba(255,255,255,0.08))] px-5 py-6 tablet:px-8 tablet:py-8">
-            <p className="text-xs uppercase tracking-[0.33em] text-muted">Musico Account</p>
-            <h1 className="mt-3 font-display text-4xl leading-tight text-white tablet:text-5xl">{title}</h1>
-            <p className="mt-3 max-w-lg text-sm text-muted tablet:text-base">
-              Access your ratings, lists, and listening profile.
-            </p>
+      <section className="relative mx-auto grid w-full max-w-5xl items-center gap-12 py-6 md:grid-cols-[1fr_minmax(0,26rem)] tablet:py-16">
+        <div className="relative hidden md:block" aria-hidden="true">
+          <div className="vinyl relative mx-auto aspect-square w-[85%] motion-safe:animate-[vinylSpin_24s_linear_infinite]">
+            <div className="absolute inset-[33%] rounded-full bg-paper">
+              <span className="absolute left-1/2 top-[22%] -translate-x-1/2 font-display text-2xl text-black">musico</span>
+              <span className="absolute left-1/2 top-1/2 h-[12%] w-[12%] -translate-x-1/2 -translate-y-1/2 rounded-full bg-black" />
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <h1 className="font-display text-5xl leading-none text-paper tablet:text-6xl">{title}</h1>
+          <p className="mt-4 text-muted">
+            {mode === 'sign-in' ? 'Welcome back. Your ratings, lists, and listening profile are waiting.' : 'Start rating records and building lists in under a minute.'}
+          </p>
+
+          <div className="relative mt-8 grid grid-cols-2 rounded-full border border-white/10 bg-white/[0.03] p-1">
+            <span
+              aria-hidden="true"
+              className={`absolute inset-y-1 left-1 w-[calc(50%-0.25rem)] rounded-full bg-paper transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] ${mode === 'sign-up' ? 'translate-x-full' : ''}`}
+            />
+            <button
+              type="button"
+              onClick={() => {
+                setMode('sign-in')
+                setError('')
+              }}
+              className={tabClass(mode === 'sign-in')}
+            >
+              Sign In
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setMode('sign-up')
+                setError('')
+              }}
+              className={tabClass(mode === 'sign-up')}
+            >
+              Create Account
+            </button>
           </div>
 
-          <div className="p-5 tablet:p-8">
-            <div className="mb-6 grid grid-cols-2 rounded-full border border-outline bg-canvas p-1">
-              <button
-                type="button"
-                onClick={() => {
-                  setMode('sign-in')
-                  setError('')
-                }}
-                className={`rounded-full px-3 py-2 text-xs uppercase tracking-[0.22em] transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas ${
-                  mode === 'sign-in' ? 'bg-white/12 text-white' : 'text-muted hover:text-white'
-                }`}
-              >
-                Sign In
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setMode('sign-up')
-                  setError('')
-                }}
-                className={`rounded-full px-3 py-2 text-xs uppercase tracking-[0.22em] transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas ${
-                  mode === 'sign-up' ? 'bg-white/12 text-white' : 'text-muted hover:text-white'
-                }`}
-              >
-                Create Account
-              </button>
+          <form onSubmit={onSubmit} className="mt-6 space-y-4">
+            {mode === 'sign-up' && (
+              <div>
+                <label htmlFor="name" className="mb-1.5 block text-sm text-muted">
+                  Name
+                </label>
+                <input
+                  id="name"
+                  name="name"
+                  value={name}
+                  onChange={(event) => setName(event.target.value)}
+                  autoComplete="name"
+                  className="w-full rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-3.5 text-paper placeholder:text-muted/70 outline-none transition focus:border-white/35 focus:bg-white/[0.05] focus-visible:outline-none"
+                  placeholder="Your name"
+                />
+              </div>
+            )}
+
+            <div>
+              <label htmlFor="email" className="mb-1.5 block text-sm text-muted">
+                Email
+              </label>
+              <input
+                id="email"
+                name="email"
+                type="email"
+                required
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
+                autoComplete="email"
+                spellCheck={false}
+                className="w-full rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-3.5 text-paper placeholder:text-muted/70 outline-none transition focus:border-white/35 focus:bg-white/[0.05] focus-visible:outline-none"
+                placeholder="you@example.com"
+              />
             </div>
 
-            <form onSubmit={onSubmit} className="space-y-4">
-              {mode === 'sign-up' && (
-                <div>
-                  <label htmlFor="name" className="mb-1 block text-xs uppercase tracking-[0.3em] text-muted">
-                    Name
-                  </label>
-                  <input
-                    id="name"
-                    name="name"
-                    value={name}
-                    onChange={(event) => setName(event.target.value)}
-                    autoComplete="name"
-                    className="w-full rounded-xl border border-outline bg-canvas px-4 py-3 text-white outline-none transition focus:border-white/35 focus-visible:ring-2 focus-visible:ring-white/35 focus-visible:ring-offset-1 focus-visible:ring-offset-canvas"
-                    placeholder="Your Name"
-                  />
-                </div>
-              )}
+            <div>
+              <label htmlFor="password" className="mb-1.5 block text-sm text-muted">
+                Password
+              </label>
+              <input
+                id="password"
+                name="password"
+                type="password"
+                required
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+                autoComplete={mode === 'sign-in' ? 'current-password' : 'new-password'}
+                className="w-full rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-3.5 text-paper placeholder:text-muted/70 outline-none transition focus:border-white/35 focus:bg-white/[0.05] focus-visible:outline-none"
+                placeholder="••••••••"
+              />
+            </div>
 
-              <div>
-                <label htmlFor="email" className="mb-1 block text-xs uppercase tracking-[0.3em] text-muted">
-                  Email
-                </label>
-                <input
-                  id="email"
-                  name="email"
-                  type="email"
-                  required
-                  value={email}
-                  onChange={(event) => setEmail(event.target.value)}
-                  autoComplete="email"
-                  spellCheck={false}
-                  className="w-full rounded-xl border border-outline bg-canvas px-4 py-3 text-white outline-none transition focus:border-white/35 focus-visible:ring-2 focus-visible:ring-white/35 focus-visible:ring-offset-1 focus-visible:ring-offset-canvas"
-                  placeholder="you@example.com"
-                />
-              </div>
+            {error && (
+              <p aria-live="polite" className="rounded-2xl border border-red-300/20 bg-red-400/[0.08] px-4 py-3 text-sm text-red-200">
+                {error}
+              </p>
+            )}
 
-              <div>
-                <label htmlFor="password" className="mb-1 block text-xs uppercase tracking-[0.3em] text-muted">
-                  Password
-                </label>
-                <input
-                  id="password"
-                  name="password"
-                  type="password"
-                  required
-                  value={password}
-                  onChange={(event) => setPassword(event.target.value)}
-                  autoComplete={mode === 'sign-in' ? 'current-password' : 'new-password'}
-                  className="w-full rounded-xl border border-outline bg-canvas px-4 py-3 text-white outline-none transition focus:border-white/35 focus-visible:ring-2 focus-visible:ring-white/35 focus-visible:ring-offset-1 focus-visible:ring-offset-canvas"
-                  placeholder="••••••••"
-                />
-              </div>
-
-              {error && (
-                <p aria-live="polite" className="rounded-xl border border-red-300/30 bg-red-400/10 px-3 py-2 text-sm text-red-200">
-                  {error}
-                </p>
-              )}
-
-              <button
-                type="submit"
-                disabled={submitting}
-                className="w-full rounded-full border border-outline bg-white/10 px-4 py-3 text-xs uppercase tracking-[0.35em] text-white transition hover:bg-white/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                {submitLabel}
-              </button>
-            </form>
-          </div>
+            <button
+              type="submit"
+              disabled={submitting}
+              className="w-full rounded-full bg-paper px-4 py-3.5 text-sm font-medium text-black transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {submitLabel}
+            </button>
+          </form>
         </div>
       </section>
     </PageTransition>
