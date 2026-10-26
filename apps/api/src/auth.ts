@@ -23,6 +23,14 @@ const initAuth = () => {
     baseURL: env.BETTER_AUTH_URL,
     secret: env.BETTER_AUTH_SECRET,
     trustedOrigins: env.ALLOWED_ORIGINS,
+    // ponytail: every authed route paid a Neon round trip just to read the session.
+    // A session revoked elsewhere stays valid here for up to maxAge; shorten it if that matters.
+    session: {
+      cookieCache: {
+        enabled: true,
+        maxAge: 5 * 60,
+      },
+    },
     plugins: [
       multiSession({
         maximumSessions: 1,
