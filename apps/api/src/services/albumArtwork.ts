@@ -7,7 +7,7 @@ import { inArray, sql } from 'drizzle-orm'
 
 import { db } from '../core/db'
 import { albumArtwork } from '../core/schema'
-import { normalizeName } from './artistImages'
+import { normalizeName, searchAppleMusic } from './artistImages'
 
 type Fetcher = (input: string, init?: RequestInit) => Promise<Response>
 type ArtworkRow = { albumId: string; cover: string | null; checkedAt: Date }
@@ -42,23 +42,17 @@ export const findAppleAlbumCover = async (artist: string, album: string, fetcher
   const targetAlbum = normalizeTitle(album)
   if (!targetArtist || !targetAlbum) return null
 
-  const term = encodeURIComponent(`${artist} ${album}`)
-  const response = await fetcher(`https://itunes.apple.com/search?term=${term}&entity=album&limit=10`, {
-    signal: AbortSignal.timeout(LOOKUP_TIMEOUT_MS),
-  })
-  if (!response.ok) throw Object.assign(new Error(`iTunes search failed (${response.status})`), { status: response.status })
-
-  const payload = (await response.json()) as {
-    results?: Array<{ artistName?: string; collectionName?: string; artworkUrl100?: string }>
-  }
-  const match = (payload.results ?? []).find(
-    (result) =>
-      artistMatches(String(result.artistName ?? ''), targetArtist) &&
-      normalizeTitle(String(result.collectionName ?? '')) === targetAlbum,
+  const items = await searchAppleMusic(`${artist} ${album}`, fetcher, LOOKUP_TIMEOUT_MS)
+  const match = items.find(
+    (item) =>
+      item.kind === 'album' &&
+      // Subtitles read "Album · Drake" (or "Single · ..."); the artist follows the first dot.
+      artistMatches(item.subtitle.split(/\s+·\s+/).slice(1).join(' · '), targetArtist) &&
+      normalizeTitle(item.title) === targetAlbum,
   )
-  const artwork = match?.artworkUrl100 ?? ''
-  if (!/^https:\/\/[a-z0-9-]+\.mzstatic\.com\/image\/thumb\//i.test(artwork)) return null
-  return artwork.replace(/\/\d+x\d+[a-z]*\.(?:png|jpe?g|webp)$/i, `/${COVER_SIZE}x${COVER_SIZE}bb.jpg`)
+  const artwork = typeof match?.artwork?.url === 'string' ? match.artwork.url : ''
+  if (!/^https:\/\/[a-z0-9-]+\.mzstatic\.com\/image\/thumb\/.+\/\{w\}x\{h\}[a-z]*\.\{f\}$/i.test(artwork)) return null
+  return artwork.replace(/\{w\}x\{h\}[a-z]*\.\{f\}$/i, `${COVER_SIZE}x${COVER_SIZE}bb.jpg`)
 }
 
 const dbStore: ArtworkStore = {
