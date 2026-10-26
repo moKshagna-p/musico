@@ -264,10 +264,16 @@ const AlbumDetails = () => {
               <div className="mt-7 flex flex-wrap items-end gap-x-10 gap-y-5">
                 <div>
                   <p className="text-sm text-paper/60">Community score</p>
-                  <p className="mt-1 flex items-baseline gap-2">
-                    <span className="font-display text-5xl leading-none text-paper">{community.average?.toFixed(1)}</span>
-                    <span className="text-sm text-paper/60">{formatLargeNumber(community.total)} votes</span>
-                  </p>
+                  {community.total > 0 ? (
+                    <p className="mt-1 flex items-baseline gap-2">
+                      <span className="font-display text-5xl leading-none text-paper">{community.average?.toFixed(1)}</span>
+                      <span className="text-sm text-paper/60">
+                        {formatLargeNumber(community.total)} {community.total === 1 ? 'vote' : 'votes'}
+                      </span>
+                    </p>
+                  ) : (
+                    <p className="mt-1 text-xl font-medium text-paper/85">No ratings yet</p>
+                  )}
                 </div>
                 <div>
                   <p className="mb-1 text-sm text-paper/60">{isSignedIn ? 'Your rating' : 'Sign in required to rate'}</p>
