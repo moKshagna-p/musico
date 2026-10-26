@@ -31,7 +31,12 @@ const Home = () => {
 
   return (
     <PageTransition bleed>
-      <Billboard artist={topAlbum?.artists?.[0]} cover={topAlbum?.cover} gutter={WIDE_GUTTER}>
+      <Billboard
+        artist={topAlbum?.artists?.[0]}
+        cover={topAlbum?.cover}
+        gutter={WIDE_GUTTER}
+        className={topAlbum || loading ? undefined : 'min-h-[50svh]'}
+      >
         {topAlbum ? (
           <div className="flex flex-col gap-8 md:flex-row md:items-end md:gap-10">
             {/* Phones skip the sleeve: it would cover the artist photo, and the same cover leads the chart row below. */}
@@ -58,6 +63,17 @@ const Home = () => {
                 Open album <FiArrowUpRight aria-hidden="true" />
               </Link>
             </div>
+          </div>
+        ) : !loading ? (
+          // The chart failed or came back empty; the rows below explain which.
+          <div className="max-w-2xl">
+            <h1 className="text-balance font-display text-5xl leading-[0.92] text-paper tablet:text-7xl">Dig through the vault</h1>
+            <Link
+              to="/discover"
+              className="mt-8 inline-flex items-center gap-2 rounded-full bg-paper px-6 py-3 text-sm font-semibold text-black transition-transform hover:scale-[1.03]"
+            >
+              Discover albums <FiArrowUpRight aria-hidden="true" />
+            </Link>
           </div>
         ) : (
           <div aria-hidden="true" className="max-w-xl space-y-5">
