@@ -8,3 +8,5 @@ SEARCH_CACHE_TTL_MS="604800000"
 DISCOGS_MIN_REQUEST_INTERVAL_MS="1100"
 HOME_RELEASE_DETAILS_PREWARM_LIMIT="6"
 CRON_SECRET="replace_with_a_long_random_secret"
+# Optional: fanart.tv personal API key for wide artist backgrounds
+FANART_API_KEY="your_fanart_api_key"
