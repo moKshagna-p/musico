@@ -95,20 +95,28 @@ type AppleArt = { wide: ArtistImage | null; portrait: ArtistImage | null }
 
 const readServerData = (html: string) => html.match(/<script[^>]+id=["']serialized-server-data["'][^>]*>([\s\S]*?)<\/script>/i)?.[1]
 
-// One search result, e.g. { kind: 'album', title: 'Take Care', subtitle: 'Album · Drake', ... }.
-export type AppleSearchItem = { kind: string; title: string; subtitle: string; url: string; artwork?: AppleArtwork }
+// One search result, e.g. { kind: 'album', title: 'Take Care', artist: 'Drake', ... }.
+export type AppleSearchItem = { kind: string; title: string; artist: string; url: string; artwork?: AppleArtwork }
+
+type Link = { title?: unknown }
+const linkTitles = (links: Link[]) => links.map((link) => String(link?.title ?? '')).join(', ')
 
 const collectSearchItems = (node: unknown, out: AppleSearchItem[] = []) => {
   if (Array.isArray(node)) node.forEach((item) => collectSearchItems(item, out))
   else if (node && typeof node === 'object') {
-    const { title, subtitle, contentDescriptor, artwork } = node as {
+    const { title, titleLinks, subtitle, subtitleLinks, contentDescriptor, artwork } = node as {
       title?: unknown
+      titleLinks?: unknown
       subtitle?: unknown
+      subtitleLinks?: unknown
       contentDescriptor?: { kind?: unknown; url?: unknown }
       artwork?: { dictionary?: AppleArtwork }
     }
-    if (typeof title === 'string' && typeof contentDescriptor?.url === 'string') {
-      out.push({ kind: String(contentDescriptor.kind), title, subtitle: String(subtitle ?? ''), url: contentDescriptor.url, artwork: artwork?.dictionary })
+    // Top results use plain text ("Album · Drake"); the per-kind sections link the title and each artist instead.
+    const name = typeof title === 'string' ? title : Array.isArray(titleLinks) ? linkTitles(titleLinks) : ''
+    const artist = Array.isArray(subtitleLinks) ? linkTitles(subtitleLinks) : String(subtitle ?? '').split(/\s+·\s+/).slice(1).join(' · ')
+    if (name && typeof contentDescriptor?.url === 'string') {
+      out.push({ kind: String(contentDescriptor.kind), title: name, artist, url: contentDescriptor.url, artwork: artwork?.dictionary })
     }
     Object.values(node).forEach((value) => collectSearchItems(value, out))
   }

@@ -19,7 +19,8 @@ export type ArtworkStore = {
 }
 
 const COVER_SIZE = 1200
-const LOOKUP_TIMEOUT_MS = 2500
+// Apple renders uncached search pages in 2-3s; each album is looked up once and the answer stored.
+const LOOKUP_TIMEOUT_MS = 5000
 const RECHECK_MISS_MS = 1000 * 60 * 60 * 24 * 30
 const RATE_LIMIT_BACKOFF_MS = 1000 * 60 * 10
 
@@ -44,11 +45,7 @@ export const findAppleAlbumCover = async (artist: string, album: string, fetcher
 
   const items = await searchAppleMusic(`${artist} ${album}`, fetcher, LOOKUP_TIMEOUT_MS)
   const match = items.find(
-    (item) =>
-      item.kind === 'album' &&
-      // Subtitles read "Album · Drake" (or "Single · ..."); the artist follows the first dot.
-      artistMatches(item.subtitle.split(/\s+·\s+/).slice(1).join(' · '), targetArtist) &&
-      normalizeTitle(item.title) === targetAlbum,
+    (item) => item.kind === 'album' && artistMatches(item.artist, targetArtist) && normalizeTitle(item.title) === targetAlbum,
   )
   const artwork = typeof match?.artwork?.url === 'string' ? match.artwork.url : ''
   if (!/^https:\/\/[a-z0-9-]+\.mzstatic\.com\/image\/thumb\/.+\/\{w\}x\{h\}[a-z]*\.\{f\}$/i.test(artwork)) return null

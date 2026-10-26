@@ -1,6 +1,7 @@
 import { expect, test } from 'bun:test'
 
 import { attachHdCovers, cleanDiscogsArtist, findAppleAlbumCover, type ArtworkStore } from './albumArtwork'
+import { searchAppleMusic } from './artistImages'
 
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } })
@@ -67,4 +68,21 @@ test('keeps Discogs covers when the artwork table cannot be read', async () => {
   const store: ArtworkStore = { read: async () => { throw new Error('relation "album_artwork" does not exist') }, write: async () => {} }
   const releases = [album('a')]
   expect(await attachHdCovers(releases, { store, fetcher: async () => json({}) })).toBe(releases)
+})
+
+test('reads artists and albums from a saved Apple Music search page', async () => {
+  // Trimmed from a real music.apple.com/us/search response for "Taylor Swift The Life Of A Showgirl".
+  const page = await Bun.file(new URL('./fixtures/apple-music-search.html', import.meta.url)).text()
+  const fetcher = async () => new Response(page)
+
+  const items = await searchAppleMusic('Taylor Swift The Life Of A Showgirl', fetcher)
+  expect(items.find((item) => item.kind === 'artist')).toMatchObject({ title: 'Taylor Swift', url: 'https://music.apple.com/us/artist/taylor-swift/159260351' })
+  // The album shows up both in top results (plain-text subtitle) and in the albums section (linked title and artist).
+  const showgirl = { kind: 'album', title: 'The Life of a Showgirl', artist: 'Taylor Swift', url: 'https://music.apple.com/us/album/the-life-of-a-showgirl/1838810949' }
+  expect(items.filter((item) => item.url === showgirl.url).map(({ artwork, ...item }) => item)).toEqual([showgirl, showgirl])
+  expect(await findAppleAlbumCover('Taylor Swift', 'The Life Of A Showgirl', fetcher)).toBe(
+    'https://is1-ssl.mzstatic.com/image/thumb/Music221/v4/58/8f/a9/588fa9a2-7cc5-f02c-9ce6-c986e0dc1c15/25UM1IM19577.rgb.jpg/1200x1200bb.jpg',
+  )
+  // Sabrina Carpenter only features on a song of that name, so it is not her album.
+  expect(await findAppleAlbumCover('Sabrina Carpenter', 'The Life Of A Showgirl', fetcher)).toBeNull()
 })
