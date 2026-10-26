@@ -36,7 +36,7 @@ const parseBody = async (route: Route) => {
   }
 }
 
-const albumCatalog: MockAlbum[] = [
+export const albumCatalog: MockAlbum[] = [
   {
     id: 'm:1001',
     name: 'Discovery',

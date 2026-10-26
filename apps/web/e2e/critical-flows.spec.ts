@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test'
 
-import { installApiMocks } from './support/mockApi'
+import { albumCatalog, installApiMocks } from './support/mockApi'
 
 test.describe('Critical user flows', () => {
   const signIn = async (page) => {
@@ -330,6 +330,16 @@ test.describe('Critical user flows', () => {
     await expect(durations).toHaveCount(3)
     const positions = await durations.evaluateAll((nodes) => nodes.map((node) => node.getBoundingClientRect().left))
     expect(Math.max(...positions) - Math.min(...positions)).toBeLessThan(2)
+  })
+
+  test('unrated albums say so instead of showing a zero score', async ({ page }) => {
+    await page.route(
+      (url) => url.pathname === '/api/releases/m:1001',
+      (route) => route.fulfill({ json: { ...albumCatalog[0], communityRating: 0, reviewCount: 0 } }),
+    )
+    await page.goto('/album/m:1001')
+    await expect(page.getByText('No ratings yet')).toBeVisible()
+    await expect(page.getByText('0.0')).toHaveCount(0)
   })
 
   test('vinyl side numbers do not restart the displayed track sequence', async ({ page }) => {
