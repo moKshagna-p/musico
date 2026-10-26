@@ -1,9 +1,16 @@
 import { expect, test } from 'bun:test'
 
-import { appleArtworkUrl, findArtistImage, pickEditorialArtwork } from './artistImages'
+import { appleArtworkUrl, findArtistImage, normalizeName, pickEditorialArtwork } from './artistImages'
 
 const json = (body: unknown) => new Response(JSON.stringify(body), { headers: { 'Content-Type': 'application/json' } })
 const APPLE_OG = 'https://is1-ssl.mzstatic.com/image/thumb/AMCArtistImages211/v4/5a/abc_cropped.png/1200x630cw.png'
+
+test('normalizes names without dropping non-Latin letters', () => {
+  expect(normalizeName('Beyoncé!')).toBe('beyonce')
+  expect(normalizeName('宇多田ヒカル')).toBe('宇多田ヒカル')
+  expect(normalizeName('YOASOBI・ヨアソビ')).toBe('yoasobi ヨアソビ')
+  expect(normalizeName('Сплин')).toBe('сплин')
+})
 
 test('upsizes Apple artist photos and rejects non-artist artwork', () => {
   expect(appleArtworkUrl(APPLE_OG)).toBe('https://is1-ssl.mzstatic.com/image/thumb/AMCArtistImages211/v4/5a/abc_cropped.png/1800x1800bb.webp')
