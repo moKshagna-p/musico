@@ -16,6 +16,14 @@ const Auth = () => {
   const [password, setPassword] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
+  const [showVinyl, setShowVinyl] = useState(() => window.matchMedia('(min-width: 768px)').matches)
+
+  useEffect(() => {
+    const media = window.matchMedia('(min-width: 768px)')
+    const handleChange = (event) => setShowVinyl(event.matches)
+    media.addEventListener('change', handleChange)
+    return () => media.removeEventListener('change', handleChange)
+  }, [])
 
   const title = useMemo(() => (mode === 'sign-in' ? 'Sign In' : 'Create Account'), [mode])
   const submitLabel = useMemo(
@@ -90,7 +98,7 @@ const Auth = () => {
     <PageTransition>
       <section className="relative mx-auto grid w-full max-w-5xl items-center gap-12 py-6 md:grid-cols-[1fr_minmax(0,26rem)] tablet:py-16">
         <div className="relative hidden md:block">
-          <SpinVinyl />
+          {showVinyl && <SpinVinyl />}
         </div>
 
         <div>

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { useReducedMotion } from 'framer-motion'
+import { motion as Motion, useAnimationFrame, useMotionValue, useReducedMotion } from 'framer-motion'
 import { Link } from 'react-router-dom'
 
 import { homeSectionsQueryOptions } from '../../queries/homeSections.js'
@@ -23,34 +23,26 @@ const SpinVinyl = () => {
   const count = albums.length
 
   const platterRef = useRef(null)
-  const labelRef = useRef(null)
+  const rotation = useMotionValue(0)
   // angle: where the label is drawn. dialed: only the turning the visitor did, which picks the album,
   // so the idle drift never swaps labels while someone is typing their password.
-  const spin = useRef({ angle: 0, dialed: 0, velocity: 0, dragging: false, pointer: 0, time: 0 })
+  const spin = useRef({ angle: 0, dialed: 0, velocity: 0, pointerId: null, pointer: 0, time: 0 })
   const [index, setIndex] = useState(0)
 
-  useEffect(() => {
-    let frame
-    let previous = performance.now()
-    const tick = (now) => {
-      const dt = Math.min((now - previous) / 1000, 0.05)
-      previous = now
-      const state = spin.current
-      if (!state.dragging) {
-        const idle = reduceMotion ? 0 : IDLE_SPEED
-        state.velocity = idle + (state.velocity - idle) * Math.exp(-dt * FRICTION)
-        state.angle += state.velocity * dt
-        // A flick's extra speed keeps dialing; easing back up to the drift after a stop does not.
-        const excess = state.velocity - idle
-        if (Math.sign(excess) === Math.sign(state.velocity)) state.dialed += excess * dt
-      }
-      if (labelRef.current) labelRef.current.style.transform = `rotate(${state.angle}deg)`
-      if (count) setIndex(wrap(Math.floor(state.dialed / STEP), count))
-      frame = requestAnimationFrame(tick)
+  useAnimationFrame((_, delta) => {
+    const dt = Math.min(delta / 1000, 0.05)
+    const state = spin.current
+    if (state.pointerId === null) {
+      const idle = reduceMotion ? 0 : IDLE_SPEED
+      state.velocity = idle + (state.velocity - idle) * Math.exp(-dt * FRICTION)
+      state.angle += state.velocity * dt
+      // A flick's extra speed keeps dialing; easing back up to the drift after a stop does not.
+      const excess = state.velocity - idle
+      if (Math.sign(excess) === Math.sign(state.velocity)) state.dialed += excess * dt
     }
-    frame = requestAnimationFrame(tick)
-    return () => cancelAnimationFrame(frame)
-  }, [count, reduceMotion])
+    rotation.set(state.angle)
+    if (count) setIndex(wrap(Math.floor(state.dialed / STEP), count))
+  })
 
   // Warm the neighbours so a fast spin doesn't flash empty labels.
   useEffect(() => {
@@ -67,13 +59,14 @@ const SpinVinyl = () => {
   }
 
   const handlePointerDown = (event) => {
+    if (spin.current.pointerId !== null) return
     event.currentTarget.setPointerCapture(event.pointerId)
-    Object.assign(spin.current, { dragging: true, velocity: 0, pointer: pointerAngle(event), time: event.timeStamp })
+    Object.assign(spin.current, { pointerId: event.pointerId, velocity: 0, pointer: pointerAngle(event), time: event.timeStamp })
   }
 
   const handlePointerMove = (event) => {
     const state = spin.current
-    if (!state.dragging) return
+    if (state.pointerId !== event.pointerId) return
     const current = pointerAngle(event)
     const delta = wrap(current - state.pointer + 180, 360) - 180
     const seconds = (event.timeStamp - state.time) / 1000
@@ -86,10 +79,17 @@ const SpinVinyl = () => {
 
   const handlePointerUp = (event) => {
     const state = spin.current
-    state.dragging = false
+    if (state.pointerId !== event.pointerId) return
+    state.pointerId = null
     // Holding still before letting go means no flick.
     const held = event.timeStamp - state.time > 80
     state.velocity = held ? 0 : Math.max(-MAX_SPEED, Math.min(MAX_SPEED, state.velocity))
+  }
+
+  const handlePointerCancel = (event) => {
+    if (spin.current.pointerId !== event.pointerId) return
+    spin.current.pointerId = null
+    spin.current.velocity = 0
   }
 
   const handleKeyDown = (event) => {
@@ -117,14 +117,14 @@ const SpinVinyl = () => {
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
-        onPointerCancel={handlePointerUp}
+        onPointerCancel={handlePointerCancel}
+        onLostPointerCapture={handlePointerCancel}
         onKeyDown={handleKeyDown}
         className="vinyl relative aspect-square cursor-grab touch-none select-none rounded-full active:cursor-grabbing focus-visible:outline-offset-8"
       >
         {/* Label photos load slowly from the Cover Art Archive; the cover (usually cached from Home) shows until it paints. */}
-        <div
-          ref={labelRef}
-          style={album?.cover ? { backgroundImage: `url(${album.cover})` } : undefined}
+        <Motion.div
+          style={{ rotate: rotation, backgroundImage: album?.cover ? `url(${album.cover})` : undefined }}
           className="absolute inset-[33%] overflow-hidden rounded-full bg-paper bg-cover bg-center ring-1 ring-black"
         >
           {album ? (
@@ -133,7 +133,7 @@ const SpinVinyl = () => {
             <span className="absolute left-1/2 top-[22%] -translate-x-1/2 font-display text-2xl text-black">musico</span>
           )}
           <span className="absolute left-1/2 top-1/2 h-[12%] w-[12%] -translate-x-1/2 -translate-y-1/2 rounded-full bg-black" />
-        </div>
+        </Motion.div>
       </div>
 
       <div className="mt-8 text-center">
