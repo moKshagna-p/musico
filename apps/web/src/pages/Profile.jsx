@@ -112,6 +112,7 @@ const Profile = () => {
   const fileInputRef = useRef(null)
   const coverInputRef = useRef(null)
   const coverSelectionRef = useRef(0)
+  const canEditProfile = Boolean(dashboard?.profile && socialProfile)
 
   useEffect(() => {
     if (!isPending && !user) {
@@ -121,7 +122,7 @@ const Profile = () => {
 
   // Use batched dashboard data instead of separate API calls
   useEffect(() => {
-    if (dashboard) {
+    if (dashboard?.profile) {
       const profile = {
         id: dashboard.profile?.id,
         userId: dashboard.profile?.userId,
@@ -148,6 +149,7 @@ const Profile = () => {
   }, [])
 
   const openEditModal = useCallback(() => {
+    if (!canEditProfile) return
     coverSelectionRef.current += 1
     setConvertingCover(false)
     setEditBio(socialProfile?.bio ?? '')
@@ -156,7 +158,7 @@ const Profile = () => {
     setCoverChanged(false)
     setProfileStatus('')
     setShowEditModal(true)
-  }, [socialProfile])
+  }, [socialProfile, canEditProfile])
 
   const handleProfileSave = useCallback(async () => {
     if (savingProfile || convertingCover) return
@@ -562,7 +564,7 @@ const Profile = () => {
                 Set Username
               </button>
             )}
-            <button type="button" onClick={openEditModal} className="inline-flex items-center gap-2 rounded-full border border-white/12 px-4 py-2 text-sm text-paper/80 transition-colors hover:border-white/30 hover:text-paper">
+            <button type="button" onClick={openEditModal} disabled={!canEditProfile} className="inline-flex items-center gap-2 rounded-full border border-white/12 px-4 py-2 text-sm text-paper/80 transition-colors hover:border-white/30 hover:text-paper disabled:opacity-40">
               <FiEdit2 aria-hidden="true" />
               Edit Profile
             </button>

@@ -110,6 +110,76 @@ test.describe('Critical user flows', () => {
     })
   }
 
+  test('profile editing waits for saved fields and later refreshes preserve active drafts', async ({ page }) => {
+    let profile = {
+      userId: 'user-e2e', username: 'e2e-user', name: 'E2E User', bio: 'Saved bio',
+      image: 'http://localhost:4000/api/avatars/user-e2e?v=1',
+      cover: 'http://localhost:4000/api/covers/user-e2e?v=1' as string | null,
+    }
+    const saves: Array<{ bio: string; image: string; cover?: string }> = []
+    let dashboardRequests = 0
+    let releaseInitial: () => void = () => {}
+    let releaseRefresh: () => void = () => {}
+    const initialHeld = new Promise<void>((resolve) => { releaseInitial = resolve })
+    const refreshHeld = new Promise<void>((resolve) => { releaseRefresh = resolve })
+    await page.route('**/api/me/dashboard', async (route) => {
+      dashboardRequests += 1
+      if (dashboardRequests === 1) await initialHeld
+      if (dashboardRequests === 2) await refreshHeld
+      await route.fulfill({ json: { ratings: {}, recentRatings: [], lists: [], profile } })
+    })
+    await page.route('**/api/me/profile', async (route) => {
+      if (route.request().method() !== 'PUT') return route.fallback()
+      const payload = route.request().postDataJSON()
+      saves.push(payload)
+      const cover = payload.cover === undefined ? profile.cover : payload.cover
+        ? 'http://localhost:4000/api/covers/user-e2e?v=2' : null
+      profile = { ...profile, ...payload, cover }
+      await route.fulfill({ json: { data: profile } })
+    })
+    await signIn(page)
+    await page.goto('/profile')
+    await expect.poll(() => dashboardRequests).toBe(1)
+    const editButton = page.getByRole('button', { name: 'Edit Profile' })
+    await expect(editButton).toBeDisabled()
+    await expect(page.getByRole('heading', { name: 'Edit Profile' })).toHaveCount(0)
+    releaseInitial()
+    await expect(editButton).toBeEnabled()
+    await editButton.click()
+    await expect(page.getByLabel('Bio', { exact: true })).toHaveValue('Saved bio')
+    const modal = page.getByRole('heading', { name: 'Edit Profile' }).locator('..')
+    await expect(modal.locator('img[src*="/api/avatars/user-e2e"]')).toHaveAttribute('src', profile.image)
+    await expect(modal.locator('img[src*="/api/covers/user-e2e"]')).toHaveAttribute('src', profile.cover!)
+
+    const png = await page.evaluate(() => {
+      const canvas = document.createElement('canvas')
+      canvas.width = canvas.height = 2
+      return canvas.toDataURL('image/png').split(',')[1]
+    })
+    await page.route('**/api/avatars/**', (route) => route.fulfill({ contentType: 'image/png', body: Buffer.from(png, 'base64') }))
+    await page.route('**/api/covers/**', (route) => route.fulfill({ contentType: 'image/png', body: Buffer.from(png, 'base64') }))
+    await page.getByLabel('Bio', { exact: true }).fill('First change')
+    await modal.locator('button').filter({ hasText: /^Remove$/ }).last().click()
+    await page.getByRole('button', { name: 'Save Changes' }).click()
+    await expect.poll(() => dashboardRequests).toBe(2)
+    await expect(editButton).toBeEnabled()
+    await page.getByLabel('Bio', { exact: true }).fill('New draft during refresh')
+    await page.locator('input[type="file"]').nth(1).setInputFiles({
+      name: 'new-cover.png', mimeType: 'image/png', buffer: Buffer.from(png, 'base64'),
+    })
+    const coverPreview = modal.locator('img[src^="data:image/jpeg;base64,"]')
+    await expect(coverPreview).toHaveCount(1)
+    const newCover = await coverPreview.getAttribute('src')
+    releaseRefresh()
+    await expect(page.getByRole('button', { name: 'Save Changes' })).toBeEnabled()
+    await expect(page.getByLabel('Bio', { exact: true })).toHaveValue('New draft during refresh')
+    await expect(coverPreview).toHaveAttribute('src', newCover!)
+    await page.getByRole('button', { name: 'Save Changes' }).click()
+    await expect.poll(() => saves.length).toBe(2)
+    expect(saves[0]).toMatchObject({ bio: 'First change', image: 'http://localhost:4000/api/avatars/user-e2e?v=1', cover: '' })
+    expect(saves[1]).toMatchObject({ bio: 'New draft during refresh', cover: newCover })
+  })
+
   test('cover save waits for the latest conversion and ignores removed or cancelled choices', async ({ page }) => {
     await page.addInitScript(() => {
       const createBitmap = window.createImageBitmap.bind(window)
