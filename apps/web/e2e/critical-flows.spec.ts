@@ -17,7 +17,7 @@ test.describe('Critical user flows', () => {
 
   test('auth flow signs in and navigates to home', async ({ page }) => {
     await signIn(page)
-    await expect(page.getByRole('link', { name: /profile/i })).toBeVisible()
+    await expect(page.getByRole('banner').getByRole('link', { name: /profile/i })).toBeVisible()
   })
 
   test('sign-up requires an available username and the feed addresses the user by it', async ({ page }) => {
@@ -36,7 +36,7 @@ test.describe('Critical user flows', () => {
     await page.locator('form').getByRole('button', { name: 'Create Account' }).click()
     await expect(page).toHaveURL('/')
 
-    await page.getByRole('link', { name: 'Feed', exact: true }).click()
+    await page.getByRole('banner').getByRole('link', { name: 'Feed', exact: true }).click()
     await expect(page.getByRole('link', { name: 'vinyl-fan', exact: true })).toHaveAttribute('href', '/profile/vinyl-fan')
   })
 
@@ -228,7 +228,7 @@ test.describe('Critical user flows', () => {
         window['coverConversions'][key][fail ? 'reject' : 'resolve']()
       }, { key: name, fail })
     }
-    const preview = page.locator('img.aspect-\\[3\\/1\\]')
+    const preview = page.locator('img.sm\\:aspect-\\[3\\/1\\]')
     await choose('old.png')
     await expect(page.getByRole('button', { name: 'Preparing cover...' })).toBeDisabled()
     expect(saves).toEqual([])
@@ -316,9 +316,9 @@ test.describe('Critical user flows', () => {
     await expect.poll(() => saves.length).toBe(1)
     expect(saves[0].cover).toMatch(/^data:image\/jpeg;base64,/)
     await page.getByRole('button', { name: 'Cancel', exact: true }).click()
-    await page.getByRole('link', { name: 'Home', exact: true }).click()
+    await page.getByRole('banner').getByRole('link', { name: 'Home', exact: true }).click()
     await expect(page.getByRole('heading', { name: /most happening right now/i })).toBeVisible()
-    await page.getByRole('link', { name: 'Profile', exact: true }).click()
+    await page.getByRole('banner').getByRole('link', { name: 'Profile', exact: true }).click()
     await page.getByRole('button', { name: 'Edit Profile' }).click()
     await page.getByLabel('Bio', { exact: true }).fill('New draft on the remounted profile')
     releaseUpload()
@@ -366,9 +366,9 @@ test.describe('Critical user flows', () => {
       await page.getByRole('button', { name: 'Save Changes' }).click()
     }
     const revisit = async () => {
-      await page.getByRole('link', { name: 'Home', exact: true }).click()
+      await page.getByRole('banner').getByRole('link', { name: 'Home', exact: true }).click()
       await expect(page.getByRole('heading', { name: /most happening right now/i })).toBeVisible()
-      await page.getByRole('link', { name: 'Profile', exact: true }).click()
+      await page.getByRole('banner').getByRole('link', { name: 'Profile', exact: true }).click()
       await expect(page.getByRole('heading', { name: 'E2E User' })).toBeVisible()
     }
     await saveCover()
@@ -446,9 +446,9 @@ test.describe('Critical user flows', () => {
     const revisitProfile = async () => {
       await expect.poll(() => dashboardRequests).toBe(saves.length + 1)
       const requestsBeforeNavigation = dashboardRequests
-      await page.getByRole('link', { name: 'Home', exact: true }).click()
+      await page.getByRole('banner').getByRole('link', { name: 'Home', exact: true }).click()
       await expect(page.getByRole('heading', { name: /most happening right now/i })).toBeVisible()
-      await page.getByRole('link', { name: 'Profile', exact: true }).click()
+      await page.getByRole('banner').getByRole('link', { name: 'Profile', exact: true }).click()
       await expect(page.getByRole('heading', { name: 'E2E User' })).toBeVisible()
       expect(dashboardRequests).toBe(requestsBeforeNavigation)
     }
@@ -514,7 +514,7 @@ test.describe('Critical user flows', () => {
     await page.getByLabel(/password/i).fill('password123')
     await page.locator('form').getByRole('button', { name: /^sign in$/i }).click()
 
-    await expect(page.getByRole('link', { name: /profile/i })).toBeVisible()
+    await expect(page.getByRole('banner').getByRole('link', { name: /profile/i })).toBeVisible()
     expect(signOutRequests).toBe(0)
   })
 
@@ -584,10 +584,10 @@ test.describe('Critical user flows', () => {
     await page.locator('article').filter({ hasText: 'Discovery' }).first().click()
     await expect(page).toHaveURL(/\/album\//)
     await expect(page.getByRole('heading', { name: 'Discovery' })).toHaveCount(1)
-    await page.getByRole('link', { name: 'Home', exact: true }).click()
+    await page.getByRole('banner').getByRole('link', { name: 'Home', exact: true }).click()
     await expect(page.getByRole('heading', { name: /most happening right now/i })).toBeVisible()
 
-    await page.getByRole('link', { name: 'Discover', exact: true }).click()
+    await page.getByRole('banner').getByRole('link', { name: 'Discover', exact: true }).click()
     await expect(page.getByRole('heading', { name: /dig through the vault/i })).toBeVisible()
     await expect(page.locator('article').filter({ hasText: 'Discovery' }).first()).toBeVisible()
 
@@ -602,16 +602,16 @@ test.describe('Critical user flows', () => {
     await page.getByRole('link', { name: 'Sign In', exact: true }).click()
     await expect(page).toHaveURL('/auth')
     await signIn(page)
-    await page.getByRole('link', { name: 'Feed', exact: true }).click()
+    await page.getByRole('banner').getByRole('link', { name: 'Feed', exact: true }).click()
     await expect(page.getByRole('heading', { name: 'Feed', exact: true })).toBeVisible()
     await page.getByRole('link', { name: 'Discovery', exact: true }).first().click()
     await expect(page).toHaveURL(/\/album\//)
     await expect(page.getByRole('heading', { name: 'Discovery' })).toHaveCount(1)
 
-    await page.getByRole('link', { name: 'Profile', exact: true }).click()
+    await page.getByRole('banner').getByRole('link', { name: 'Profile', exact: true }).click()
     await expect(page.getByRole('heading', { name: 'E2E User' })).toBeVisible()
 
-    await page.getByRole('link', { name: 'Home', exact: true }).click()
+    await page.getByRole('banner').getByRole('link', { name: 'Home', exact: true }).click()
     await expect(page.getByRole('heading', { name: /most happening right now/i })).toBeVisible()
     expect(browserErrors).toEqual([])
   })
