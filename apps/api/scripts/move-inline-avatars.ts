@@ -21,7 +21,7 @@ let moved = 0
 for (const { id, image, avatar } of avatars) {
   const now = new Date()
   // One statement: the link only changes if the user still has the image read above, and the bytes only move with it.
-  // A user who uploaded or removed an avatar since then is left alone.
+  // A user who uploaded or removed an avatar since then is left alone. user before user_avatar, like profile saves.
   const result = await db.execute(sql`
     with relinked as (
       update "user" set "image" = ${avatarPath(id, now)}, "updatedAt" = ${now.toISOString()}

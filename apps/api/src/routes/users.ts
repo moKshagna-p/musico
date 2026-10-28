@@ -559,11 +559,12 @@ export const userRoutes = new Elysia({ prefix: '/api' })
       if (avatar) userUpdates.image = avatarPath(authUser.id, now)
       const saveUser = db.update(user).set({ ...userUpdates, updatedAt: now }).where(eq(user.id, authUser.id))
       // The avatar bytes and the user.image link change in one transaction, so they never disagree.
+      // user is written first, the same order as scripts/move-inline-avatars.ts, so the two cannot deadlock.
       if (avatar) {
         const values = { userId: authUser.id, ...avatar, updatedAt: now }
-        await db.batch([db.insert(userAvatar).values(values).onConflictDoUpdate({ target: userAvatar.userId, set: values }), saveUser])
+        await db.batch([saveUser, db.insert(userAvatar).values(values).onConflictDoUpdate({ target: userAvatar.userId, set: values })])
       } else if ('image' in userUpdates) {
-        await db.batch([db.delete(userAvatar).where(eq(userAvatar.userId, authUser.id)), saveUser])
+        await db.batch([saveUser, db.delete(userAvatar).where(eq(userAvatar.userId, authUser.id))])
       } else {
         await saveUser
       }
