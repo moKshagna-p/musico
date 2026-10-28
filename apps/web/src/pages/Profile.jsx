@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { FiEdit2, FiLogOut, FiUpload, FiX } from 'react-icons/fi'
 import { Link, useNavigate } from 'react-router-dom'
 
@@ -87,6 +88,7 @@ const formatReviewedAt = (timestamp) => {
 
 const Profile = () => {
   const navigate = useNavigate()
+  const queryClient = useQueryClient()
   const { user, isPending, signOutCurrentUser } = useAuth()
   const { dashboard, isLoading: dashboardLoading } = useDashboard()
 
@@ -97,6 +99,7 @@ const Profile = () => {
   const [editBio, setEditBio] = useState('')
   const [editImage, setEditImage] = useState('')
   const [editCover, setEditCover] = useState('')
+  const [coverChanged, setCoverChanged] = useState(false)
   const [convertingCover, setConvertingCover] = useState(false)
   const [savingProfile, setSavingProfile] = useState(false)
   const [profileStatus, setProfileStatus] = useState('')
@@ -132,9 +135,6 @@ const Profile = () => {
         recentRatings: dashboard.recentRatings ?? [],
       }
       setSocialProfile(profile)
-      setEditBio(profile.bio ?? '')
-      setEditImage(profile.image ?? '')
-      setEditCover(profile.cover ?? '')
       if (!profile.username) {
         setShowUsernameSetup(true)
       }
@@ -153,6 +153,7 @@ const Profile = () => {
     setEditBio(socialProfile?.bio ?? '')
     setEditImage(socialProfile?.image ?? '')
     setEditCover(socialProfile?.cover ?? '')
+    setCoverChanged(false)
     setProfileStatus('')
     setShowEditModal(true)
   }, [socialProfile])
@@ -166,9 +167,10 @@ const Profile = () => {
       const updated = await updateMyProfile({
         bio: editBio.trim(),
         image: editImage.trim(),
-        cover: editCover,
+        cover: coverChanged ? editCover : undefined,
       })
       setSocialProfile((prev) => ({ ...prev, ...updated }))
+      await queryClient.invalidateQueries({ queryKey: ['dashboard', user.id], exact: true })
       if (selection === coverSelectionRef.current) setProfileStatus('Saved.')
       setTimeout(() => {
         if (selection === coverSelectionRef.current) closeEditModal()
@@ -178,7 +180,7 @@ const Profile = () => {
     } finally {
       setSavingProfile(false)
     }
-  }, [editBio, editImage, editCover, savingProfile, convertingCover, closeEditModal])
+  }, [editBio, editImage, editCover, coverChanged, savingProfile, convertingCover, closeEditModal, queryClient, user?.id])
 
   const openFollowers = useCallback(async () => {
     setShowFollowersModal(true)
@@ -244,7 +246,10 @@ const Profile = () => {
     setProfileStatus('')
     try {
       const cover = await toCoverDataUrl(file)
-      if (selection === coverSelectionRef.current) setEditCover(cover)
+      if (selection === coverSelectionRef.current) {
+        setEditCover(cover)
+        setCoverChanged(true)
+      }
     } catch {
       if (selection === coverSelectionRef.current) setProfileStatus('Unable to read that image.')
     } finally {
@@ -459,6 +464,7 @@ const Profile = () => {
                           coverSelectionRef.current += 1
                           setConvertingCover(false)
                           setEditCover('')
+                          setCoverChanged(true)
                         }}
                         className="rounded-full border border-white/12 px-4 py-2 text-sm text-paper/80 transition-colors hover:border-white/30 hover:text-paper"
                       >

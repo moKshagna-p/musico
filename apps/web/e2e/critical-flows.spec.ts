@@ -119,7 +119,13 @@ test.describe('Critical user flows', () => {
         return createBitmap(file)
       }
     })
-    const saves: Array<{ cover: string }> = []
+    const saves: Array<{ cover?: string }> = []
+    const savedCoverUrl = 'http://localhost:4000/api/covers/user-e2e?v=1'
+    let storedCover: string | null = null
+    await page.route('**/api/me/dashboard', (route) => route.fulfill({ json: {
+      ratings: {}, recentRatings: [], lists: [],
+      profile: { userId: 'user-e2e', username: 'e2e-user', name: 'E2E User', bio: 'E2E profile', image: null, cover: storedCover },
+    } }))
     let finishSave: () => void = () => {}
     const saveHeld = new Promise<void>((resolve) => { finishSave = resolve })
     await page.route('**/api/me/profile', async (route) => {
@@ -127,7 +133,8 @@ test.describe('Critical user flows', () => {
       const payload = route.request().postDataJSON()
       saves.push(payload)
       await saveHeld
-      await route.fulfill({ json: { data: { ...payload } } })
+      if (payload.cover !== undefined) storedCover = payload.cover ? savedCoverUrl : null
+      await route.fulfill({ json: { data: { ...payload, cover: storedCover } } })
     })
     await signIn(page)
     await page.goto('/profile')
@@ -190,10 +197,237 @@ test.describe('Critical user flows', () => {
     expect(saves[0].cover).toBe(latestPreview)
     await page.getByRole('button', { name: 'Cancel', exact: true }).click()
     await page.getByRole('button', { name: 'Edit Profile' }).click()
+    await page.getByLabel('Bio', { exact: true }).fill('Keep this newer draft')
     finishSave()
     await expect(page.getByRole('button', { name: 'Save Changes' })).toBeEnabled()
     await page.waitForTimeout(650)
     await expect(page.getByRole('heading', { name: 'Edit Profile' })).toBeVisible()
+    await expect(page.getByLabel('Bio', { exact: true })).toHaveValue('Keep this newer draft')
+    await page.getByRole('button', { name: 'Save Changes' }).click()
+    await expect.poll(() => saves.length).toBe(2)
+    expect(saves[1]).not.toHaveProperty('cover')
+    expect(storedCover).toBe(savedCoverUrl)
+  })
+
+  test('bio edits after navigating during a pending cover upload do not delete the cover', async ({ page }) => {
+    const saves: Array<{ bio: string; cover?: string }> = []
+    const savedCoverUrl = 'http://localhost:4000/api/covers/user-e2e?v=123'
+    let storedCover: string | null = null
+    await page.route('**/api/me/dashboard', (route) => route.fulfill({ json: {
+      ratings: {}, recentRatings: [], lists: [],
+      profile: { userId: 'user-e2e', username: 'e2e-user', name: 'E2E User', bio: 'E2E profile', image: null, cover: storedCover },
+    } }))
+    let releaseUpload: () => void = () => {}
+    const uploadHeld = new Promise<void>((resolve) => { releaseUpload = resolve })
+    await page.route('**/api/me/profile', async (route) => {
+      if (route.request().method() !== 'PUT') return route.fallback()
+      const payload = route.request().postDataJSON()
+      saves.push(payload)
+      if (saves.length === 1) await uploadHeld
+      if (payload.cover !== undefined) storedCover = payload.cover ? savedCoverUrl : null
+      await route.fulfill({ json: { data: { ...payload, cover: storedCover } } })
+    })
+    await signIn(page)
+    await page.goto('/profile')
+    await page.getByRole('button', { name: 'Edit Profile' }).click()
+    const png = await page.evaluate(() => {
+      const canvas = document.createElement('canvas')
+      canvas.width = canvas.height = 2
+      return canvas.toDataURL('image/png').split(',')[1]
+    })
+    await page.route('**/api/covers/**', (route) => route.fulfill({
+      contentType: 'image/png', body: Buffer.from(png, 'base64'),
+    }))
+    await page.locator('input[type="file"]').nth(1).setInputFiles({
+      name: 'cover.png', mimeType: 'image/png', buffer: Buffer.from(png, 'base64'),
+    })
+    await expect(page.getByRole('button', { name: 'Save Changes' })).toBeEnabled()
+    await page.getByRole('button', { name: 'Save Changes' }).click()
+    await expect.poll(() => saves.length).toBe(1)
+    expect(saves[0].cover).toMatch(/^data:image\/jpeg;base64,/)
+    await page.getByRole('button', { name: 'Cancel', exact: true }).click()
+    await page.getByRole('link', { name: 'Home', exact: true }).click()
+    await expect(page.getByRole('heading', { name: /most happening right now/i })).toBeVisible()
+    await page.getByRole('link', { name: 'Profile', exact: true }).click()
+    await page.getByRole('button', { name: 'Edit Profile' }).click()
+    await page.getByLabel('Bio', { exact: true }).fill('New draft on the remounted profile')
+    releaseUpload()
+    await expect(page.locator('img[decoding="async"][src*="/api/covers/user-e2e"]')).toHaveAttribute('src', savedCoverUrl)
+    await expect(page.getByLabel('Bio', { exact: true })).toHaveValue('New draft on the remounted profile')
+    await page.getByRole('button', { name: 'Save Changes' }).click()
+    await expect.poll(() => saves.length).toBe(2)
+    expect(saves[1]).not.toHaveProperty('cover')
+    expect(storedCover).toBe(savedCoverUrl)
+  })
+
+  test('an older upload response cannot replace a newer cover saved after navigation', async ({ page }) => {
+    let profile = { userId: 'user-e2e', username: 'e2e-user', name: 'E2E User', bio: '', image: null, cover: null as string | null }
+    let version = 0
+    let releaseFirst: () => void = () => {}
+    const firstHeld = new Promise<void>((resolve) => { releaseFirst = resolve })
+    await page.route('**/api/me/dashboard', (route) => route.fulfill({ json: {
+      ratings: {}, recentRatings: [], lists: [], profile,
+    } }))
+    await page.route('**/api/me/profile', async (route) => {
+      if (route.request().method() !== 'PUT') return route.fallback()
+      const payload = route.request().postDataJSON()
+      profile = { ...profile, ...payload, cover: `http://localhost:4000/api/covers/user-e2e?v=${++version}` }
+      // The server write completes now; each response retains its own saved version.
+      const saved = { ...profile }
+      if (version === 1) await firstHeld
+      await route.fulfill({ json: { data: saved } })
+    })
+    await signIn(page)
+    await page.goto('/profile')
+    const png = await page.evaluate(() => {
+      const canvas = document.createElement('canvas')
+      canvas.width = canvas.height = 2
+      return canvas.toDataURL('image/png').split(',')[1]
+    })
+    await page.route('**/api/covers/**', (route) => route.fulfill({
+      contentType: 'image/png', body: Buffer.from(png, 'base64'),
+    }))
+    const saveCover = async () => {
+      await page.getByRole('button', { name: 'Edit Profile' }).click()
+      await page.locator('input[type="file"]').nth(1).setInputFiles({
+        name: 'cover.png', mimeType: 'image/png', buffer: Buffer.from(png, 'base64'),
+      })
+      await expect(page.getByRole('button', { name: 'Save Changes' })).toBeEnabled()
+      await page.getByRole('button', { name: 'Save Changes' }).click()
+    }
+    const revisit = async () => {
+      await page.getByRole('link', { name: 'Home', exact: true }).click()
+      await expect(page.getByRole('heading', { name: /most happening right now/i })).toBeVisible()
+      await page.getByRole('link', { name: 'Profile', exact: true }).click()
+      await expect(page.getByRole('heading', { name: 'E2E User' })).toBeVisible()
+    }
+    await saveCover()
+    await expect.poll(() => version).toBe(1)
+    await page.getByRole('button', { name: 'Cancel', exact: true }).click()
+    await revisit()
+    await saveCover()
+    await expect(page.getByRole('heading', { name: 'Edit Profile' })).toHaveCount(0)
+    const latestCover = profile.cover!
+    const backdrop = page.locator('img[decoding="async"][src*="/api/covers/user-e2e"]')
+    await expect(backdrop).toHaveAttribute('src', latestCover)
+    const firstResponse = page.waitForResponse(async (response) =>
+      new URL(response.url()).pathname === '/api/me/profile' && (await response.json()).data.cover.endsWith('?v=1'))
+    releaseFirst()
+    await (await firstResponse).finished()
+    await revisit()
+    expect(profile.cover).toBe(latestCover)
+    await expect(backdrop).toHaveAttribute('src', latestCover)
+  })
+
+  test('saved covers survive cached profile navigation and later bio edits, replacement, and removal', async ({ page }) => {
+    let profile = {
+      id: 'profile-e2e', userId: 'user-e2e', username: 'e2e-user', bio: 'Original bio',
+      name: 'E2E User', image: null as string | null, cover: null as string | null,
+      followerCount: 7, followingCount: 3,
+    }
+    let version = 0
+    let dashboardRequests = 0
+    let rejectNextSave = false
+    let rejectedPayload: { cover?: string } | null = null
+    const saves: Array<{ bio: string; cover?: string }> = []
+    await page.route('**/api/me/dashboard', async (route) => {
+      dashboardRequests += 1
+      await route.fulfill({ json: {
+        ratings: {}, ratingSummary: { totalRated: 0, averageRating: 0 }, recentRatings: [], lists: [], profile,
+      } })
+    })
+    await page.route('**/api/me/profile', async (route) => {
+      if (route.request().method() !== 'PUT') return route.fallback()
+      const payload = route.request().postDataJSON()
+      if (rejectNextSave) {
+        rejectedPayload = payload
+        rejectNextSave = false
+        return route.fulfill({ status: 503, json: { error: 'Unable to save profile.' } })
+      }
+      saves.push(payload)
+      const cover = payload.cover === undefined ? profile.cover : payload.cover.startsWith('data:')
+        ? `http://localhost:4000/api/covers/user-e2e?v=${++version}`
+        : payload.cover || null
+      profile = { ...profile, ...payload, cover }
+      // Match the save endpoint: name and follower counts come only from the dashboard.
+      await route.fulfill({ json: { data: {
+        username: profile.username, bio: profile.bio, image: profile.image, cover: profile.cover, isPublic: true,
+      } } })
+    })
+    await signIn(page)
+    await page.goto('/profile')
+    const png = await page.evaluate(() => {
+      const canvas = document.createElement('canvas')
+      canvas.width = canvas.height = 2
+      return canvas.toDataURL('image/png').split(',')[1]
+    })
+    await page.route('**/api/covers/**', (route) => route.fulfill({
+      contentType: 'image/png', body: Buffer.from(png, 'base64'),
+    }))
+    const uploadCover = async () => {
+      await page.getByRole('button', { name: 'Edit Profile' }).click()
+      await page.locator('input[type="file"]').nth(1).setInputFiles({
+        name: 'cover.png', mimeType: 'image/png', buffer: Buffer.from(png, 'base64'),
+      })
+      await expect(page.getByRole('button', { name: 'Save Changes' })).toBeEnabled()
+      await page.getByRole('button', { name: 'Save Changes' }).click()
+      await expect(page.getByRole('heading', { name: 'Edit Profile' })).toHaveCount(0)
+    }
+    const revisitProfile = async () => {
+      await expect.poll(() => dashboardRequests).toBe(saves.length + 1)
+      const requestsBeforeNavigation = dashboardRequests
+      await page.getByRole('link', { name: 'Home', exact: true }).click()
+      await expect(page.getByRole('heading', { name: /most happening right now/i })).toBeVisible()
+      await page.getByRole('link', { name: 'Profile', exact: true }).click()
+      await expect(page.getByRole('heading', { name: 'E2E User' })).toBeVisible()
+      expect(dashboardRequests).toBe(requestsBeforeNavigation)
+    }
+    const backdrop = page.locator('img[decoding="async"][src*="/api/covers/user-e2e"]')
+    await uploadCover()
+    const firstCover = profile.cover!
+    await expect(backdrop).toHaveAttribute('src', firstCover)
+    await revisitProfile()
+    await expect(backdrop).toHaveAttribute('src', firstCover)
+    await page.getByRole('button', { name: 'Edit Profile' }).click()
+    await page.getByLabel('Bio', { exact: true }).fill('This edit fails')
+    rejectNextSave = true
+    await page.getByRole('button', { name: 'Save Changes' }).click()
+    await expect(page.getByText('Unable to save profile.')).toBeVisible()
+    await page.getByRole('button', { name: 'Cancel', exact: true }).click()
+    await revisitProfile()
+    await expect(backdrop).toHaveAttribute('src', firstCover)
+    await page.getByRole('button', { name: 'Edit Profile' }).click()
+    await expect(page.getByLabel('Bio', { exact: true })).toHaveValue('Original bio')
+    await page.getByLabel('Bio', { exact: true }).fill('New bio, same cover')
+    await page.getByRole('button', { name: 'Save Changes' }).click()
+    await expect(page.getByRole('heading', { name: 'Edit Profile' })).toHaveCount(0)
+    expect(saves[1]).toMatchObject({ bio: 'New bio, same cover' })
+    expect(saves[1]).not.toHaveProperty('cover')
+    expect(profile.cover).toBe(firstCover)
+
+    await uploadCover()
+    expect(profile.cover).not.toBe(firstCover)
+    await revisitProfile()
+    await expect(backdrop).toHaveAttribute('src', profile.cover!)
+    await page.getByRole('button', { name: 'Edit Profile' }).click()
+    await expect(page.getByLabel('Bio', { exact: true })).toHaveValue('New bio, same cover')
+    await page.getByRole('button', { name: 'Remove', exact: true }).click()
+    rejectNextSave = true
+    await page.getByRole('button', { name: 'Save Changes' }).click()
+    await expect(page.getByText('Unable to save profile.')).toBeVisible()
+    expect(rejectedPayload).toMatchObject({ cover: '' })
+    await expect(backdrop).toHaveAttribute('src', profile.cover!)
+    await page.getByRole('button', { name: 'Save Changes' }).click()
+    await expect(page.getByRole('heading', { name: 'Edit Profile' })).toHaveCount(0)
+    expect(saves[3].cover).toBe('')
+    await revisitProfile()
+    await expect(backdrop).toHaveCount(0)
+    await page.getByRole('button', { name: 'Edit Profile' }).click()
+    await page.getByLabel('Bio', { exact: true }).fill('Cover stays removed')
+    await page.getByRole('button', { name: 'Save Changes' }).click()
+    await expect.poll(() => saves.length).toBe(5)
+    expect(saves[4]).not.toHaveProperty('cover')
+    expect(profile.cover).toBeNull()
   })
 
   test('a stale previous session does not sign out a fresh login', async ({ page }) => {
