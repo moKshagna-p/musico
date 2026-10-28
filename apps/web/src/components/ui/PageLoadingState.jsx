@@ -94,33 +94,56 @@ export const SearchResultsPageSkeleton = () => (
   </section>
 )
 
-// Mirrors ActivityCard rows.
+// Mirrors the feed: a day heading over ActivityCard groups.
 export const FeedItemsSkeleton = () => (
-  <div role="status" aria-label="Loading feed" className="divide-y divide-white/[0.06] border-y border-white/[0.06]">
-    {createSkeletonArray(5).map((_, index) => (
-      <div key={index} className="flex items-start gap-3.5 py-5">
-        <div className="skeleton h-10 w-10 shrink-0 rounded-full" />
-        <div className="min-w-0 flex-1 pt-1.5">
-          <div className="skeleton h-3.5 w-3/5 rounded-full" />
-          <div className="skeleton mt-3 h-2.5 w-1/5 rounded-full" />
+  <div role="status" aria-label="Loading feed">
+    <div className="border-b border-white/[0.06] py-2.5">
+      <div className="skeleton my-0.5 h-3 w-14 rounded-full" />
+    </div>
+    <div className="divide-y divide-white/[0.06]">
+      {[2, 1, 2].map((albums, index) => (
+        <div key={index} className="flex items-start gap-3.5 py-5">
+          <div className="skeleton h-10 w-10 shrink-0 rounded-full" />
+          <div className="min-w-0 flex-1 pt-1">
+            <div className="skeleton h-3.5 w-28 rounded-full" />
+            <div className="mt-4 space-y-3">
+              {createSkeletonArray(albums).map((__, entry) => (
+                <div key={entry} className="flex items-start gap-3">
+                  <div className="skeleton h-12 w-12 shrink-0 rounded-[3px] tablet:h-14 tablet:w-14" />
+                  <div className="min-w-0 flex-1 pt-1">
+                    <div className="skeleton h-3.5 w-2/5 rounded-full" />
+                    <div className="skeleton mt-2.5 h-3 w-1/4 rounded-full" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
-        <div className="skeleton h-14 w-14 shrink-0 rounded-[3px] tablet:h-16 tablet:w-16" />
-      </div>
-    ))}
+      ))}
+    </div>
   </div>
 )
 
 export const FeedPageSkeleton = () => (
-  <section aria-busy="true" aria-label="Loading feed" className="mx-auto w-full max-w-2xl py-2 tablet:py-6">
-    <div className="flex items-end justify-between gap-4 pb-8 pt-4 tablet:pb-10 tablet:pt-6">
+  <section
+    aria-busy="true"
+    aria-label="Loading feed"
+    className="mx-auto grid w-full max-w-6xl py-2 [grid-template-areas:'head''rail''feed'] tablet:grid-cols-[minmax(0,1fr)_20rem] tablet:grid-rows-[auto_1fr] tablet:gap-x-16 tablet:py-6 tablet:[grid-template-areas:'head_rail''feed_rail']"
+  >
+    <div className="flex items-end justify-between gap-4 pb-8 pt-4 [grid-area:head] tablet:pb-10 tablet:pt-6">
       <div className="min-w-0 flex-1">
         <div className="skeleton h-[3.75rem] w-40 rounded-2xl tablet:h-[4.5rem]" />
         <div className="skeleton mt-4 h-4 w-full max-w-sm rounded-full" />
       </div>
       <div className="skeleton h-9 w-[6.5rem] shrink-0 rounded-full" />
     </div>
-    <div className="skeleton mb-8 h-[50px] rounded-full" />
-    <FeedItemsSkeleton />
+    <div className="mb-8 [grid-area:rail] tablet:mb-0 tablet:pt-8">
+      <div className="skeleton mb-4 hidden h-3 w-24 rounded-full tablet:block" />
+      <div className="skeleton h-[50px] rounded-full" />
+    </div>
+    <div className="min-w-0 [grid-area:feed]">
+      <FeedItemsSkeleton />
+    </div>
   </section>
 )
 
