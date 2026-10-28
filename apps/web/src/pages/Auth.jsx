@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 
 import PageTransition from '../components/ui/PageTransition.jsx'
-import PageLoadingState from '../components/ui/PageLoadingState.jsx'
+import { AuthPageSkeleton } from '../components/ui/PageLoadingState.jsx'
 import { useAuth } from '../hooks/useAuth.js'
 
 const Auth = () => {
@@ -75,9 +75,7 @@ const Auth = () => {
   if (isPending) {
     return (
       <PageTransition>
-        <div aria-live="polite">
-          <PageLoadingState title="Loading session" cards={1} compact />
-        </div>
+        <AuthPageSkeleton />
       </PageTransition>
     )
   }

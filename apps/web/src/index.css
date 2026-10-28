@@ -60,6 +60,18 @@ body {
     border-radius: 9999px;
     background: conic-gradient(from 30deg, transparent 0 10%, rgba(255, 255, 255, 0.09) 15%, transparent 22% 60%, rgba(255, 255, 255, 0.06) 65%, transparent 72%);
   }
+
+  /* Loading placeholder. The highlight sits in the middle third of a 3x-wide gradient, so the
+     sweep starts and ends on the flat base color and loops without a seam, with a pause between passes. */
+  .skeleton {
+    background: linear-gradient(90deg, rgb(255 255 255 / 0.05) 40%, rgb(255 255 255 / 0.1) 50%, rgb(255 255 255 / 0.05) 60%) 0 0 / 300% 100%;
+    animation: skeleton-sweep 1.6s linear infinite;
+  }
+}
+
+@keyframes skeleton-sweep {
+  from { background-position: 100% 0; }
+  to { background-position: 0 0; }
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -7,6 +7,7 @@ import AlbumRow from '../components/album/AlbumRow.jsx'
 import Billboard, { WIDE_GUTTER } from '../components/ui/Billboard.jsx'
 import PageTransition from '../components/ui/PageTransition.jsx'
 import VinylSleeve from '../components/ui/VinylSleeve.jsx'
+import { SleeveSkeleton } from '../components/ui/LoadingSkeleton.jsx'
 import { homeSectionsQueryOptions } from '../queries/homeSections.js'
 
 const Home = () => {
@@ -76,11 +77,17 @@ const Home = () => {
             </Link>
           </div>
         ) : (
-          <div aria-hidden="true" className="max-w-xl space-y-5">
-            <div className="h-6 w-44 rounded-full bg-white/[0.06]" />
-            <div className="h-16 w-full rounded-2xl bg-gradient-to-r from-white/[0.04] via-white/[0.08] to-white/[0.04] bg-[length:400px_100%] motion-safe:animate-shimmer" />
-            <div className="h-5 w-40 rounded-full bg-white/[0.05]" />
-            <div className="h-12 w-40 rounded-full bg-white/[0.06]" />
+          <div aria-hidden="true" className="flex flex-col gap-8 md:flex-row md:items-end md:gap-10">
+            <div className="hidden w-56 shrink-0 pr-16 md:block tablet:w-72 tablet:pr-24">
+              <SleeveSkeleton out />
+            </div>
+            <div className="w-full max-w-2xl">
+              <div className="skeleton h-[26px] w-44 rounded-full" />
+              <div className="skeleton mt-5 h-11 w-full max-w-xl rounded-xl tablet:h-[4.25rem]" />
+              <div className="skeleton mt-5 h-5 w-40 rounded-full tablet:h-6" />
+              <div className="skeleton mt-2.5 h-3.5 w-16 rounded-full" />
+              <div className="skeleton mt-8 h-11 w-40 rounded-full" />
+            </div>
           </div>
         )}
       </Billboard>
