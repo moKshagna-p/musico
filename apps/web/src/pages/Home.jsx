@@ -25,8 +25,8 @@ const Home = () => {
   const loading = homeSectionsQuery.isLoading && !homeSectionsQuery.data
   const topAlbum = mostHappeningAlbums[0]
 
-  const handleAlbumSelect = (id) => {
-    navigate(`/album/${id}`, { state: { from: '/', query: '' } })
+  const handleAlbumSelect = (id, album) => {
+    navigate(`/album/${id}`, { state: { from: '/', query: '', album } })
   }
 
   return (
@@ -57,7 +57,7 @@ const Home = () => {
               </p>
               <Link
                 to={`/album/${topAlbum.id}`}
-                state={{ from: '/', query: '' }}
+                state={{ from: '/', query: '', album: topAlbum }}
                 className="mt-8 inline-flex items-center gap-2 rounded-full bg-paper px-6 py-3 text-sm font-semibold text-black transition-transform hover:scale-[1.03]"
               >
                 Open album <FiArrowUpRight aria-hidden="true" />

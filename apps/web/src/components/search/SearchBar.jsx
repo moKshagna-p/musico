@@ -102,7 +102,7 @@ const SearchBar = ({
       if (enablePredictive && activeSuggestionIndex >= 0 && suggestions[activeSuggestionIndex]) {
         e.preventDefault()
         const item = suggestions[activeSuggestionIndex]
-        navigate(`/album/${item.id}`)
+        navigate(`/album/${item.id}`, { state: { album: item } })
         setIsFocused(false)
       } else {
         submitSearch(value)
@@ -192,7 +192,7 @@ const SearchBar = ({
                     {suggestions.map((item, i) => (
                       <button
                         key={item.id}
-                        onClick={() => navigate(`/album/${item.id}`)}
+                        onClick={() => navigate(`/album/${item.id}`, { state: { album: item } })}
                         onMouseEnter={() => setActiveSuggestionIndex(i)}
                         className={`flex w-full items-center gap-4 rounded-xl p-2 text-left transition-colors ${
                           activeSuggestionIndex === i ? 'bg-white/[0.08]' : 'hover:bg-white/[0.04]'

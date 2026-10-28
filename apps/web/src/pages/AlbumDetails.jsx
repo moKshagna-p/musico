@@ -49,17 +49,23 @@ const AlbumDetails = () => {
   const [listStatus, setListStatus] = useState('')
   const [listenLaterPending, setListenLaterPending] = useState(false)
   const [busyListIds, setBusyListIds] = useState(() => new Set())
-  const [reviewKey, setReviewKey] = useState(0) // increment to refresh reviews list
+  const [reviewKey, setReviewKey] = useState(0)
 
-  const { 
-    data: album, 
-    isLoading: loading, 
-    error: queryError 
+  // The card that linked here already has name, cover and stats; show those now and let the tracklist load in.
+  const seed = String(location.state?.album?.id) === albumId ? location.state.album : undefined
+  const {
+    data,
+    isLoading: loading,
+    isPlaceholderData: loadingTracks,
+    error: queryError,
   } = useQuery({
     queryKey: ['release', albumId],
     queryFn: () => getReleaseDetails(albumId),
     enabled: !!albumId,
+    placeholderData: seed,
   })
+  // Keep the card's cover so the art the browser already has isn't swapped and downloaded again.
+  const album = useMemo(() => (data && seed?.cover ? { ...data, cover: seed.cover } : data), [data, seed])
 
   const streamingLinks = useMemo(() => generateStreamingLinks(album), [album])
   const albumGenres = useMemo(() => inferAlbumGenres(album), [album])
@@ -82,9 +88,7 @@ const AlbumDetails = () => {
   const inListenLater = useMemo(() => isAlbumInListenLater(album?.id ?? ''), [album?.id, isAlbumInListenLater])
 
   useEffect(() => {
-    // Reset local component state when navigating to a new album
     if (albumId) {
-      // Wrap in setTimeout to avoid synchronous setState inside effect warning
       const timer = setTimeout(() => {
         setListStatus('')
         setNewListName('')
@@ -259,7 +263,7 @@ const AlbumDetails = () => {
                 {formatReleaseDate(album.releaseDate, album.releaseYear)}, {genreLine}
               </p>
               <h1 className="mt-3 text-balance break-words font-display text-5xl leading-[0.92] text-paper tablet:text-7xl">{album.name}</h1>
-              <p className="mt-3 text-xl font-medium text-paper/85 tablet:text-2xl">{album.artists.join(', ')}</p>
+              <p className="mt-3 text-xl font-medium text-paper/85 tablet:text-2xl">{album.artists?.join(', ')}</p>
 
               <div className="mt-7 flex flex-wrap items-end gap-x-10 gap-y-5">
                 <div>
@@ -308,7 +312,13 @@ const AlbumDetails = () => {
           <section aria-labelledby="tracklist-heading">
             <h2 id="tracklist-heading" className="font-display text-3xl text-paper">Tracklist</h2>
             <ol className="mt-5 border-t border-white/[0.07]">
-              {album.tracks?.length ? (
+              {loadingTracks ? (
+                Array.from({ length: 6 }, (_, index) => (
+                  <li key={index} aria-hidden="true" className="border-b border-white/[0.07] px-1 py-3.5">
+                    <span className="block h-4 w-2/3 rounded bg-gradient-to-r from-white/10 via-white/5 to-white/10 bg-[length:220px_100%] motion-safe:animate-shimmer" />
+                  </li>
+                ))
+              ) : album.tracks?.length ? (
                 album.tracks.map((track, index) => (
                   <li
                     key={track.id ?? track.track_number}

@@ -38,6 +38,25 @@ test.describe('Critical user flows', () => {
     expect(signOutRequests).toBe(0)
   })
 
+  test('album cards open details instantly while the tracklist loads', async ({ page }) => {
+    let releaseTracks: () => void = () => {}
+    const tracksHeld = new Promise<void>((resolve) => { releaseTracks = resolve })
+    await page.route('**/api/releases/**', async (route) => {
+      await tracksHeld
+      await route.fallback()
+    })
+
+    await page.goto('/')
+    await page.locator('article').filter({ hasText: 'Discovery' }).first().click()
+    await expect(page).toHaveURL(/\/album\//)
+    await expect(page.getByText('Community score')).toBeVisible()
+    await expect(page.getByRole('heading', { level: 1, name: 'Discovery' })).toBeVisible()
+    await expect(page.getByTestId('track-number')).toHaveCount(0)
+
+    releaseTracks()
+    await expect(page.getByTestId('track-number').first()).toBeVisible()
+  })
+
   test('navbar pages render their data and album links open details', async ({ page }) => {
     const browserErrors: string[] = []
     page.on('console', (message) => {

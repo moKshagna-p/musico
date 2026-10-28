@@ -14,7 +14,7 @@ const AlbumCard = ({ album, onSelect }) => {
   const meta = [formatReleaseDate(album.releaseDate, album.releaseYear), genres[0]].filter(Boolean).join(', ')
 
   const handleNavigate = () => {
-    onSelect?.(album.id)
+    onSelect?.(album.id, album)
   }
 
   return (

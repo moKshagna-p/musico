@@ -1,7 +1,8 @@
 import { betterAuth } from 'better-auth'
 import { drizzleAdapter } from 'better-auth/adapters/drizzle'
 
-import { multiSession } from 'better-auth/plugins'
+import { customSession, multiSession } from 'better-auth/plugins'
+import { toAvatarUrl } from './core/avatar'
 import { db } from './core/db'
 import { env } from './core/env'
 import { authSchema } from './core/schema'
@@ -29,6 +30,8 @@ const initAuth = () => {
       multiSession({
         maximumSessions: 1,
       }),
+      // Keep inline avatars out of every session response; the app links to /api/avatars instead.
+      customSession(async ({ user, session }) => ({ user: { ...user, image: toAvatarUrl(user) }, session })),
     ],
     advanced: {
       useSecureCookies: isHttpsAuthUrl,

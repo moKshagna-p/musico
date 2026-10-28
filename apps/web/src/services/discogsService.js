@@ -29,7 +29,6 @@ const storage = {
   set: (key, value) => {
     try {
       localStorage.setItem(key, JSON.stringify(value))
-      // Track this cache key for faster updates later
       recentCacheKeys.add(key)
     } catch {
       // Ignore quota errors
@@ -37,7 +36,7 @@ const storage = {
   },
 }
 
-// Track recently accessed cache keys to avoid iterating through entire localStorage
+// Keys written this session, so stat patches don't scan all of localStorage.
 const recentCacheKeys = new Set()
 
 const isFresh = (timestamp, ttl = CACHE_WINDOW) => Date.now() - timestamp < ttl
@@ -95,12 +94,9 @@ export const updateAlbumCommunityStatsInCache = ({ albumId, communityRating, rev
   )
 
   try {
-    // Iterate through tracked cache keys instead of entire localStorage
-    // This is O(n) where n = tracked keys, not O(localStorage.length)
     const keysToDelete = []
-    
+
     for (const key of recentCacheKeys) {
-      // Clean up deleted keys
       if (!localStorage.getItem(key)) {
         keysToDelete.push(key)
         continue
@@ -132,8 +128,7 @@ export const updateAlbumCommunityStatsInCache = ({ albumId, communityRating, rev
         ),
       })
     }
-    
-    // Clean up deleted keys from tracking set
+
     keysToDelete.forEach((key) => recentCacheKeys.delete(key))
   } catch {
     // Ignore storage access failures.
@@ -271,8 +266,6 @@ export const searchReleases = async (query, options = {}) => {
 
 export const getReleaseDetails = async (releaseId) => {
   if (!releaseId) throw new Error('Release id missing')
-
-  // TanStack Query owns the view cache; persisted release responses contain
-  // mutable community scores and cannot stay valid across page reloads.
+  // Not persisted: the response carries live community scores.
   return validatedRequest({ url: `/api/releases/${releaseId}` }, AlbumSchema)
 }

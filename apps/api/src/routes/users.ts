@@ -1,6 +1,7 @@
 import { Elysia } from 'elysia'
 import { and, desc, eq, inArray, lt, sql, ilike, or } from 'drizzle-orm'
 import { db } from '../core/db'
+import { avatarUrl, decodeInlineAvatar, isOwnAvatarUrl, toAvatarUrl } from '../core/avatar'
 import {
   user,
   userProfile,
@@ -29,6 +30,19 @@ import { USERNAME_REGEX, MAX_BIO_LENGTH } from '../core/constants'
 import { isRecord, readBoolean, readBoundedText, readIdentifier, readRating } from './validation'
 
 export const userRoutes = new Elysia({ prefix: '/api' })
+  .get('/avatars/:userId', async ({ params, set }) => {
+    const userId = readIdentifier(params?.userId)
+    const [row] = userId ? await db.select({ image: user.image }).from(user).where(eq(user.id, userId)).limit(1) : []
+    const avatar = decodeInlineAvatar(row?.image)
+    if (!avatar) {
+      set.status = 404
+      return { error: 'Avatar not found.' }
+    }
+    // URLs carry ?v=<updatedAt>, so a changed avatar gets a new URL.
+    return new Response(avatar.bytes, {
+      headers: { 'Content-Type': avatar.type, 'Cache-Control': 'public, max-age=31536000, immutable' },
+    })
+  })
   .get('/me/ratings', async ({ request, set }) => {
     const authUser = await ensureAuthenticated(request, set)
     if (!authUser) return { error: 'Unauthorized.' }
@@ -415,7 +429,7 @@ export const userRoutes = new Elysia({ prefix: '/api' })
         username: profile.username,
         bio: profile.bio,
         isPublic: profile.isPublic,
-        image: authUser.image ?? null,
+        image: toAvatarUrl(authUser),
         followerCount,
         followingCount,
         stats: {
@@ -488,7 +502,10 @@ export const userRoutes = new Elysia({ prefix: '/api' })
       updates.isPublic = isPublic
     }
 
-    if (typed.image !== undefined) {
+    // The client echoes back the /api/avatars link it was given; that means "unchanged", not a new image URL.
+    if (typeof typed.image === 'string' && isOwnAvatarUrl(typed.image, authUser.id)) {
+      // leave the stored avatar as is
+    } else if (typed.image !== undefined) {
       if (typed.image === null) {
         userUpdates.image = null
       } else if (typeof typed.image !== 'string') {
@@ -533,7 +550,7 @@ export const userRoutes = new Elysia({ prefix: '/api' })
         username: updatedProfile?.username ?? null,
         bio: updatedProfile?.bio ?? '',
         isPublic: updatedProfile?.isPublic ?? true,
-        image: updatedUser?.image ?? null,
+        image: updatedUser ? toAvatarUrl(updatedUser) : null,
       },
     }
   })
@@ -570,7 +587,7 @@ export const userRoutes = new Elysia({ prefix: '/api' })
       .select({
         id: user.id,
         name: user.name,
-        image: user.image,
+        image: avatarUrl(),
         username: userProfile.username,
       })
       .from(user)
@@ -610,7 +627,7 @@ export const userRoutes = new Elysia({ prefix: '/api' })
         bio: userProfile.bio,
         isPublic: userProfile.isPublic,
         name: user.name,
-        image: user.image,
+        image: avatarUrl(),
       })
       .from(userProfile)
       .innerJoin(user, eq(user.id, userProfile.userId))
@@ -863,7 +880,7 @@ export const userRoutes = new Elysia({ prefix: '/api' })
 
     const followingIds = following.map((f) => f.followingId)
     const [users, profiles] = await Promise.all([
-      db.select().from(user).where(inArray(user.id, followingIds)),
+      db.select({ id: user.id, name: user.name, image: avatarUrl() }).from(user).where(inArray(user.id, followingIds)),
       db.select().from(userProfile).where(inArray(userProfile.userId, followingIds)),
     ])
 
@@ -892,7 +909,7 @@ export const userRoutes = new Elysia({ prefix: '/api' })
 
     const followerIds = followers.map((f) => f.followerId)
     const [users, profiles] = await Promise.all([
-      db.select().from(user).where(inArray(user.id, followerIds)),
+      db.select({ id: user.id, name: user.name, image: avatarUrl() }).from(user).where(inArray(user.id, followerIds)),
       db.select().from(userProfile).where(inArray(userProfile.userId, followerIds)),
     ])
 
@@ -934,7 +951,7 @@ export const userRoutes = new Elysia({ prefix: '/api' })
           listsRows,
         ] = await Promise.all([
           // User data (name, image)
-          db.select({ name: user.name, image: user.image }).from(user).where(eq(user.id, authUser.id)),
+          db.select({ name: user.name, image: avatarUrl() }).from(user).where(eq(user.id, authUser.id)),
           // Ratings
           db.select().from(userRating).where(eq(userRating.userId, authUser.id)),
           // Rating summary

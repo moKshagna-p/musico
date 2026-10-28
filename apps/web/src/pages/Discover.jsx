@@ -33,8 +33,8 @@ const Discover = () => {
     }
   }
 
-  const handleAlbumSelect = (id) => {
-    navigate(`/album/${id}`, { state: { from: '/discover', query: '' } })
+  const handleAlbumSelect = (id, album) => {
+    navigate(`/album/${id}`, { state: { from: '/discover', query: '', album } })
   }
 
   return (

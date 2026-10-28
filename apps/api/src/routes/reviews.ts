@@ -1,6 +1,7 @@
 import { Elysia } from 'elysia'
 import { desc, eq, sql } from 'drizzle-orm'
 import { db } from '../core/db'
+import { avatarUrl } from '../core/avatar'
 import { user, userReview } from '../core/schema'
 import {
   ensureAuthenticated,
@@ -130,7 +131,7 @@ export const reviewRoutes = new Elysia()
         content: userReview.content,
         updatedAt: userReview.updatedAt,
         userName: user.name,
-        userImage: user.image,
+        userImage: avatarUrl(),
       })
       .from(userReview)
       .innerJoin(user, eq(user.id, userReview.userId))

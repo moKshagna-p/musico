@@ -1,11 +1,17 @@
 import { Elysia } from 'elysia'
 import { getReleaseDetails } from '../services/discogs'
-import {
-  attachMusicoCommunityStats,
-} from '../core/utils'
+import { attachMusicoCommunityStats } from '../core/utils'
 import { attachHdCovers } from '../services/albumArtwork'
 import { loadStoredFeaturedSection } from '../services/trending'
 import { readIdentifier } from './validation'
+
+type Hydratable = Parameters<typeof attachHdCovers>[0][number] & { communityRating?: number; reviewCount?: number }
+
+// Stats and covers live in separate tables, so read both at once rather than one after the other.
+const hydrate = async <T extends Hydratable>(releases: T[], options?: Parameters<typeof attachHdCovers>[1]) => {
+  const [withStats, withCovers] = await Promise.all([attachMusicoCommunityStats(releases), attachHdCovers(releases, options)])
+  return withStats.map((release, index) => ({ ...release, cover: withCovers[index].cover }))
+}
 
 export const albumRoutes = new Elysia({ prefix: '/api' })
   .get('/featured', async ({ query, set }) => {
@@ -17,13 +23,11 @@ export const albumRoutes = new Elysia({ prefix: '/api' })
       const data = await loadStoredFeaturedSection(normalizedMode, limit)
 
       set.headers ??= {}
-      // Never let shared caches hold an empty payload: the trending service
-      // swallows refresh failures and returns [], and a cached empty response
-      // would be served to every user until it expires.
+      // Refresh failures come back as []; caching that would blank the page for everyone.
       set.headers['Cache-Control'] = data.length
         ? 'public, max-age=60, s-maxage=300, stale-while-revalidate=21000'
         : 'no-store'
-      return { data: await attachHdCovers(await attachMusicoCommunityStats(data)) }
+      return { data: await hydrate(data) }
     } catch (error) {
       console.error('[featured] error', error)
       set.status = 502
@@ -44,8 +48,7 @@ export const albumRoutes = new Elysia({ prefix: '/api' })
 
       const happeningAlbums = mostHappening.status === 'fulfilled' ? mostHappening.value : []
       const recentAlbums = recentReleases.status === 'fulfilled' ? recentReleases.value : []
-      // Hydrate both sections together so overlapping albums share one stats lookup.
-      const hydratedAlbums = await attachHdCovers(await attachMusicoCommunityStats([...happeningAlbums, ...recentAlbums]))
+      const hydratedAlbums = await hydrate([...happeningAlbums, ...recentAlbums])
       const mostHappeningData = hydratedAlbums.slice(0, happeningAlbums.length)
       const recentReleasesData = hydratedAlbums.slice(happeningAlbums.length)
 
@@ -54,9 +57,7 @@ export const albumRoutes = new Elysia({ prefix: '/api' })
         console.warn('[home] both sections failed, returning empty data')
       }
 
-      // Only allow shared caches to store fully healthy responses; a failed or
-      // empty section cached at the edge would show every user a broken
-      // homepage until the entry expires.
+      // Only cache fully healthy responses at the edge.
       const isHealthy =
         mostHappening.status === 'fulfilled' &&
         recentReleases.status === 'fulfilled' &&
@@ -95,9 +96,9 @@ export const albumRoutes = new Elysia({ prefix: '/api' })
      }
      try {
        const data = await getReleaseDetails(releaseId)
-       const [hydrated] = await attachHdCovers(await attachMusicoCommunityStats([data]), { maxLookups: 1 })
+       const [hydrated] = await hydrate([data], { maxLookups: 1 })
        set.headers ??= {}
-       // Catalog data is cached internally; mutable community scores must stay current.
+       // Community scores change; catalog data is cached server-side.
        set.headers['Cache-Control'] = 'no-store'
        return hydrated
      } catch (error) {
