@@ -45,6 +45,10 @@ const initAuth = () => {
     emailAndPassword: {
       enabled: true,
     },
+    // Read session + user in one query instead of two round trips; needs core/relations.ts.
+    experimental: {
+      joins: true,
+    },
   })
   return _auth
 }
