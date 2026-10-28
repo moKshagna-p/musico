@@ -40,6 +40,11 @@ export const log = (level: 'info' | 'warn' | 'error', message: string, data: Rec
 }
 
 export const getClientIp = (request: Request) => {
+  // Browser traffic arrives through Vercel's /api rewrite, so cf-connecting-ip is a Vercel egress IP shared by many visitors.
+  // ponytail: unsigned header, a direct workers.dev caller can rotate it to dodge the limit; verify a Vercel-added secret if abuse shows up.
+  const vercelForwardedIp = request.headers.get('x-vercel-forwarded-for')?.split(',')[0]?.trim()
+  if (vercelForwardedIp && isIpAddress(vercelForwardedIp)) return vercelForwardedIp
+
   const connectingIp = request.headers.get('cf-connecting-ip')?.trim()
   if (connectingIp && isIpAddress(connectingIp)) return connectingIp
 

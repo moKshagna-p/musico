@@ -59,3 +59,13 @@ test('activity writes expose completion so routes can await persistence', async 
   expect(exitCode, stderr).toBe(0)
   expect(JSON.parse(stdout)).toEqual({ awaitable: true, before: false, complete: true, persisted: true })
 })
+
+test('rate limiting keys on the visitor behind the Vercel rewrite, not the shared proxy IP', async () => {
+  const { getClientIp } = await import('./utils')
+  const viaVercel = new Request('https://api.test/', {
+    headers: { 'cf-connecting-ip': '76.76.21.1', 'x-vercel-forwarded-for': '203.0.113.7, 10.0.0.1' },
+  })
+  expect(getClientIp(viaVercel)).toBe('203.0.113.7')
+  expect(getClientIp(new Request('https://api.test/', { headers: { 'cf-connecting-ip': '198.51.100.2' } }))).toBe('198.51.100.2')
+  expect(getClientIp(new Request('https://api.test/', { headers: { 'x-vercel-forwarded-for': 'not-an-ip', 'cf-connecting-ip': '198.51.100.2' } }))).toBe('198.51.100.2')
+})
