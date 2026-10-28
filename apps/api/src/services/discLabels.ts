@@ -94,11 +94,14 @@ export const findDiscLabel = async (artist: string, album: string, fetcher: Fetc
     .slice(0, MAX_PRESSINGS)
 
   // The Cover Art Archive is not rate limited like MusicBrainz, so check the pressings together.
-  const art = await Promise.all(pressings.map((release) => getJson(`https://coverartarchive.org/release/${release.id}`, fetcher)))
+  const art = await Promise.allSettled(pressings.map((release) => getJson(`https://coverartarchive.org/release/${release.id}`, fetcher)))
   for (const entry of art) {
-    const label = pickLabel(entry?.images)
+    const label = entry.status === 'fulfilled' ? pickLabel(entry.value?.images) : null
     if (label) return label
   }
+  // A failed pressing might hold the photo, so throw rather than record a miss; the album is retried later.
+  const failed = art.find((entry) => entry.status === 'rejected')
+  if (failed) throw failed.reason
   return null
 }
 

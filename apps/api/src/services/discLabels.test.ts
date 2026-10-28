@@ -52,6 +52,17 @@ test('ignores a leading "The" and edition notes when matching', async () => {
   expect(queries).toEqual(['releasegroup:"explorations" AND artist:"bill evans trio"'])
 })
 
+test('keeps a found label when another pressing fails, and retries when none is found', async () => {
+  const fetcher = (broken: string) => async (url: string) => {
+    if (url.includes('musicbrainz.org')) return json({ releases: [pressing('a', { date: '1977' }), pressing('b', { date: '1978' })] })
+    if (url.endsWith(`/${broken}`)) return json({}, 500)
+    return json({ images: [photo(['Front'], 'front')] })
+  }
+  const withLabel = async (url: string) => (url.endsWith('/b') ? json({ images: [photo(['Medium'], 'b')] }) : fetcher('a')(url))
+  expect(await findDiscLabel('Fleetwood Mac', 'Rumours', withLabel)).toBe(LABEL('b'))
+  await expect(findDiscLabel('Fleetwood Mac', 'Rumours', fetcher('a'))).rejects.toThrow('returned 500')
+})
+
 test('returns null when no pressing has a disc-only photo', async () => {
   const fetcher = async (url: string) =>
     url.includes('musicbrainz.org') ? json({ releases: [pressing('a')] }) : json({ images: [photo(['Front'], 'front')] })
