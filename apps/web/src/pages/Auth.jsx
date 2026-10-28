@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 
 import PageTransition from '../components/ui/PageTransition.jsx'
+import SpinVinyl from '../components/ui/SpinVinyl.jsx'
 import { AuthPageSkeleton } from '../components/ui/PageLoadingState.jsx'
 import { useAuth } from '../hooks/useAuth.js'
 
@@ -88,13 +89,8 @@ const Auth = () => {
   return (
     <PageTransition>
       <section className="relative mx-auto grid w-full max-w-5xl items-center gap-12 py-6 md:grid-cols-[1fr_minmax(0,26rem)] tablet:py-16">
-        <div className="relative hidden md:block" aria-hidden="true">
-          <div className="vinyl relative mx-auto aspect-square w-[85%] motion-safe:animate-[vinylSpin_24s_linear_infinite]">
-            <div className="absolute inset-[33%] rounded-full bg-paper">
-              <span className="absolute left-1/2 top-[22%] -translate-x-1/2 font-display text-2xl text-black">musico</span>
-              <span className="absolute left-1/2 top-1/2 h-[12%] w-[12%] -translate-x-1/2 -translate-y-1/2 rounded-full bg-black" />
-            </div>
-          </div>
+        <div className="relative hidden md:block">
+          <SpinVinyl />
         </div>
 
         <div>
