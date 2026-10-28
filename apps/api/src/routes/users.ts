@@ -561,7 +561,7 @@ export const userRoutes = new Elysia({ prefix: '/api' })
           const values = { userId: authUser.id, ...avatar, updatedAt: now }
           await db.insert(userAvatar).values(values).onConflictDoUpdate({ target: userAvatar.userId, set: values })
           userUpdates.image = avatarPath(authUser.id, now)
-        } else {
+        } else if ('image' in userUpdates) {
           await db.delete(userAvatar).where(eq(userAvatar.userId, authUser.id))
         }
       } catch (error) {
