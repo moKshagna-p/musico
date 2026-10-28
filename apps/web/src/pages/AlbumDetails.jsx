@@ -11,7 +11,7 @@ import StreamingLinks from '../components/album/StreamingLinks.jsx'
 import BackButton from '../components/ui/BackButton.jsx'
 import Billboard, { PAGE_GUTTER } from '../components/ui/Billboard.jsx'
 import VinylSleeve from '../components/ui/VinylSleeve.jsx'
-import { AlbumDetailsPageSkeleton } from '../components/ui/PageLoadingState.jsx'
+import { AlbumDetailsPageSkeleton, TrackRowsSkeleton } from '../components/ui/PageLoadingState.jsx'
 import { useAuth } from '../hooks/useAuth.js'
 import { useLists } from '../hooks/useLists.js'
 import { useRatings } from '../hooks/useRatings.js'
@@ -213,7 +213,7 @@ const AlbumDetails = () => {
 
   if (loading) {
     return (
-      <PageTransition>
+      <PageTransition bleed>
         <AlbumDetailsPageSkeleton />
       </PageTransition>
     )
@@ -313,11 +313,7 @@ const AlbumDetails = () => {
             <h2 id="tracklist-heading" className="font-display text-3xl text-paper">Tracklist</h2>
             <ol className="mt-5 border-t border-white/[0.07]">
               {loadingTracks ? (
-                Array.from({ length: 6 }, (_, index) => (
-                  <li key={index} aria-hidden="true" className="border-b border-white/[0.07] px-1 py-3.5">
-                    <span className="block h-4 w-2/3 rounded bg-gradient-to-r from-white/10 via-white/5 to-white/10 bg-[length:220px_100%] motion-safe:animate-shimmer" />
-                  </li>
-                ))
+                <TrackRowsSkeleton />
               ) : album.tracks?.length ? (
                 album.tracks.map((track, index) => (
                   <li
@@ -363,8 +359,8 @@ const AlbumDetails = () => {
               <div className="mt-4 flex flex-wrap gap-2">
                 {loadingLists && isSignedIn ? (
                   <div aria-hidden="true" className="flex gap-2">
-                    <span className="h-9 w-28 rounded-full bg-gradient-to-r from-white/10 via-white/5 to-white/10 bg-[length:220px_100%] motion-safe:animate-shimmer" />
-                    <span className="h-9 w-24 rounded-full bg-gradient-to-r from-white/10 via-white/5 to-white/10 bg-[length:220px_100%] motion-safe:animate-shimmer" />
+                    <span className="skeleton h-9 w-28 rounded-full" />
+                    <span className="skeleton h-9 w-24 rounded-full" />
                   </div>
                 ) : listLoadError && isSignedIn ? (
                   <button type="button" onClick={() => void refreshLists().catch(() => {})} className={chipClass(false)}>

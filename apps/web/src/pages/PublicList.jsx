@@ -5,6 +5,7 @@ import { useLocation, useNavigate, useParams } from 'react-router-dom'
 
 import AlbumTile from '../components/album/AlbumTile.jsx'
 import PageTransition from '../components/ui/PageTransition.jsx'
+import LoadingSkeleton from '../components/ui/LoadingSkeleton.jsx'
 import { PublicListPageSkeleton } from '../components/ui/PageLoadingState.jsx'
 import { fetchPublicList } from '../services/socialService.js'
 
@@ -107,14 +108,7 @@ const PublicList = () => {
                 meta={album.releaseYear}
               />
             ))}
-            {Array.from({ length: pendingTiles }, (_, index) => (
-              <div key={`pending-${index}`} aria-hidden="true">
-                <div className="pr-[12%]">
-                  <div className="aspect-square w-full rounded-[4px] bg-gradient-to-r from-white/10 via-white/5 to-white/10 bg-[length:220px_100%] motion-safe:animate-shimmer" />
-                </div>
-                <div className="mt-4 h-5 w-2/3 rounded bg-white/[0.06]" />
-              </div>
-            ))}
+            <LoadingSkeleton count={pendingTiles} tile />
           </div>
         ) : (
           <p className="rounded-2xl border border-dashed border-white/10 py-12 text-center text-sm text-muted">This list is empty.</p>

@@ -5,19 +5,19 @@ const { avatarPath, coverUrl, isOwnAvatarUrl, isOwnCoverUrl, parseInlineAvatar, 
 
 test('inline raster avatars become versioned links and split into type and base64', () => {
   const data = Buffer.from('png-bytes').toString('base64')
-  const url = toAvatarUrl({ id: 'u1', image: `data:image/png;base64,${data}`, updatedAt: new Date(1_700_000_000_000) })
+  const url = toAvatarUrl({ id: 'u1', image: `data:image/png;base64,${data}`, updatedAt: new Date(1_700_000_000_123) })
 
-  expect(url).toBe(`${process.env.BETTER_AUTH_URL}/api/avatars/u1?v=1700000000`)
+  expect(url).toBe(`${process.env.BETTER_AUTH_URL}/api/avatars/u1?v=1700000000123`)
   expect(isOwnAvatarUrl(url!, 'u1')).toBe(true)
   expect(isOwnAvatarUrl(url!, 'u2')).toBe(false)
   expect(parseInlineAvatar(`data:image/png;base64,${data}`)).toEqual({ contentType: 'image/png', data })
 })
 
-test('stored relative avatar paths become absolute links', () => {
-  const image = avatarPath('u1', new Date(1_700_000_000_000))
-  expect(image).toBe('/api/avatars/u1?v=1700000000')
+test('stored relative avatar paths keep millisecond versions and become absolute links', () => {
+  const image = avatarPath('u1', new Date(1_700_000_000_123))
+  expect(image).toBe('/api/avatars/u1?v=1700000000123')
   const url = toAvatarUrl({ id: 'u1', image, updatedAt: new Date() })
-  expect(url).toBe(`${process.env.BETTER_AUTH_URL}/api/avatars/u1?v=1700000000`)
+  expect(url).toBe(`${process.env.BETTER_AUTH_URL}/api/avatars/u1?v=1700000000123`)
   expect(isOwnAvatarUrl(url!, 'u1')).toBe(true)
 })
 

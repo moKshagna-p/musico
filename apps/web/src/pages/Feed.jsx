@@ -5,7 +5,7 @@ import { motion, AnimatePresence, useReducedMotion } from 'framer-motion'
 
 import ActivityCard from '../components/user/ActivityCard.jsx'
 import FollowButton from '../components/user/FollowButton.jsx'
-import PageLoadingState from '../components/ui/PageLoadingState.jsx'
+import { FeedItemsSkeleton, FeedPageSkeleton } from '../components/ui/PageLoadingState.jsx'
 import PageTransition from '../components/ui/PageTransition.jsx'
 import { useAuth } from '../hooks/useAuth.js'
 import useFeed from '../hooks/useFeed.js'
@@ -126,10 +126,10 @@ const UserSearchPanel = () => {
               <div className="space-y-1 p-2">
                 {[1, 2, 3].map((i) => (
                   <div key={i} className="flex items-center gap-3 rounded-xl px-3 py-3">
-                    <div className="h-10 w-10 animate-pulse rounded-full bg-white/5" />
+                    <div className="skeleton h-10 w-10 rounded-full" />
                     <div className="flex-1 space-y-2">
-                      <div className="h-3.5 w-24 animate-pulse rounded bg-white/5" />
-                      <div className="h-3 w-16 animate-pulse rounded bg-white/5" />
+                      <div className="skeleton h-3.5 w-24 rounded-full" />
+                      <div className="skeleton h-3 w-16 rounded-full" />
                     </div>
                   </div>
                 ))}
@@ -283,23 +283,6 @@ const Step = ({ number, title, description }) => (
   </div>
 )
 
-// ── Feed Skeleton ──
-
-const FeedSkeleton = () => (
-  <div className="divide-y divide-white/[0.06] border-y border-white/[0.06]" aria-label="Loading feed…" role="status">
-    {Array.from({ length: 5 }).map((_, i) => (
-      <div key={i} className="flex items-start gap-3.5 py-5">
-        <div className="h-10 w-10 shrink-0 animate-pulse rounded-full bg-white/5" />
-        <div className="flex-1 space-y-2.5 pt-1">
-          <div className="h-3.5 w-3/5 animate-pulse rounded bg-white/5" />
-          <div className="h-3 w-1/5 animate-pulse rounded bg-white/5" />
-        </div>
-        <div className="h-14 w-14 shrink-0 animate-pulse rounded-[3px] bg-white/5 tablet:h-16 tablet:w-16" />
-      </div>
-    ))}
-  </div>
-)
-
 // ── Main Feed Page ──
 
 const Feed = () => {
@@ -317,7 +300,7 @@ const Feed = () => {
   if (isPending || !user) {
     return (
       <PageTransition>
-        <PageLoadingState title="Loading feed" cards={5} compact />
+        <FeedPageSkeleton />
       </PageTransition>
     )
   }
@@ -358,7 +341,7 @@ const Feed = () => {
         {/* Feed Content */}
         <section aria-label="Activity feed">
           {loading && !items.length ? (
-            <FeedSkeleton />
+            <FeedItemsSkeleton />
           ) : error ? (
             <Motion.div
               initial={shouldReduceMotion ? false : { opacity: 0 }}

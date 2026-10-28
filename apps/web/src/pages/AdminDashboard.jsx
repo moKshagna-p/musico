@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { FiAlertTriangle, FiSearch, FiShield, FiTrash2, FiUserCheck, FiUserX } from 'react-icons/fi'
 import { Navigate } from 'react-router-dom'
 
+import { AdminDashboardPageSkeleton, AdminRowsSkeleton } from '../components/ui/PageLoadingState.jsx'
 import PageTransition from '../components/ui/PageTransition.jsx'
 import { useAdminAccess } from '../hooks/useAdminAccess.js'
 import { deleteAdminReview, fetchAdminOverview, fetchAdminReviews, fetchAdminUsers, setUserAdminRole } from '../services/adminService.js'
@@ -110,13 +111,7 @@ const AdminDashboard = () => {
   if (loadingAdmin) {
     return (
       <PageTransition>
-        <section className="space-y-4" aria-busy="true" aria-label="Loading admin dashboard">
-          <div className="h-20 animate-pulse rounded-2xl border border-outline/70 bg-panel/35" />
-          <div className="grid gap-3 laptop:grid-cols-2">
-            <div className="h-72 animate-pulse rounded-2xl border border-outline/70 bg-panel/35" />
-            <div className="h-72 animate-pulse rounded-2xl border border-outline/70 bg-panel/35" />
-          </div>
-        </section>
+        <AdminDashboardPageSkeleton />
       </PageTransition>
     )
   }
@@ -169,9 +164,7 @@ const AdminDashboard = () => {
 
             <div className="mt-4 divide-y divide-outline/55">
               {usersQuery.isLoading ? (
-                Array.from({ length: 5 }).map((_, index) => (
-                  <div key={index} className="h-16 animate-pulse bg-white/[0.03]" />
-                ))
+                <AdminRowsSkeleton />
               ) : users.length ? (
                 users.map((person) => {
                   const isPending = pendingUserId === person.userId
@@ -235,9 +228,7 @@ const AdminDashboard = () => {
 
             <div className="mt-4 divide-y divide-outline/55">
               {reviewsQuery.isLoading ? (
-                Array.from({ length: 5 }).map((_, index) => (
-                  <div key={index} className="h-20 animate-pulse bg-white/[0.03]" />
-                ))
+                <AdminRowsSkeleton />
               ) : reviews.length ? (
                 reviews.map((review) => {
                   const isPending = pendingReviewId === review.id

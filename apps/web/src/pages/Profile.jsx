@@ -325,7 +325,7 @@ const Profile = () => {
   if (isPending || !user) {
     return (
       <PageTransition>
-        <ProfilePageSkeleton showActions />
+        <ProfilePageSkeleton own />
       </PageTransition>
     )
   }
