@@ -1,7 +1,7 @@
 import { expect, test } from 'bun:test'
 
 process.env.BETTER_AUTH_URL ??= 'http://localhost:4000'
-const { avatarPath, isOwnAvatarUrl, parseInlineAvatar, toAvatarUrl } = await import('./avatar')
+const { avatarPath, coverUrl, isOwnAvatarUrl, isOwnCoverUrl, parseInlineAvatar, toAvatarUrl } = await import('./avatar')
 
 test('inline raster avatars become versioned links and split into type and base64', () => {
   const data = Buffer.from('png-bytes').toString('base64')
@@ -27,4 +27,12 @@ test('remote and svg avatars pass through untouched', () => {
   expect(toAvatarUrl({ id: 'u1', image: 'data:image/svg+xml;base64,PHN2Zy8+', updatedAt })).toBe('data:image/svg+xml;base64,PHN2Zy8+')
   expect(toAvatarUrl({ id: 'u1', image: null, updatedAt })).toBeNull()
   expect(parseInlineAvatar('data:image/svg+xml;base64,PHN2Zy8+')).toBeNull()
+})
+
+test('cover links are versioned and recognized only for their owner', () => {
+  const url = coverUrl('u1', new Date(1_700_000_000_000))
+  expect(url).toBe(`${process.env.BETTER_AUTH_URL}/api/covers/u1?v=1700000000000`)
+  expect(isOwnCoverUrl(url, 'u1')).toBe(true)
+  expect(isOwnCoverUrl(url, 'u2')).toBe(false)
+  expect(isOwnAvatarUrl(url, 'u1')).toBe(false)
 })

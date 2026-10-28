@@ -7,7 +7,7 @@ const ActivityCard = ({ item }) => {
 
   const timeAgo = formatTimeAgo(createdAt)
 
-  const userLink = <span className="font-medium text-paper">{actor?.name ?? 'Unknown'}</span>
+  const userLink = <PersonName person={actor} />
 
   const albumLink = albumId ? (
     <Link to={`/album/${albumId}`} className="font-medium text-paper hover:underline">
@@ -15,7 +15,7 @@ const ActivityCard = ({ item }) => {
     </Link>
   ) : null
 
-  const targetLink = targetUser ? <span className="font-medium text-paper">{targetUser.name}</span> : null
+  const targetLink = targetUser ? <PersonName person={targetUser} /> : null
 
   const renderContent = () => {
     switch (type) {
@@ -83,7 +83,7 @@ const ActivityCard = ({ item }) => {
         />
       ) : (
         <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-white/[0.04] text-xl font-semibold text-paper/50 ring-1 ring-white/10" aria-hidden="true">
-          {actor?.name?.charAt(0)?.toUpperCase() ?? '?'}
+          {(actor?.username ?? actor?.name)?.charAt(0)?.toUpperCase() ?? '?'}
         </div>
       )}
 
@@ -94,6 +94,16 @@ const ActivityCard = ({ item }) => {
     </div>
   )
 }
+
+// Usernames link to profiles; accounts created before signup asked for one fall back to their name.
+const PersonName = ({ person }) =>
+  person?.username ? (
+    <Link to={`/profile/${person.username}`} className="font-medium text-paper hover:underline">
+      {person.username}
+    </Link>
+  ) : (
+    <span className="font-medium text-paper">{person?.name ?? 'Unknown'}</span>
+  )
 
 const formatTimeAgo = (timestamp) => {
   const seconds = Math.floor((Date.now() - timestamp) / 1000)

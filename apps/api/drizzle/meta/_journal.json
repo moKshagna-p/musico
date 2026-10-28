@@ -99,6 +99,13 @@
       "when": 1793184843442,
       "tag": "0013_album_disc_label",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1793188029661,
+      "tag": "0014_user_cover",
+      "breakpoints": true
     }
   ]
 }

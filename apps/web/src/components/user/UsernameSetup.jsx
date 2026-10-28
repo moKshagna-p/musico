@@ -1,44 +1,14 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useState } from 'react'
 import { FiCheck, FiX } from 'react-icons/fi'
 
-import { checkUsernameAvailability, updateMyProfile } from '../../services/socialService.js'
-
-const USERNAME_REGEX = /^[a-z0-9][a-z0-9-]{1,22}[a-z0-9]$/
+import { USERNAME_STATUS_TEXT, cleanUsername, useUsernameStatus } from '../../hooks/useUsernameStatus.js'
+import { updateMyProfile } from '../../services/socialService.js'
 
 const UsernameSetup = ({ onComplete, onSkip }) => {
   const [username, setUsername] = useState('')
-  const [status, setStatus] = useState(null) // null | 'checking' | 'available' | 'taken' | 'invalid'
+  const status = useUsernameStatus(username)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
-
-  useEffect(() => {
-    if (!username.trim()) {
-      setStatus(null)
-      return
-    }
-
-    const lower = username.trim().toLowerCase()
-    if (!USERNAME_REGEX.test(lower)) {
-      setStatus('invalid')
-      return
-    }
-
-    setStatus('checking')
-    const timer = setTimeout(async () => {
-      try {
-        const result = await checkUsernameAvailability(lower)
-        if (!result.valid) {
-          setStatus('invalid')
-        } else {
-          setStatus(result.available ? 'available' : 'taken')
-        }
-      } catch {
-        setStatus(null)
-      }
-    }, 400)
-
-    return () => clearTimeout(timer)
-  }, [username])
 
   const handleSubmit = useCallback(
     async (event) => {
@@ -48,7 +18,7 @@ const UsernameSetup = ({ onComplete, onSkip }) => {
       setSaving(true)
       setError('')
       try {
-        await updateMyProfile({ username: username.trim().toLowerCase() })
+        await updateMyProfile({ username })
         onComplete?.()
       } catch (err) {
         setError(err?.message ?? 'Failed to set username.')
@@ -66,16 +36,7 @@ const UsernameSetup = ({ onComplete, onSkip }) => {
       <FiX className="text-red-400" />
     ) : null
 
-  const statusText =
-    status === 'checking'
-      ? 'Checking...'
-      : status === 'available'
-        ? 'Available'
-        : status === 'taken'
-          ? 'Already taken'
-          : status === 'invalid'
-            ? '3-24 chars, lowercase letters, numbers, hyphens'
-            : ''
+  const statusText = USERNAME_STATUS_TEXT[status] ?? ''
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-md">
@@ -96,7 +57,7 @@ const UsernameSetup = ({ onComplete, onSkip }) => {
                 id="username-input"
                 type="text"
                 value={username}
-                onChange={(e) => setUsername(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))}
+                onChange={(e) => setUsername(cleanUsername(e.target.value))}
                 placeholder="yourname"
                 autoComplete="off"
                 autoFocus
@@ -116,9 +77,9 @@ const UsernameSetup = ({ onComplete, onSkip }) => {
                 {statusText}
               </p>
             )}
-            {username.trim() && status === 'available' && (
+            {status === 'available' && (
               <p className="mt-1 text-xs text-muted">
-                Findable as @{username.trim().toLowerCase()}
+                Findable as @{username}
               </p>
             )}
           </div>

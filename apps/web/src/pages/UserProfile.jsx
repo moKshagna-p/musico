@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 
 import FollowButton from '../components/user/FollowButton.jsx'
+import ProfileCover from '../components/user/ProfileCover.jsx'
 import PageTransition from '../components/ui/PageTransition.jsx'
 import { ProfilePageSkeleton } from '../components/ui/PageLoadingState.jsx'
 import SectionHeading from '../components/ui/SectionHeading.jsx'
@@ -84,6 +85,7 @@ const UserProfile = () => {
     <PageTransition>
       <div className="mx-auto w-full max-w-6xl py-4 tablet:py-8">
         <BackButton onClick={() => navigate(-1)} />
+        <ProfileCover src={profile.cover} />
 
         <header className="flex flex-col gap-8 border-b border-white/[0.07] pb-10 md:flex-row md:items-end md:justify-between">
           <div className="flex min-w-0 flex-col gap-6 sm:flex-row sm:items-end">

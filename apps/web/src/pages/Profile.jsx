@@ -11,6 +11,7 @@ import ListCard from '../components/list/ListCard.jsx'
 import AlbumSlotMachine from '../components/album/AlbumSlotMachine.jsx'
 import CoverImage from '../components/ui/CoverImage.jsx'
 import UsernameSetup from '../components/user/UsernameSetup.jsx'
+import ProfileCover from '../components/user/ProfileCover.jsx'
 import { useAuth } from '../hooks/useAuth.js'
 import { useDashboard } from '../hooks/useDashboard.js'
 import { fetchMyFollowers, fetchMyFollowing, updateMyProfile } from '../services/socialService.js'
@@ -60,6 +61,18 @@ const FollowListModal = ({ title, users, loading, onClose }) => (
   </div>
 )
 
+// Phone photos run several MB; a banner only needs ~1600px across, which keeps uploads well under the 2MB limit.
+const toCoverDataUrl = async (file) => {
+  const bitmap = await createImageBitmap(file)
+  const scale = Math.min(1, 1600 / bitmap.width)
+  const canvas = document.createElement('canvas')
+  canvas.width = Math.round(bitmap.width * scale)
+  canvas.height = Math.round(bitmap.height * scale)
+  canvas.getContext('2d').drawImage(bitmap, 0, 0, canvas.width, canvas.height)
+  bitmap.close()
+  return canvas.toDataURL('image/jpeg', 0.85)
+}
+
 const formatReviewedAt = (timestamp) => {
   if (!timestamp) return ''
 
@@ -83,6 +96,7 @@ const Profile = () => {
   const [showEditModal, setShowEditModal] = useState(false)
   const [editBio, setEditBio] = useState('')
   const [editImage, setEditImage] = useState('')
+  const [editCover, setEditCover] = useState('')
   const [savingProfile, setSavingProfile] = useState(false)
   const [profileStatus, setProfileStatus] = useState('')
   const [showFollowersModal, setShowFollowersModal] = useState(false)
@@ -92,6 +106,7 @@ const Profile = () => {
   const [followersLoading, setFollowersLoading] = useState(false)
   const [followingLoading, setFollowingLoading] = useState(false)
   const fileInputRef = useRef(null)
+  const coverInputRef = useRef(null)
 
   useEffect(() => {
     if (!isPending && !user) {
@@ -109,6 +124,7 @@ const Profile = () => {
         bio: dashboard.profile?.bio,
         name: dashboard.profile?.name,
         image: dashboard.profile?.image,
+        cover: dashboard.profile?.cover,
         followerCount: dashboard.profile?.followerCount ?? 0,
         followingCount: dashboard.profile?.followingCount ?? 0,
         recentRatings: dashboard.recentRatings ?? [],
@@ -116,6 +132,7 @@ const Profile = () => {
       setSocialProfile(profile)
       setEditBio(profile.bio ?? '')
       setEditImage(profile.image ?? '')
+      setEditCover(profile.cover ?? '')
       if (!profile.username) {
         setShowUsernameSetup(true)
       }
@@ -125,6 +142,7 @@ const Profile = () => {
   const openEditModal = useCallback(() => {
     setEditBio(socialProfile?.bio ?? '')
     setEditImage(socialProfile?.image ?? '')
+    setEditCover(socialProfile?.cover ?? '')
     setProfileStatus('')
     setShowEditModal(true)
   }, [socialProfile])
@@ -137,6 +155,7 @@ const Profile = () => {
       const updated = await updateMyProfile({
         bio: editBio.trim(),
         image: editImage.trim(),
+        cover: editCover,
       })
       setSocialProfile((prev) => ({ ...prev, ...updated }))
       setProfileStatus('Saved.')
@@ -146,7 +165,7 @@ const Profile = () => {
     } finally {
       setSavingProfile(false)
     }
-  }, [editBio, editImage, savingProfile])
+  }, [editBio, editImage, editCover, savingProfile])
 
   const openFollowers = useCallback(async () => {
     setShowFollowersModal(true)
@@ -201,6 +220,18 @@ const Profile = () => {
     }
     reader.readAsDataURL(file)
     event.target.value = ''
+  }, [])
+
+  const handleCoverFileChange = useCallback(async (event) => {
+    const file = event.target.files?.[0]
+    event.target.value = ''
+    if (!file) return
+    try {
+      setEditCover(await toCoverDataUrl(file))
+      setProfileStatus('')
+    } catch {
+      setProfileStatus('Unable to read that image.')
+    }
   }, [])
 
   const ratedItems = useMemo(
@@ -311,7 +342,7 @@ const Profile = () => {
       {/* Edit Profile Modal */}
       {showEditModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-md">
-          <div className="relative mx-4 w-full max-w-md rounded-3xl border border-white/10 bg-[#0b0b0a]/95 shadow-[0_40px_120px_-20px_rgba(0,0,0,1)] p-8">
+          <div className="relative mx-4 max-h-[90svh] w-full max-w-md overflow-y-auto rounded-3xl border border-white/10 bg-[#0b0b0a]/95 shadow-[0_40px_120px_-20px_rgba(0,0,0,1)] p-8">
             <button
               type="button"
               onClick={() => setShowEditModal(false)}
@@ -322,7 +353,7 @@ const Profile = () => {
             </button>
 
             <h2 className="font-display text-3xl text-paper">Edit Profile</h2>
-            <p className="mt-1 text-sm text-muted">Update your bio and profile picture.</p>
+            <p className="mt-1 text-sm text-muted">Update your bio, profile picture, and cover.</p>
 
             <div className="mt-6 space-y-5">
               {socialProfile?.username && (
@@ -386,6 +417,43 @@ const Profile = () => {
                 />
               </div>
 
+              <div>
+                <label className="block text-sm text-muted">Cover</label>
+                <div className="mt-2 overflow-hidden rounded-lg border border-outline/60 bg-canvas/30">
+                  {editCover ? (
+                    <img src={editCover} alt="" className="aspect-[3/1] w-full object-cover" />
+                  ) : (
+                    <div className="aspect-[3/1] w-full bg-white/[0.03]" />
+                  )}
+                  <div className="flex flex-wrap gap-3 p-4">
+                    <button
+                      type="button"
+                      onClick={() => coverInputRef.current?.click()}
+                      className="inline-flex items-center gap-2 rounded-full border border-white/12 px-4 py-2 text-sm text-paper/80 transition-colors hover:border-white/30 hover:text-paper"
+                    >
+                      <FiUpload aria-hidden="true" />
+                      Upload Cover
+                    </button>
+                    {editCover && (
+                      <button
+                        type="button"
+                        onClick={() => setEditCover('')}
+                        className="rounded-full border border-white/12 px-4 py-2 text-sm text-paper/80 transition-colors hover:border-white/30 hover:text-paper"
+                      >
+                        Remove
+                      </button>
+                    )}
+                  </div>
+                </div>
+                <input
+                  ref={coverInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={handleCoverFileChange}
+                  className="hidden"
+                />
+              </div>
+
               {profileStatus && (
                 <p className={`text-xs ${profileStatus === 'Saved.' ? 'text-green-400' : 'text-red-400'}`} aria-live="polite">
                   {profileStatus}
@@ -415,6 +483,7 @@ const Profile = () => {
       )}
 
       <div className="mx-auto w-full max-w-6xl py-4 tablet:py-8">
+        <ProfileCover src={socialProfile?.cover} />
         <header className="flex flex-col gap-8 border-b border-white/[0.07] pb-10 md:flex-row md:items-end md:justify-between">
           <div className="flex min-w-0 flex-col gap-6 sm:flex-row sm:items-end">
             {socialProfile?.image ? (

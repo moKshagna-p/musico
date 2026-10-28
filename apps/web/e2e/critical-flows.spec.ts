@@ -20,6 +20,26 @@ test.describe('Critical user flows', () => {
     await expect(page.getByRole('link', { name: /profile/i })).toBeVisible()
   })
 
+  test('sign-up requires an available username and the feed addresses the user by it', async ({ page }) => {
+    await page.goto('/auth')
+    await page.getByRole('button', { name: 'Create Account' }).click()
+    await page.getByLabel('Email').fill('new@musico.dev')
+    await page.getByLabel('Password').fill('password123')
+
+    await page.getByLabel('Username').fill('Taken-Name')
+    await expect(page.getByText('Already taken')).toBeVisible()
+    await page.locator('form').getByRole('button', { name: 'Create Account' }).click()
+    await expect(page.getByText('Pick an available username.')).toBeVisible()
+
+    await page.getByLabel('Username').fill('vinyl-fan')
+    await expect(page.getByText('Available', { exact: true })).toBeVisible()
+    await page.locator('form').getByRole('button', { name: 'Create Account' }).click()
+    await expect(page).toHaveURL('/')
+
+    await page.getByRole('link', { name: 'Feed', exact: true }).click()
+    await expect(page.getByRole('link', { name: 'vinyl-fan', exact: true })).toHaveAttribute('href', '/profile/vinyl-fan')
+  })
+
   test('a stale previous session does not sign out a fresh login', async ({ page }) => {
     let signOutRequests = 0
     page.on('request', (request) => {
