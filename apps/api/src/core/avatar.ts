@@ -7,9 +7,10 @@ import { user } from './schema'
 // and production share one database). Rows not yet moved still hold an inline data URL (up to ~2.8MB).
 const INLINE_AVATAR = /^data:(image\/(?:png|jpeg|webp|gif|avif));base64,/
 const AVATAR_PATH = '/api/avatars/'
-export const avatarPath = (userId: string, at: Date) => `${AVATAR_PATH}${userId}?v=${Math.floor(at.getTime() / 1000)}`
+// Millisecond versions: avatar URLs are cached as immutable, so two saves in one second need different URLs.
+export const avatarPath = (userId: string, at: Date) => `${AVATAR_PATH}${userId}?v=${at.getTime()}`
 export const avatarUrl = () => sql<string | null>`case when ${user.image} ~ ${INLINE_AVATAR.source}
-  then ${`${env.BETTER_AUTH_URL}${AVATAR_PATH}`} || ${user.id} || '?v=' || floor(extract(epoch from ${user.updatedAt}))::bigint
+  then ${`${env.BETTER_AUTH_URL}${AVATAR_PATH}`} || ${user.id} || '?v=' || floor(extract(epoch from ${user.updatedAt}) * 1000)::bigint
   when starts_with(${user.image}, ${AVATAR_PATH}) then ${env.BETTER_AUTH_URL} || ${user.image}
   else ${user.image} end`
 export const toAvatarUrl = ({ id, image, updatedAt }: { id: string; image?: string | null; updatedAt: Date }) => {

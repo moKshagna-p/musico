@@ -556,22 +556,18 @@ export const userRoutes = new Elysia({ prefix: '/api' })
 
     if (Object.keys(userUpdates).length) {
       const avatar = parseInlineAvatar(userUpdates.image as string | null)
-      try {
-        if (avatar) {
-          const values = { userId: authUser.id, ...avatar, updatedAt: now }
-          await db.insert(userAvatar).values(values).onConflictDoUpdate({ target: userAvatar.userId, set: values })
-          userUpdates.image = avatarPath(authUser.id, now)
-        } else if ('image' in userUpdates) {
-          await db.delete(userAvatar).where(eq(userAvatar.userId, authUser.id))
-        }
-      } catch (error) {
-        // Before the user_avatar migration is applied, keep storing the data URL inline.
-        if (!isMissingTableError(error, 'user_avatar')) throw error
+      if (avatar) userUpdates.image = avatarPath(authUser.id, now)
+      const saveUser = db.update(user).set({ ...userUpdates, updatedAt: now }).where(eq(user.id, authUser.id))
+      // The avatar bytes and the user.image link change in one transaction, so they never disagree.
+      // user is written first, the same order as scripts/move-inline-avatars.ts, so the two cannot deadlock.
+      if (avatar) {
+        const values = { userId: authUser.id, ...avatar, updatedAt: now }
+        await db.batch([saveUser, db.insert(userAvatar).values(values).onConflictDoUpdate({ target: userAvatar.userId, set: values })])
+      } else if ('image' in userUpdates) {
+        await db.batch([saveUser, db.delete(userAvatar).where(eq(userAvatar.userId, authUser.id))])
+      } else {
+        await saveUser
       }
-      await db
-        .update(user)
-        .set({ ...userUpdates, updatedAt: now })
-        .where(eq(user.id, authUser.id))
     }
 
     const [updatedProfile] = await db.select().from(userProfile).where(eq(userProfile.userId, authUser.id)).limit(1)
