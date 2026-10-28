@@ -104,6 +104,13 @@ export const albumArtwork = pgTable('album_artwork', {
   checkedAt: timestamp('checkedAt', { withTimezone: true, mode: 'date' }).notNull(),
 })
 
+// Photo of the record's center label from the Cover Art Archive; a null label records that none exists.
+export const albumDiscLabel = pgTable('album_disc_label', {
+  albumId: text('albumId').primaryKey(),
+  label: text('label'),
+  checkedAt: timestamp('checkedAt', { withTimezone: true, mode: 'date' }).notNull(),
+})
+
 export const storedTrendingAlbum = pgTable(
   'stored_trending_album',
   {

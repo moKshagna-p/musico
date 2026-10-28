@@ -36,7 +36,10 @@ export default {
     context.waitUntil(
       (async () => {
         const { refreshStoredHomeAlbums } = await import('./src/services/trending')
-        await refreshStoredHomeAlbums({ happeningLimit: 24, recentLimit: 24 })
+        const home = await refreshStoredHomeAlbums({ happeningLimit: 24, recentLimit: 24 })
+        // ponytail: a few disc-label lookups per run keeps us under subrequest limits; home albums fill in over a few runs.
+        const { attachDiscLabels } = await import('./src/services/discLabels')
+        await attachDiscLabels([...home.mostHappening.data, ...home.recentReleases.data], { maxLookups: 4 })
       })().catch((error) => {
         console.error('[worker.scheduled] homepage refresh failed', error instanceof Error ? error.message : String(error), error)
       }),

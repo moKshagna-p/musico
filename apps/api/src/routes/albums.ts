@@ -2,15 +2,20 @@ import { Elysia } from 'elysia'
 import { getReleaseDetails } from '../services/discogs'
 import { attachMusicoCommunityStats } from '../core/utils'
 import { attachHdCovers } from '../services/albumArtwork'
+import { attachDiscLabels, lookUpDiscLabelsLater } from '../services/discLabels'
 import { loadStoredFeaturedSection } from '../services/trending'
 import { readIdentifier } from './validation'
 
 type Hydratable = Parameters<typeof attachHdCovers>[0][number] & { communityRating?: number; reviewCount?: number }
 
-// Stats and covers live in separate tables, so read both at once rather than one after the other.
+// Stats, covers and disc labels live in separate tables, so read them at once rather than one after the other.
 const hydrate = async <T extends Hydratable>(releases: T[], options?: Parameters<typeof attachHdCovers>[1]) => {
-  const [withStats, withCovers] = await Promise.all([attachMusicoCommunityStats(releases), attachHdCovers(releases, options)])
-  return withStats.map((release, index) => ({ ...release, cover: withCovers[index].cover }))
+  const [withStats, withCovers, withLabels] = await Promise.all([
+    attachMusicoCommunityStats(releases),
+    attachHdCovers(releases, options),
+    attachDiscLabels(releases),
+  ])
+  return withStats.map((release, index) => ({ ...release, cover: withCovers[index].cover, discLabel: withLabels[index].discLabel }))
 }
 
 export const albumRoutes = new Elysia({ prefix: '/api' })
@@ -97,6 +102,7 @@ export const albumRoutes = new Elysia({ prefix: '/api' })
      try {
        const data = await getReleaseDetails(releaseId)
        const [hydrated] = await hydrate([data], { maxLookups: 1 })
+       if (!hydrated.discLabel) lookUpDiscLabelsLater([data])
        set.headers ??= {}
        // Community scores change; catalog data is cached server-side.
        set.headers['Cache-Control'] = 'no-store'

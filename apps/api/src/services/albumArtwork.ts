@@ -33,11 +33,11 @@ let appleBackoffUntil = 0
 export const cleanDiscogsArtist = (name = '') => name.replace(/\s*\(\d+\)$/, '').replace(/\*$/, '').trim()
 
 // Apple appends edition notes ("(Deluxe Version)", " - Single") that Discogs titles lack.
-const normalizeTitle = (value: string) =>
+export const normalizeTitle = (value: string) =>
   normalizeName(value.replace(/\s*[([][^)\]]*[)\]]/g, '').replace(/\s+-\s+(single|ep)$/i, ''))
 
 // Accepts the exact artist or a collaboration led by them ("Drake & Future"), not look-alikes ("Drake Tribute").
-const artistMatches = (candidate: string, target: string) =>
+export const artistMatches = (candidate: string, target: string) =>
   normalizeName(candidate) === target || normalizeName(candidate.split(/\s*(?:&|,|\bfeat\.?|\bft\.?|\bwith\b)\s*/i)[0]) === target
 
 export const findAppleAlbumCover = async (artist: string, album: string, fetcher: Fetcher = fetch) => {

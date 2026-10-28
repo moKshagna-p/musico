@@ -255,7 +255,7 @@ const AlbumDetails = () => {
 
           <div className="flex flex-col gap-8 md:flex-row md:items-end md:gap-10">
             <div className="w-44 shrink-0 pr-14 tablet:w-64 tablet:pr-20">
-              <VinylSleeve src={album.cover} alt={album.name} out spin loading="eager" />
+              <VinylSleeve src={album.cover} label={album.discLabel} alt={album.name} out spin loading="eager" />
             </div>
 
             <header className="min-w-0">

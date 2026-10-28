@@ -34,6 +34,7 @@ const AlbumCard = ({ album, onSelect }) => {
     >
       <VinylSleeve
         src={album.cover}
+        label={album.discLabel}
         alt={album.name}
         pull="up"
         size={600}
