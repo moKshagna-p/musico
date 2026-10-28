@@ -286,18 +286,15 @@ const Step = ({ number, title, description }) => (
 // ── Feed Skeleton ──
 
 const FeedSkeleton = () => (
-  <div className="mt-6 space-y-3" aria-label="Loading feed…" role="status">
+  <div className="divide-y divide-white/[0.06] border-y border-white/[0.06]" aria-label="Loading feed…" role="status">
     {Array.from({ length: 5 }).map((_, i) => (
-      <div
-        key={i}
-        className="flex gap-4 rounded-2xl border border-outline/30 bg-panel/30 p-4"
-        style={{ animationDelay: `${i * 120}ms` }}
-      >
-        <div className="h-12 w-12 animate-pulse rounded-xl bg-white/5" />
-        <div className="flex-1 space-y-2.5 py-1">
+      <div key={i} className="flex items-start gap-3.5 py-5">
+        <div className="h-10 w-10 shrink-0 animate-pulse rounded-full bg-white/5" />
+        <div className="flex-1 space-y-2.5 pt-1">
           <div className="h-3.5 w-3/5 animate-pulse rounded bg-white/5" />
-          <div className="h-3 w-2/5 animate-pulse rounded bg-white/5" />
+          <div className="h-3 w-1/5 animate-pulse rounded bg-white/5" />
         </div>
+        <div className="h-14 w-14 shrink-0 animate-pulse rounded-[3px] bg-white/5 tablet:h-16 tablet:w-16" />
       </div>
     ))}
   </div>
@@ -381,25 +378,27 @@ const Feed = () => {
           ) : items.length === 0 ? (
             <EmptyFeed navigate={navigate} />
           ) : (
-            <div className="divide-y divide-white/[0.06] border-y border-white/[0.06]">
-              <AnimatePresence mode="popLayout">
-                {items.map((item, i) => (
-                  <Motion.div
-                    key={item.id}
-                    initial={shouldReduceMotion ? false : { opacity: 0, y: 8 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={shouldReduceMotion ? { opacity: 0 } : { opacity: 0, scale: 0.98 }}
-                    transition={{
-                      delay: Math.min(i * 0.03, 0.3),
-                      duration: 0.3,
-                      ease: [0.16, 1, 0.3, 1],
-                    }}
-                    layout={!shouldReduceMotion}
-                  >
-                    <ActivityCard item={item} />
-                  </Motion.div>
-                ))}
-              </AnimatePresence>
+            <>
+              <div className="divide-y divide-white/[0.06] border-y border-white/[0.06]">
+                <AnimatePresence mode="popLayout">
+                  {items.map((item, i) => (
+                    <Motion.div
+                      key={item.id}
+                      initial={shouldReduceMotion ? false : { opacity: 0, y: 8 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={shouldReduceMotion ? { opacity: 0 } : { opacity: 0, scale: 0.98 }}
+                      transition={{
+                        delay: Math.min(i * 0.03, 0.3),
+                        duration: 0.3,
+                        ease: [0.16, 1, 0.3, 1],
+                      }}
+                      layout={!shouldReduceMotion}
+                    >
+                      <ActivityCard item={item} />
+                    </Motion.div>
+                  ))}
+                </AnimatePresence>
+              </div>
 
               {hasMore && (
                 <Motion.button
@@ -408,7 +407,7 @@ const Feed = () => {
                   disabled={loadingMore}
                   initial={shouldReduceMotion ? false : { opacity: 0 }}
                   animate={{ opacity: 1 }}
-                  className="w-full rounded-full border border-white/10 py-3.5 text-sm text-muted transition-colors hover:border-white/25 hover:text-paper disabled:opacity-40"
+                  className="mt-6 w-full rounded-full border border-white/10 py-3.5 text-sm text-muted transition-colors hover:border-white/25 hover:text-paper disabled:opacity-40"
                 >
                   {loadingMore ? (
                     <span className="inline-flex items-center gap-2">
@@ -420,7 +419,7 @@ const Feed = () => {
                   )}
                 </Motion.button>
               )}
-            </div>
+            </>
           )}
         </section>
       </div>

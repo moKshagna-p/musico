@@ -1,13 +1,9 @@
 import { Link } from 'react-router-dom'
 import CoverImage from '../ui/CoverImage.jsx'
-import RatingStars from '../ui/RatingStars.jsx'
 
+// One feed row: who (avatar + username), what they did in one sentence, when, and the album on the right.
 const ActivityCard = ({ item }) => {
   const { type, user: actor, albumId, albumName, albumCover, targetUser, metadata, createdAt } = item
-
-  const timeAgo = formatTimeAgo(createdAt)
-
-  const userLink = <PersonName person={actor} />
 
   const albumLink = albumId ? (
     <Link to={`/album/${albumId}`} className="font-medium text-paper hover:underline">
@@ -15,83 +11,78 @@ const ActivityCard = ({ item }) => {
     </Link>
   ) : null
 
-  const targetLink = targetUser ? <PersonName person={targetUser} /> : null
+  const listLink = metadata?.listId ? (
+    <Link to={`/lists/${metadata.listId}`} className="font-medium text-paper hover:underline">
+      {metadata.listName ?? 'a list'}
+    </Link>
+  ) : (
+    <span className="font-medium text-paper">{metadata?.listName ?? 'a list'}</span>
+  )
 
-  const renderContent = () => {
-    switch (type) {
-      case 'rated': {
-        const rating = Number(metadata?.rating ?? 0)
-        return (
-          <div className="text-[15px] leading-relaxed text-paper/75">
-            {userLink} rated {albumLink}{' '}
-            <span className="inline-flex align-middle">
-              <RatingStars value={rating} readOnly size="sm" align="left" />
-            </span>
-          </div>
-        )
-      }
-      case 'reviewed':
-        return (
-          <div>
-            <p className="text-[15px] leading-relaxed text-paper/75">
-              {userLink} reviewed {albumLink}
-            </p>
-            {metadata?.snippet && (
-              <p className="mt-2 border-l border-white/15 pl-3 italic leading-snug text-paper/80">&ldquo;{metadata.snippet}&rdquo;</p>
-            )}
-          </div>
-        )
-      case 'listed':
-        return (
-          <p className="text-[15px] leading-relaxed text-paper/75">
-            {userLink} added {albumLink} to{' '}
-            <span className="font-medium text-white/90">{metadata?.listName ?? 'a list'}</span>
-          </p>
-        )
-      case 'followed':
-        return (
-          <p className="text-[15px] leading-relaxed text-paper/75">
-            {userLink} started following {targetLink}
-          </p>
-        )
-      default:
-        return null
-    }
-  }
+  const sentence = {
+    rated: <>rated {albumLink}</>,
+    reviewed: <>reviewed {albumLink}</>,
+    listed: <>added {albumLink} to {listLink}</>,
+    followed: <>started following <PersonName person={targetUser} /></>,
+  }[type]
+  if (!sentence) return null
+
+  const rating = Number(metadata?.rating ?? 0)
 
   return (
-    <div className="flex gap-4 px-1 py-5 transition-colors hover:bg-white/[0.02]">
-      {albumCover && (type === 'rated' || type === 'reviewed' || type === 'listed') ? (
-        <Link to={`/album/${albumId}`} className="shrink-0">
+    <article className="flex items-start gap-3.5 py-5">
+      <PersonAvatar person={actor} />
+
+      <div className="min-w-0 flex-1 pt-0.5">
+        <p className="text-[15px] leading-snug text-muted">
+          <PersonName person={actor} /> {sentence}
+        </p>
+        {type === 'rated' && rating > 0 && (
+          <p className="mt-1.5 text-sm tracking-[0.15em] text-paper" aria-label={`${rating} out of 5 stars`}>
+            {'★'.repeat(Math.floor(rating))}
+            {rating % 1 ? '½' : ''}
+          </p>
+        )}
+        {type === 'reviewed' && metadata?.snippet && (
+          <p className="mt-2 line-clamp-3 border-l border-white/15 pl-3 text-sm italic leading-relaxed text-paper/80">
+            &ldquo;{metadata.snippet}&rdquo;
+          </p>
+        )}
+        <time dateTime={new Date(createdAt).toISOString()} className="mt-1.5 block text-xs text-muted/70">
+          {formatTimeAgo(createdAt)}
+        </time>
+      </div>
+
+      {albumId && albumCover && (
+        <Link to={`/album/${albumId}`} className="shrink-0" tabIndex={-1} aria-hidden="true">
           <CoverImage
             src={albumCover}
-            alt={albumName ?? ''}
+            alt=""
             width={56}
             height={56}
             loading="lazy"
-            className="h-16 w-16 rounded-[3px] object-cover shadow-sleeve"
+            className="h-14 w-14 rounded-[3px] object-cover shadow-sleeve tablet:h-16 tablet:w-16"
           />
         </Link>
-      ) : actor?.image ? (
-        <img
-          src={actor.image}
-          alt=""
-          width={56}
-          height={56}
-          loading="lazy"
-          className="h-16 w-16 shrink-0 rounded-full object-cover ring-1 ring-white/10"
-        />
-      ) : (
-        <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-white/[0.04] text-xl font-semibold text-paper/50 ring-1 ring-white/10" aria-hidden="true">
-          {(actor?.username ?? actor?.name)?.charAt(0)?.toUpperCase() ?? '?'}
-        </div>
       )}
+    </article>
+  )
+}
 
-      <div className="min-w-0 flex-1">
-        {renderContent()}
-        <p className="mt-1.5 text-xs text-muted">{timeAgo}</p>
-      </div>
-    </div>
+const PersonAvatar = ({ person }) => {
+  const avatar = person?.image ? (
+    <img src={person.image} alt="" width={40} height={40} loading="lazy" className="h-10 w-10 rounded-full object-cover ring-1 ring-white/10" />
+  ) : (
+    <span className="flex h-10 w-10 items-center justify-center rounded-full bg-white/[0.06] text-sm font-semibold text-paper/60 ring-1 ring-white/10">
+      {(person?.username ?? person?.name)?.charAt(0)?.toUpperCase() ?? '?'}
+    </span>
+  )
+  return person?.username ? (
+    <Link to={`/profile/${person.username}`} className="shrink-0" tabIndex={-1} aria-hidden="true">
+      {avatar}
+    </Link>
+  ) : (
+    <span className="shrink-0" aria-hidden="true">{avatar}</span>
   )
 }
 
