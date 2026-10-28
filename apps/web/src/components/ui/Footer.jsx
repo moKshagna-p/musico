@@ -1,3 +1,4 @@
+import { motion as Motion } from 'framer-motion'
 import { Link } from 'react-router-dom'
 import { SiApplemusic, SiGithub } from 'react-icons/si'
 
@@ -27,16 +28,22 @@ const socials = [
 ]
 
 const Footer = () => (
-  <footer className="relative mt-24 overflow-hidden border-t border-white/[0.07]">
-    {/* An oxblood pressing rising out of the bottom edge, behind the oversized wordmark */}
-    <div
+  <footer className="relative mt-24 overflow-hidden border-t border-white/[0.07] pb-[env(safe-area-inset-bottom)]">
+    {/* An oxblood pressing: on phones it peeks in beside the social links, above the wordmark (which fills the width
+        there, so the record would cover it); on wider screens it rises out of the bottom edge behind the wordmark.
+        26vw is about the wordmark's visible height (26vw type, 1.15 line, sunk 0.14em). */}
+    <Motion.div
       aria-hidden="true"
       style={{ '--vinyl': '#5c1420' }}
-      className="vinyl pointer-events-none absolute -bottom-40 -right-16 h-64 w-64 tablet:-bottom-60 tablet:right-[5%] tablet:h-[26rem] tablet:w-[26rem]"
+      initial={{ y: '45%', x: '20%', rotate: 120, opacity: 0 }}
+      whileInView={{ y: 0, x: 0, rotate: 0, opacity: 1 }}
+      viewport={{ once: true }}
+      transition={{ duration: 1.4, ease: [0.16, 1, 0.3, 1] }}
+      className="vinyl pointer-events-none absolute -right-14 bottom-[calc(26vw+2.5rem)] h-36 w-36 tablet:-bottom-60 tablet:right-[5%] tablet:h-[26rem] tablet:w-[26rem]"
     >
       <span className="absolute inset-[38%] rounded-full bg-paper/90" />
       <span className="absolute inset-[48.5%] rounded-full bg-canvas" />
-    </div>
+    </Motion.div>
 
     <div className="relative mx-auto max-w-6xl px-4 pt-14 tablet:px-6 tablet:pt-20">
       <div className="grid gap-12 tablet:grid-cols-[1.6fr_1fr_1fr]">
@@ -92,9 +99,11 @@ const Footer = () => (
         </div>
       </div>
 
+      {/* Clipped text only paints inside its line box, so the line is tall enough for the i's dot; the negative
+          margin then sinks the empty space under the letters below the edge so they sit on it. */}
       <p
         aria-hidden="true"
-        className="pointer-events-none -mb-[0.1em] mt-8 select-none bg-gradient-to-b from-white/[0.14] to-white/[0.03] bg-clip-text font-display text-[26vw] leading-[0.8] text-transparent tablet:text-[15rem]"
+        className="pointer-events-none -mb-[0.14em] mt-6 select-none bg-gradient-to-b from-white/[0.16] to-white/[0.04] bg-clip-text font-display text-[26vw] leading-[1.15] text-transparent tablet:mt-8 tablet:text-[15rem]"
       >
         musico
       </p>
