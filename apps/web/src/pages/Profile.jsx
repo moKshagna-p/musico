@@ -97,6 +97,7 @@ const Profile = () => {
   const [editBio, setEditBio] = useState('')
   const [editImage, setEditImage] = useState('')
   const [editCover, setEditCover] = useState('')
+  const [convertingCover, setConvertingCover] = useState(false)
   const [savingProfile, setSavingProfile] = useState(false)
   const [profileStatus, setProfileStatus] = useState('')
   const [showFollowersModal, setShowFollowersModal] = useState(false)
@@ -107,6 +108,7 @@ const Profile = () => {
   const [followingLoading, setFollowingLoading] = useState(false)
   const fileInputRef = useRef(null)
   const coverInputRef = useRef(null)
+  const coverSelectionRef = useRef(0)
 
   useEffect(() => {
     if (!isPending && !user) {
@@ -139,7 +141,15 @@ const Profile = () => {
     }
   }, [dashboard])
 
+  const closeEditModal = useCallback(() => {
+    coverSelectionRef.current += 1
+    setConvertingCover(false)
+    setShowEditModal(false)
+  }, [])
+
   const openEditModal = useCallback(() => {
+    coverSelectionRef.current += 1
+    setConvertingCover(false)
     setEditBio(socialProfile?.bio ?? '')
     setEditImage(socialProfile?.image ?? '')
     setEditCover(socialProfile?.cover ?? '')
@@ -148,7 +158,8 @@ const Profile = () => {
   }, [socialProfile])
 
   const handleProfileSave = useCallback(async () => {
-    if (savingProfile) return
+    if (savingProfile || convertingCover) return
+    const selection = coverSelectionRef.current
     setSavingProfile(true)
     setProfileStatus('')
     try {
@@ -158,14 +169,16 @@ const Profile = () => {
         cover: editCover,
       })
       setSocialProfile((prev) => ({ ...prev, ...updated }))
-      setProfileStatus('Saved.')
-      setTimeout(() => setShowEditModal(false), 600)
+      if (selection === coverSelectionRef.current) setProfileStatus('Saved.')
+      setTimeout(() => {
+        if (selection === coverSelectionRef.current) closeEditModal()
+      }, 600)
     } catch (err) {
-      setProfileStatus(err?.message ?? 'Failed to update profile.')
+      if (selection === coverSelectionRef.current) setProfileStatus(err?.message ?? 'Failed to update profile.')
     } finally {
       setSavingProfile(false)
     }
-  }, [editBio, editImage, editCover, savingProfile])
+  }, [editBio, editImage, editCover, savingProfile, convertingCover, closeEditModal])
 
   const openFollowers = useCallback(async () => {
     setShowFollowersModal(true)
@@ -226,11 +239,16 @@ const Profile = () => {
     const file = event.target.files?.[0]
     event.target.value = ''
     if (!file) return
+    const selection = ++coverSelectionRef.current
+    setConvertingCover(true)
+    setProfileStatus('')
     try {
-      setEditCover(await toCoverDataUrl(file))
-      setProfileStatus('')
+      const cover = await toCoverDataUrl(file)
+      if (selection === coverSelectionRef.current) setEditCover(cover)
     } catch {
-      setProfileStatus('Unable to read that image.')
+      if (selection === coverSelectionRef.current) setProfileStatus('Unable to read that image.')
+    } finally {
+      if (selection === coverSelectionRef.current) setConvertingCover(false)
     }
   }, [])
 
@@ -345,7 +363,7 @@ const Profile = () => {
           <div className="relative mx-4 max-h-[90svh] w-full max-w-md overflow-y-auto rounded-3xl border border-white/10 bg-[#0b0b0a]/95 shadow-[0_40px_120px_-20px_rgba(0,0,0,1)] p-8">
             <button
               type="button"
-              onClick={() => setShowEditModal(false)}
+              onClick={closeEditModal}
               className="absolute right-4 top-4 p-1 text-muted transition-colors hover:text-white"
               aria-label="Close"
             >
@@ -437,7 +455,11 @@ const Profile = () => {
                     {editCover && (
                       <button
                         type="button"
-                        onClick={() => setEditCover('')}
+                        onClick={() => {
+                          coverSelectionRef.current += 1
+                          setConvertingCover(false)
+                          setEditCover('')
+                        }}
                         className="rounded-full border border-white/12 px-4 py-2 text-sm text-paper/80 transition-colors hover:border-white/30 hover:text-paper"
                       >
                         Remove
@@ -464,14 +486,14 @@ const Profile = () => {
                 <button
                   type="button"
                   onClick={handleProfileSave}
-                  disabled={savingProfile}
+                  disabled={savingProfile || convertingCover}
                   className="flex-1 rounded-full bg-paper py-3 text-sm font-medium text-black transition-opacity hover:opacity-90 disabled:opacity-40"
                 >
-                  {savingProfile ? 'Saving...' : 'Save Changes'}
+                  {convertingCover ? 'Preparing cover...' : savingProfile ? 'Saving...' : 'Save Changes'}
                 </button>
                 <button
                   type="button"
-                  onClick={() => setShowEditModal(false)}
+                  onClick={closeEditModal}
                   className="rounded-full border border-white/12 px-5 py-3 text-sm text-paper/80 transition-colors hover:border-white/30 hover:text-paper"
                 >
                   Cancel

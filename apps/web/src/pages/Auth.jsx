@@ -14,7 +14,7 @@ const Auth = () => {
   const [mode, setMode] = useState('sign-in')
   const [name, setName] = useState('')
   const [username, setUsername] = useState('')
-  const usernameStatus = useUsernameStatus(mode === 'sign-up' ? username : '')
+  const { status: usernameStatus, retry: retryUsernameCheck } = useUsernameStatus(mode === 'sign-up' ? username : '')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [submitting, setSubmitting] = useState(false)
@@ -36,7 +36,7 @@ const Auth = () => {
     event.preventDefault()
     setError('')
     if (mode === 'sign-up' && usernameStatus !== 'available') {
-      setError(usernameStatus === 'checking' ? 'Still checking that username…' : 'Pick an available username.')
+      setError(usernameStatus === 'error' ? USERNAME_STATUS_TEXT.error : usernameStatus === 'checking' ? 'Still checking that username…' : 'Pick an available username.')
       return
     }
     setSubmitting(true)
@@ -188,6 +188,11 @@ const Auth = () => {
                   className={`mt-1.5 min-h-4 text-xs ${usernameStatus === 'available' ? 'text-green-400' : usernameStatus === 'checking' ? 'text-muted' : 'text-red-400'}`}
                 >
                   {USERNAME_STATUS_TEXT[usernameStatus] ?? ''}
+                  {usernameStatus === 'error' && (
+                    <button type="button" onClick={() => retryUsernameCheck()} className="ml-2 underline">
+                      Retry username check
+                    </button>
+                  )}
                 </p>
               </div>
             )}

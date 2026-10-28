@@ -579,12 +579,17 @@ export const userRoutes = new Elysia({ prefix: '/api' })
       }
     }
 
+    if (typed.cover !== undefined && typed.cover !== null && typeof typed.cover !== 'string') {
+      set.status = 400
+      return { error: 'Cover must be an image data URL or null.' }
+    }
+
     // Same contract as image: own link = unchanged, null/'' = remove, data URL = new upload.
     let cover: ReturnType<typeof parseInlineAvatar> | undefined
     if (typed.cover !== undefined && !(typeof typed.cover === 'string' && isOwnCoverUrl(typed.cover, authUser.id))) {
       const raw = typeof typed.cover === 'string' ? typed.cover.trim() : typed.cover
       cover = raw ? parseInlineAvatar(parseProfileImage(raw)) : null
-      if (raw && !cover) {
+      if (raw && (!cover || Buffer.from(cover.data, 'base64').byteLength > 2 * 1024 * 1024)) {
         set.status = 400
         return { error: 'Cover must be a PNG, JPEG, WebP, GIF, or AVIF image under 2MB.' }
       }

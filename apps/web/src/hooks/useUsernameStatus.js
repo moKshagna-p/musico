@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
 
 import { checkUsernameAvailability } from '../services/socialService.js'
 
@@ -9,25 +10,34 @@ export const USERNAME_STATUS_TEXT = {
   available: 'Available',
   taken: 'Already taken',
   invalid: '3-24 chars, lowercase letters, numbers, hyphens',
+  error: 'Unable to check username. Please retry.',
 }
 
 export const cleanUsername = (value) => value.toLowerCase().replace(/[^a-z0-9-]/g, '')
 
-// null | 'checking' | 'available' | 'taken' | 'invalid', debounced against /api/username/check.
 export const useUsernameStatus = (username) => {
-  const [checked, setChecked] = useState({ username: '', status: null })
+  const [debouncedUsername, setDebouncedUsername] = useState('')
   const valid = USERNAME_REGEX.test(username)
 
   useEffect(() => {
-    if (!valid) return
-    const timer = setTimeout(async () => {
-      const result = await checkUsernameAvailability(username)
-      setChecked({ username, status: !result.valid ? 'invalid' : result.available ? 'available' : 'taken' })
-    }, 400)
+    const timer = setTimeout(() => setDebouncedUsername(username), 400)
     return () => clearTimeout(timer)
-  }, [username, valid])
+  }, [username])
 
-  if (!username) return null
-  if (!valid) return 'invalid'
-  return checked.username === username ? checked.status : 'checking'
+  const query = useQuery({
+    queryKey: ['username-availability', debouncedUsername],
+    queryFn: ({ signal }) => checkUsernameAvailability(debouncedUsername, { signal }),
+    enabled: valid && username === debouncedUsername,
+    retry: 1,
+    staleTime: 0,
+  })
+
+  let status = null
+  if (username) {
+    if (!valid) status = 'invalid'
+    else if (username !== debouncedUsername || query.isFetching || query.isPending) status = 'checking'
+    else if (query.isError) status = 'error'
+    else status = !query.data.valid ? 'invalid' : query.data.available ? 'available' : 'taken'
+  }
+  return { status, retry: query.refetch }
 }

@@ -11,13 +11,10 @@ export const updateMyProfile = async ({ username, bio, image, cover }) => {
   return response.data ?? null
 }
 
-export const checkUsernameAvailability = async (username) => {
-  try {
-    const response = await api.get('/api/username/check', { params: { username } })
-    return response.data ?? { available: false, valid: false }
-  } catch {
-    return { available: false, valid: false }
-  }
+export const checkUsernameAvailability = async (username, { signal } = {}) => {
+  const response = await api.get('/api/username/check', { params: { username }, signal })
+  if (!response.data) throw new Error('Unable to check username.')
+  return response.data
 }
 
 export const fetchUserProfile = async (username) => {

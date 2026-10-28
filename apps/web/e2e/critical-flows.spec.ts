@@ -40,6 +40,162 @@ test.describe('Critical user flows', () => {
     await expect(page.getByRole('link', { name: 'vinyl-fan', exact: true })).toHaveAttribute('href', '/profile/vinyl-fan')
   })
 
+  test('late username checks cannot overwrite the current name and typing is debounced', async ({ page }) => {
+    let releaseOld: () => void = () => {}
+    const oldHeld = new Promise<void>((resolve) => { releaseOld = resolve })
+    const checked: string[] = []
+    await page.route('**/api/username/check?*', async (route) => {
+      const name = new URL(route.request().url()).searchParams.get('username') ?? ''
+      checked.push(name)
+      if (name === 'alice') await oldHeld
+      await route.fulfill({ json: { data: { valid: true, available: name !== 'alice' } } })
+    })
+    await page.goto('/auth')
+    await page.getByRole('button', { name: 'Create Account' }).click()
+    await page.getByLabel('Email').fill('new@musico.dev')
+    await page.getByLabel('Password').fill('password123')
+    const input = page.getByLabel('Username')
+    await input.fill('ab')
+    await expect(page.getByText('3-24 chars, lowercase letters, numbers, hyphens')).toBeVisible()
+    await input.fill('alice')
+    await expect.poll(() => checked).toEqual(['alice'])
+    await input.fill('alicea')
+    await input.fill('alicia')
+    await expect(page.getByText('Available', { exact: true })).toBeVisible()
+    releaseOld()
+    await page.waitForTimeout(450)
+    await expect(page.getByText('Available', { exact: true })).toBeVisible()
+    expect(checked).toEqual(['alice', 'alicia'])
+    await page.locator('form').getByRole('button', { name: 'Create Account' }).click()
+    await expect(page).toHaveURL('/')
+  })
+
+  for (const flow of ['sign-up', 'username setup']) {
+    test(`${flow} can retry a failed username check without changing the input`, async ({ page }) => {
+      let attempts = 0
+      await page.route('**/api/username/check?*', async (route) => {
+        attempts += 1
+        await route.fulfill(attempts <= 2
+          ? { status: 503, json: { error: 'Temporarily unavailable' } }
+          : { json: { data: { valid: true, available: true } } })
+      })
+      if (flow === 'sign-up') {
+        await page.goto('/auth')
+        await page.getByRole('button', { name: 'Create Account' }).click()
+      } else {
+        await signIn(page)
+        await page.route('**/api/me/dashboard', async (route) => {
+          await route.fulfill({ json: {
+            ratings: {}, recentRatings: [], lists: [],
+            profile: { username: null, name: 'E2E User', bio: '' },
+          } })
+        })
+        await page.goto('/profile')
+        await expect(page.getByRole('heading', { name: 'Choose your username' })).toBeVisible()
+      }
+      await page.getByLabel('Username', { exact: true }).fill('vinyl-fan')
+      await expect(page.getByText('Unable to check username. Please retry.')).toBeVisible()
+      await page.getByRole('button', { name: 'Retry username check' }).click()
+      await expect(page.getByText('Available', { exact: true })).toBeVisible()
+      expect(attempts).toBe(3)
+      if (flow === 'username setup') {
+        await page.locator('form').getByRole('button', { name: 'Set Username' }).click()
+        await expect(page.getByRole('heading', { name: 'Choose your username' })).toHaveCount(0)
+      } else {
+        await page.getByLabel('Email').fill('new@musico.dev')
+        await page.getByLabel('Password').fill('password123')
+        await page.locator('form').getByRole('button', { name: 'Create Account' }).click()
+        await expect(page).toHaveURL('/')
+      }
+    })
+  }
+
+  test('cover save waits for the latest conversion and ignores removed or cancelled choices', async ({ page }) => {
+    await page.addInitScript(() => {
+      const createBitmap = window.createImageBitmap.bind(window)
+      window['coverConversions'] = {}
+      window.createImageBitmap = async (file: File) => {
+        await new Promise<void>((resolve, reject) => { window['coverConversions'][file.name] = { resolve, reject } })
+        return createBitmap(file)
+      }
+    })
+    const saves: Array<{ cover: string }> = []
+    let finishSave: () => void = () => {}
+    const saveHeld = new Promise<void>((resolve) => { finishSave = resolve })
+    await page.route('**/api/me/profile', async (route) => {
+      if (route.request().method() !== 'PUT') return route.fallback()
+      const payload = route.request().postDataJSON()
+      saves.push(payload)
+      await saveHeld
+      await route.fulfill({ json: { data: { ...payload } } })
+    })
+    await signIn(page)
+    await page.goto('/profile')
+    await page.getByRole('button', { name: 'Edit Profile' }).click()
+    const colors = await page.evaluate(() => ['red', 'blue'].map((color) => {
+      const canvas = document.createElement('canvas')
+      canvas.width = canvas.height = 2
+      const context = canvas.getContext('2d')!
+      context.fillStyle = color
+      context.fillRect(0, 0, 2, 2)
+      return canvas.toDataURL('image/png').split(',')[1]
+    }))
+    const choose = async (name: string, color = 0) => {
+      await page.locator('input[type="file"]').nth(1).setInputFiles({
+        name, mimeType: 'image/png', buffer: Buffer.from(colors[color], 'base64'),
+      })
+      await expect.poll(() => page.evaluate((key) => Boolean(window['coverConversions'][key]), name)).toBe(true)
+    }
+    const finish = async (name: string, fail = false) => {
+      await page.evaluate(({ key, fail }) => {
+        window['coverConversions'][key][fail ? 'reject' : 'resolve']()
+      }, { key: name, fail })
+    }
+    const preview = page.locator('img.aspect-\\[3\\/1\\]')
+    await choose('old.png')
+    await expect(page.getByRole('button', { name: 'Preparing cover...' })).toBeDisabled()
+    expect(saves).toEqual([])
+    await choose('latest.png', 1)
+    await finish('latest.png')
+    await expect(page.getByRole('button', { name: 'Save Changes' })).toBeEnabled()
+    const latestPreview = await preview.getAttribute('src')
+    await finish('old.png')
+    await page.waitForTimeout(100)
+    await expect(preview).toHaveAttribute('src', latestPreview!)
+
+    await choose('removed.png')
+    await page.getByRole('button', { name: 'Remove', exact: true }).click()
+    await expect(page.getByRole('button', { name: 'Save Changes' })).toBeEnabled()
+    await finish('removed.png')
+    await page.waitForTimeout(100)
+    await expect(preview).toHaveCount(0)
+
+    await choose('cancelled.png')
+    await page.getByRole('button', { name: 'Cancel', exact: true }).click()
+    await page.getByRole('button', { name: 'Edit Profile' }).click()
+    await finish('cancelled.png')
+    await page.waitForTimeout(100)
+    await expect(preview).toHaveCount(0)
+    await expect(page.getByRole('button', { name: 'Save Changes' })).toBeEnabled()
+
+    await choose('failed.png')
+    await finish('failed.png', true)
+    await expect(page.getByText('Unable to read that image.')).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Save Changes' })).toBeEnabled()
+    await choose('saved.png', 1)
+    await finish('saved.png')
+    await expect(page.getByRole('button', { name: 'Save Changes' })).toBeEnabled()
+    await page.getByRole('button', { name: 'Save Changes' }).click()
+    await expect.poll(() => saves.length).toBe(1)
+    expect(saves[0].cover).toBe(latestPreview)
+    await page.getByRole('button', { name: 'Cancel', exact: true }).click()
+    await page.getByRole('button', { name: 'Edit Profile' }).click()
+    finishSave()
+    await expect(page.getByRole('button', { name: 'Save Changes' })).toBeEnabled()
+    await page.waitForTimeout(650)
+    await expect(page.getByRole('heading', { name: 'Edit Profile' })).toBeVisible()
+  })
+
   test('a stale previous session does not sign out a fresh login', async ({ page }) => {
     let signOutRequests = 0
     page.on('request', (request) => {

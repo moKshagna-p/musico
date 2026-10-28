@@ -6,7 +6,7 @@ import { updateMyProfile } from '../../services/socialService.js'
 
 const UsernameSetup = ({ onComplete, onSkip }) => {
   const [username, setUsername] = useState('')
-  const status = useUsernameStatus(username)
+  const { status, retry: retryUsernameCheck } = useUsernameStatus(username)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
 
@@ -75,6 +75,11 @@ const UsernameSetup = ({ onComplete, onSkip }) => {
                 }`}
               >
                 {statusText}
+                {status === 'error' && (
+                  <button type="button" onClick={() => retryUsernameCheck()} className="ml-2 underline">
+                    Retry username check
+                  </button>
+                )}
               </p>
             )}
             {status === 'available' && (
