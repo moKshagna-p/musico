@@ -1,15 +1,17 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
 import { FiLock, FiRefreshCw, FiSearch, FiX, FiUsers, FiMusic } from 'react-icons/fi'
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion'
 
-import ActivityCard from '../components/user/ActivityCard.jsx'
+import ActivityCard, { PersonAvatar, PersonName } from '../components/user/ActivityCard.jsx'
+import CoverImage from '../components/ui/CoverImage.jsx'
 import FollowButton from '../components/user/FollowButton.jsx'
 import { FeedItemsSkeleton, FeedPageSkeleton } from '../components/ui/PageLoadingState.jsx'
 import PageTransition from '../components/ui/PageTransition.jsx'
 import { useAuth } from '../hooks/useAuth.js'
 import useFeed from '../hooks/useFeed.js'
 import { searchUsers } from '../services/socialService.js'
+import { feedDays, groupFeed } from '../services/feedGroups.js'
 
 const Motion = motion
 
@@ -283,6 +285,78 @@ const Step = ({ number, title, description }) => (
   </div>
 )
 
+// ── Side Rail ──
+
+const RailHeading = ({ className = '', children }) => (
+  <h2 className={`mb-4 text-xs uppercase tracking-[0.2em] text-muted/80 ${className}`}>{children}</h2>
+)
+
+// What the people you follow are into lately, read off the feed already loaded. Your own activity is left out.
+const CircleSummary = ({ items, meId }) => {
+  const { albums, people } = useMemo(() => {
+    const albumsById = new Map()
+    const peopleById = new Map()
+    for (const item of items) {
+      if (item.userId === meId) continue
+      const person = peopleById.get(item.userId) ?? { user: item.user, count: 0 }
+      person.count += 1
+      peopleById.set(item.userId, person)
+      if (!item.albumId) continue
+      const album = albumsById.get(item.albumId) ?? { albumId: item.albumId, albumName: item.albumName, albumCover: item.albumCover, people: new Map() }
+      album.people.set(item.userId, item.user)
+      albumsById.set(item.albumId, album)
+    }
+    // Sorts are stable, so ties keep feed order (most recent first).
+    return {
+      albums: [...albumsById.values()].sort((a, b) => b.people.size - a.people.size).slice(0, 4),
+      people: [...peopleById.values()].sort((a, b) => b.count - a.count).slice(0, 3),
+    }
+  }, [items, meId])
+
+  if (!albums.length) return null
+
+  return (
+    <div className="hidden space-y-10 tablet:block">
+      <section aria-label="Lately in your circle">
+        <RailHeading>Lately in your circle</RailHeading>
+        <ul className="space-y-3">
+          {albums.map((album) => {
+            const [first] = album.people.values()
+            return (
+              <li key={album.albumId}>
+                <Link to={`/album/${album.albumId}`} className="group flex items-center gap-3">
+                  <CoverImage src={album.albumCover} alt="" width={44} height={44} loading="lazy" className="h-11 w-11 shrink-0 rounded-[3px] object-cover shadow-sleeve" />
+                  <span className="min-w-0">
+                    <span className="block truncate text-sm text-paper group-hover:underline">{album.albumName || 'Untitled album'}</span>
+                    <span className="block truncate text-xs text-muted">
+                      {album.people.size > 1 ? `${album.people.size} people` : first?.username ?? first?.name}
+                    </span>
+                  </span>
+                </Link>
+              </li>
+            )
+          })}
+        </ul>
+      </section>
+
+      <section aria-label="Most active">
+        <RailHeading>Most active</RailHeading>
+        <ul className="space-y-3">
+          {people.map(({ user: person, count }) => (
+            <li key={person?.username ?? person?.name} className="flex items-center gap-3">
+              <PersonAvatar person={person} />
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-sm"><PersonName person={person} /></span>
+                <span className="block text-xs text-muted">{count} {count === 1 ? 'update' : 'updates'}</span>
+              </span>
+            </li>
+          ))}
+        </ul>
+      </section>
+    </div>
+  )
+}
+
 // ── Main Feed Page ──
 
 const Feed = () => {
@@ -290,6 +364,7 @@ const Feed = () => {
   const { user, isPending } = useAuth()
   const { items, loading, loadingMore, error, hasMore, loadMore, refresh } = useFeed()
   const shouldReduceMotion = useReducedMotion()
+  const days = useMemo(() => feedDays(groupFeed(items)), [items])
 
   useEffect(() => {
     if (!isPending && !user) {
@@ -307,9 +382,10 @@ const Feed = () => {
 
   return (
     <PageTransition>
-      <div className="mx-auto w-full max-w-2xl py-2 tablet:py-6">
+      {/* Phones stack header, search, feed; wider screens move search and the circle summary into a pinned side rail */}
+      <div className="mx-auto grid w-full max-w-6xl py-2 [grid-template-areas:'head''rail''feed'] tablet:grid-cols-[minmax(0,1fr)_20rem] tablet:grid-rows-[auto_1fr] tablet:gap-x-16 tablet:py-6 tablet:[grid-template-areas:'head_rail''feed_rail']">
         {/* Header */}
-        <header className="flex items-end justify-between pb-8 pt-4 tablet:pb-10 tablet:pt-6">
+        <header className="flex items-end justify-between gap-4 pb-8 pt-4 [grid-area:head] tablet:pb-10 tablet:pt-6">
           <div>
             <h1 className="font-display text-6xl leading-none text-paper tablet:text-7xl">
               Feed
@@ -333,13 +409,16 @@ const Feed = () => {
           </button>
         </header>
 
-        {/* User Search */}
-        <section className="mb-8" aria-label="User search">
-          <UserSearchPanel />
-        </section>
+        <aside className="mb-8 space-y-10 [grid-area:rail] tablet:sticky tablet:top-24 tablet:mb-0 tablet:self-start tablet:pt-8">
+          <section aria-label="User search">
+            <RailHeading className="hidden tablet:block">Find people</RailHeading>
+            <UserSearchPanel />
+          </section>
+          <CircleSummary items={items} meId={user.id} />
+        </aside>
 
         {/* Feed Content */}
-        <section aria-label="Activity feed">
+        <section aria-label="Activity feed" className="min-w-0 [grid-area:feed]">
           {loading && !items.length ? (
             <FeedItemsSkeleton />
           ) : error ? (
@@ -362,26 +441,26 @@ const Feed = () => {
             <EmptyFeed navigate={navigate} />
           ) : (
             <>
-              <div className="divide-y divide-white/[0.06] border-y border-white/[0.06]">
-                <AnimatePresence mode="popLayout">
-                  {items.map((item, i) => (
-                    <Motion.div
-                      key={item.id}
-                      initial={shouldReduceMotion ? false : { opacity: 0, y: 8 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={shouldReduceMotion ? { opacity: 0 } : { opacity: 0, scale: 0.98 }}
-                      transition={{
-                        delay: Math.min(i * 0.03, 0.3),
-                        duration: 0.3,
-                        ease: [0.16, 1, 0.3, 1],
-                      }}
-                      layout={!shouldReduceMotion}
-                    >
-                      <ActivityCard item={item} />
-                    </Motion.div>
-                  ))}
-                </AnimatePresence>
-              </div>
+              {days.map((day) => (
+                <section key={day.label} aria-label={day.label}>
+                  {/* Pinned just under the floating nav so a long scroll always says which day it's in */}
+                  <h2 className="sticky top-16 z-10 border-b border-white/[0.06] bg-canvas/85 py-2.5 text-xs uppercase tracking-[0.2em] text-muted/80 backdrop-blur-md tablet:top-[4.25rem]">
+                    {day.label}
+                  </h2>
+                  <div className="mb-8 divide-y divide-white/[0.06]">
+                    {day.groups.map((group, i) => (
+                      <Motion.div
+                        key={group.id}
+                        initial={shouldReduceMotion ? false : { opacity: 0, y: 8 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: Math.min(i * 0.03, 0.3), duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
+                      >
+                        <ActivityCard group={group} />
+                      </Motion.div>
+                    ))}
+                  </div>
+                </section>
+              ))}
 
               {hasMore && (
                 <Motion.button
