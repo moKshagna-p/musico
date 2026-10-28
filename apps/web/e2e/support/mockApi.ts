@@ -159,6 +159,11 @@ export const installApiMocks = async (page: Page) => {
     },
   ]
 
+  const isAdmin = () => adminIds.has(user.id) || user.email.toLowerCase() === bootstrapAdminEmail
+  const ratingsPayload = () => Object.fromEntries(
+    Array.from(ratings.entries()).map(([albumId, rating]) => [albumId, { rating, timestamp: Date.now() }]),
+  )
+
   await page.route('**/api/**', async (route) => {
     const request = route.request()
     const url = new URL(request.url())
@@ -188,11 +193,12 @@ export const installApiMocks = async (page: Page) => {
 
     if (pathname === '/api/admin/me' && method === 'GET') {
       if (!signedIn) return json(route, { error: 'Unauthorized.' }, 401)
-      return json(route, {
-        data: {
-          isAdmin: adminIds.has(user.id) || user.email.toLowerCase() === bootstrapAdminEmail,
-        },
-      })
+      return json(route, { data: { isAdmin: isAdmin() } })
+    }
+
+    if (pathname === '/api/me/bootstrap' && method === 'GET') {
+      if (!signedIn) return json(route, { error: 'Unauthorized.' }, 401)
+      return json(route, { data: { userId: user.id, ratings: ratingsPayload(), lists, isAdmin: isAdmin() } })
     }
 
     if (pathname === '/api/admin/users' && method === 'GET') {
@@ -338,10 +344,7 @@ export const installApiMocks = async (page: Page) => {
     }
 
     if (pathname === '/api/me/ratings' && method === 'GET') {
-      const payload = Object.fromEntries(
-        Array.from(ratings.entries()).map(([albumId, rating]) => [albumId, { rating, timestamp: Date.now() }]),
-      )
-      return json(route, { data: payload })
+      return json(route, { data: ratingsPayload() })
     }
 
     if (pathname === '/api/me/ratings/history' && method === 'GET') {

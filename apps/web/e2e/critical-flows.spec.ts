@@ -387,15 +387,35 @@ test.describe('Critical user flows', () => {
     await expect(page.getByRole('link', { name: 'Spotify', exact: true }).first()).toHaveAttribute('href', 'https://open.spotify.com/search/Daft%20Punk%20Discovery')
   })
 
-  test('lists show their loading state until the account lists arrive', async ({ page }) => {
-    let releaseLists: (() => void) | undefined
-    await page.route('**/api/me/lists', async (route) => {
-      if (route.request().method() === 'GET') {
-        await new Promise<void>((resolve) => { releaseLists = resolve })
-      }
+  test('a signed-in page load fetches account data in one request alongside the session', async ({ page }) => {
+    await signIn(page)
+    const accountRequests: string[] = []
+    let markBootstrapRequested: () => void = () => {}
+    const bootstrapRequested = new Promise<void>((resolve) => { markBootstrapRequested = resolve })
+    page.on('request', (request) => {
+      const { pathname } = new URL(request.url())
+      if (['/api/me/bootstrap', '/api/me/ratings', '/api/me/lists', '/api/admin/me'].includes(pathname)) accountRequests.push(pathname)
+      if (pathname === '/api/me/bootstrap') markBootstrapRequested()
+    })
+    // Holding the session back until the bootstrap is requested proves it does not wait for get-session.
+    await page.route('**/api/auth/get-session*', async (route) => {
+      await bootstrapRequested
       await route.fallback()
     })
+
+    await page.goto('/album/m:1001')
+    await expect(page.getByRole('button', { name: /favorites/i })).toBeVisible()
+    await page.waitForLoadState('networkidle')
+    expect(accountRequests).toEqual(['/api/me/bootstrap'])
+  })
+
+  test('lists show their loading state until the account lists arrive', async ({ page }) => {
     await signIn(page)
+    let releaseLists: (() => void) | undefined
+    await page.route('**/api/me/bootstrap', async (route) => {
+      await new Promise<void>((resolve) => { releaseLists = resolve })
+      await route.fallback()
+    })
     await page.goto('/album/m:1001')
     await expect(page.getByRole('heading', { name: 'Discovery' })).toBeVisible()
     await expect(page.getByText('Loading your lists')).toBeVisible()
@@ -405,6 +425,9 @@ test.describe('Critical user flows', () => {
 
   test('a failed list load offers a retry instead of showing an empty account', async ({ page }) => {
     await signIn(page)
+    // A failed bootstrap falls back to /me/lists, which fails once here.
+    await page.route('**/api/me/bootstrap', (route) =>
+      route.fulfill({ status: 503, contentType: 'application/json', body: '{"error":"Unavailable"}' }))
     let attempts = 0
     await page.route('**/api/me/lists', async (route) => {
       if (route.request().method() === 'GET') {

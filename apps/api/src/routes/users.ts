@@ -29,6 +29,20 @@ import {
 import { USERNAME_REGEX, MAX_BIO_LENGTH } from '../core/constants'
 import { isRecord, readBoolean, readBoundedText, readIdentifier, readRating } from './validation'
 
+export const loadMyRatings = async (userId: string) => {
+  const rows = await db.select().from(userRating).where(eq(userRating.userId, userId))
+  return rows.reduce(
+    (acc, row) => {
+      acc[row.albumId] = {
+        rating: row.rating,
+        timestamp: row.updatedAt.getTime(),
+      }
+      return acc
+    },
+    {} as Record<string, { rating: number; timestamp: number }>,
+  )
+}
+
 export const userRoutes = new Elysia({ prefix: '/api' })
   .get('/avatars/:userId', async ({ params, set }) => {
     const userId = readIdentifier(params?.userId)
@@ -47,17 +61,7 @@ export const userRoutes = new Elysia({ prefix: '/api' })
     const authUser = await ensureAuthenticated(request, set)
     if (!authUser) return { error: 'Unauthorized.' }
 
-    const rows = await db.select().from(userRating).where(eq(userRating.userId, authUser.id))
-    const data = rows.reduce(
-      (acc, row) => {
-        acc[row.albumId] = {
-          rating: row.rating,
-          timestamp: row.updatedAt.getTime(),
-        }
-        return acc
-      },
-      {} as Record<string, { rating: number; timestamp: number }>,
-    )
+    const data = await loadMyRatings(authUser.id)
 
     set.headers ??= {}
     set.headers['Cache-Control'] = 'no-store'

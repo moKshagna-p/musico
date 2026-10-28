@@ -1,7 +1,9 @@
 /* eslint-disable react-refresh/only-export-components */
 import { createContext, useCallback, useEffect, useMemo, useState } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 
 import { useAuth } from '../hooks/useAuth.js'
+import { getMeBootstrap } from '../queries/meBootstrap.js'
 import {
   createMyList,
   fetchMyLists,
@@ -60,6 +62,7 @@ const applyAlbumToggleToList = (list, albumSummary, added, timestamp) => {
 
 export const ListsProvider = ({ children }) => {
   const { user, isPending } = useAuth()
+  const queryClient = useQueryClient()
   const [lists, setLists] = useState([])
   const [loadingLists, setLoadingLists] = useState(isPending || Boolean(user?.id))
   const [listLoadError, setListLoadError] = useState(false)
@@ -99,7 +102,8 @@ export const ListsProvider = ({ children }) => {
 
       setLoadingLists(true)
       try {
-        const remote = await fetchMyLists()
+        const bootstrap = await getMeBootstrap(queryClient, user.id)
+        const remote = bootstrap ? bootstrap.lists : await fetchMyLists()
         if (isCancelled) return
         const normalized = remote.map(normalizeRemoteList).filter(Boolean)
         setLists(sortListsByUpdatedAt(normalized))
@@ -118,7 +122,7 @@ export const ListsProvider = ({ children }) => {
     return () => {
       isCancelled = true
     }
-  }, [isPending, user?.id])
+  }, [isPending, user?.id, queryClient])
 
   const createList = useCallback(
     async (name, options = {}) => {

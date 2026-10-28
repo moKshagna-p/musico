@@ -5,6 +5,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { useAuth } from '../hooks/useAuth.js'
 import { deleteMyRating, fetchMyRatings, saveMyRating } from '../services/profileDataService.js'
 import { updateHomeSectionsCommunityStats } from '../queries/homeSections.js'
+import { getMeBootstrap } from '../queries/meBootstrap.js'
 
 export const RatingsContext = createContext(null)
 
@@ -28,7 +29,8 @@ export const RatingsProvider = ({ children }) => {
       }
 
       try {
-        const remoteRatings = await fetchMyRatings()
+        const bootstrap = await getMeBootstrap(queryClient, user.id)
+        const remoteRatings = bootstrap ? bootstrap.ratings : await fetchMyRatings()
         if (!isCancelled) {
           setRatings(remoteRatings)
         }
@@ -48,7 +50,7 @@ export const RatingsProvider = ({ children }) => {
     return () => {
       isCancelled = true
     }
-  }, [isPending, user?.id])
+  }, [isPending, user?.id, queryClient])
 
   const rateAlbum = useCallback((albumId, rating, meta = {}) => {
     if (!user?.id) return
