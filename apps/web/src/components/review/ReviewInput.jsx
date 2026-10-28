@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { AnimatePresence, motion as Motion } from 'framer-motion'
 import { FiImage, FiX } from 'react-icons/fi'
 
 import GifPicker from './GifPicker.jsx'
@@ -8,6 +9,16 @@ import { uploadReviewImage } from '../../services/socialService.js'
 
 const MAX_IMAGES = 4
 const MAX_LENGTH = 280
+const EASE = [0.16, 1, 0.3, 1]
+// Media and the GIF picker unfold under the text box and fold away when removed.
+const UNFOLD = {
+  initial: { height: 0, opacity: 0 },
+  animate: { height: 'auto', opacity: 1 },
+  exit: { height: 0, opacity: 0 },
+  transition: { duration: 0.3, ease: EASE },
+  className: 'overflow-hidden',
+}
+const POP = { initial: { opacity: 0, scale: 0.9 }, animate: { opacity: 1, scale: 1 }, transition: { duration: 0.3, ease: EASE } }
 
 // Composer with tweet-style media: up to 4 images (pick, paste, or drop) or one GIF.
 // Images upload as soon as they're added, so Post only has to attach them.
@@ -139,83 +150,89 @@ const ReviewInput = ({ initialContent = '', onSave, disabled = false }) => {
           className="block w-full resize-none bg-transparent p-4 text-[15px] text-paper placeholder:text-muted focus:outline-none focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
         />
 
-        {images.length > 0 && (
-          <div className="px-4 pb-3">
-            <MediaGrid
-              items={images}
-              renderTile={(image) => (
-                <div className="relative h-full w-full bg-white/[0.04]">
-                  <img src={image.preview} alt={image.alt} className={`h-full w-full object-cover ${image.status === 'uploading' ? 'opacity-50' : ''}`} />
-                  {image.status === 'uploading' && (
-                    <span className="absolute inset-0 m-auto h-6 w-6 animate-spin rounded-full border-2 border-paper/30 border-t-paper" aria-label="Uploading" />
+        <AnimatePresence initial={false}>
+          {images.length > 0 && (
+            <Motion.div key="images" {...UNFOLD}>
+              <div className="px-4 pb-3">
+                <MediaGrid
+                  items={images}
+                  renderTile={(image) => (
+                    <Motion.div {...POP} className="relative h-full w-full bg-white/[0.04]">
+                      <img src={image.preview} alt={image.alt} className={`h-full w-full object-cover ${image.status === 'uploading' ? 'opacity-50' : ''}`} />
+                      {image.status === 'uploading' && (
+                        <span className="absolute inset-0 m-auto h-6 w-6 animate-spin rounded-full border-2 border-paper/30 border-t-paper" aria-label="Uploading" />
+                      )}
+                      {image.status === 'error' && (
+                        <p className="absolute inset-x-2 bottom-2 rounded-md bg-red-950/90 px-2 py-1 text-xs text-red-200">{image.error}</p>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => removeImage(image.localId)}
+                        aria-label="Remove image"
+                        className="absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-full bg-black/75 text-paper backdrop-blur transition-colors hover:bg-black"
+                      >
+                        <FiX className="h-4 w-4" />
+                      </button>
+                      {image.status === 'done' && (
+                        <button
+                          type="button"
+                          onClick={() => setEditingAlt(editingAlt === image.localId ? null : image.localId)}
+                          aria-label={image.alt ? 'Edit image description' : 'Add image description'}
+                          className={`absolute bottom-2 left-2 rounded bg-black/75 px-1.5 py-0.5 text-[11px] font-semibold backdrop-blur transition-colors hover:bg-black ${
+                            image.alt ? 'text-paper' : 'text-paper/70'
+                          }`}
+                        >
+                          {image.alt ? 'ALT ✓' : '+ALT'}
+                        </button>
+                      )}
+                    </Motion.div>
                   )}
-                  {image.status === 'error' && (
-                    <p className="absolute inset-x-2 bottom-2 rounded-md bg-red-950/90 px-2 py-1 text-xs text-red-200">{image.error}</p>
-                  )}
-                  <button
-                    type="button"
-                    onClick={() => removeImage(image.localId)}
-                    aria-label="Remove image"
-                    className="absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-full bg-black/75 text-paper backdrop-blur transition-colors hover:bg-black"
-                  >
-                    <FiX className="h-4 w-4" />
-                  </button>
-                  {image.status === 'done' && (
-                    <button
-                      type="button"
-                      onClick={() => setEditingAlt(editingAlt === image.localId ? null : image.localId)}
-                      aria-label={image.alt ? 'Edit image description' : 'Add image description'}
-                      className={`absolute bottom-2 left-2 rounded bg-black/75 px-1.5 py-0.5 text-[11px] font-semibold backdrop-blur transition-colors hover:bg-black ${
-                        image.alt ? 'text-paper' : 'text-paper/70'
-                      }`}
-                    >
-                      {image.alt ? 'ALT ✓' : '+ALT'}
-                    </button>
-                  )}
-                </div>
-              )}
-            />
-            {altImage && (
-              <label className="mt-3 block">
-                <span className="text-xs text-muted">Describe this image for people who can&apos;t see it</span>
-                <input
-                  autoFocus
-                  value={altImage.alt}
-                  onChange={(event) => patchImage(altImage.localId, { alt: event.target.value.replace(/[\r\n]+/g, ' ').slice(0, 1000) })}
-                  onKeyDown={(event) => {
-                    if (event.key === 'Enter' || event.key === 'Escape') {
-                      event.preventDefault()
-                      setEditingAlt(null)
-                    }
-                  }}
-                  className="mt-1.5 w-full rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-sm text-paper focus:border-white/30 focus:outline-none"
                 />
-              </label>
-            )}
-          </div>
-        )}
+                {altImage && (
+                  <label className="mt-3 block">
+                    <span className="text-xs text-muted">Describe this image for people who can&apos;t see it</span>
+                    <input
+                      autoFocus
+                      value={altImage.alt}
+                      onChange={(event) => patchImage(altImage.localId, { alt: event.target.value.replace(/[\r\n]+/g, ' ').slice(0, 1000) })}
+                      onKeyDown={(event) => {
+                        if (event.key === 'Enter' || event.key === 'Escape') {
+                          event.preventDefault()
+                          setEditingAlt(null)
+                        }
+                      }}
+                      className="mt-1.5 w-full rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-sm text-paper focus:border-white/30 focus:outline-none"
+                    />
+                  </label>
+                )}
+              </div>
+            </Motion.div>
+          )}
 
-        {gif && (
-          <div className="px-4 pb-3">
-            <MediaGrid
-              items={[gif]}
-              renderTile={() => (
-                <div className="relative h-full w-full">
-                  <img src={gif.url} alt={gif.title || 'GIF'} className="h-full w-full object-cover" />
-                  <span className="absolute bottom-2 left-2 rounded bg-black/70 px-1.5 py-0.5 text-[11px] font-semibold text-paper">GIF</span>
-                  <button
-                    type="button"
-                    onClick={() => setGif(null)}
-                    aria-label="Remove GIF"
-                    className="absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-full bg-black/75 text-paper backdrop-blur transition-colors hover:bg-black"
-                  >
-                    <FiX className="h-4 w-4" />
-                  </button>
-                </div>
-              )}
-            />
-          </div>
-        )}
+          {gif && (
+            <Motion.div key="gif" {...UNFOLD}>
+              <div className="px-4 pb-3">
+                <MediaGrid
+                  items={[gif]}
+                  renderTile={() => (
+                    <Motion.div {...POP} className="relative h-full w-full">
+                      <img src={gif.url} alt={gif.title || 'GIF'} className="h-full w-full object-cover" />
+                      <span className="absolute bottom-2 left-2 rounded bg-black/70 px-1.5 py-0.5 text-[11px] font-semibold text-paper">GIF</span>
+                      <button
+                        type="button"
+                        onClick={() => setGif(null)}
+                        aria-label="Remove GIF"
+                        className="absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-full bg-black/75 text-paper backdrop-blur transition-colors hover:bg-black"
+                      >
+                        <FiX className="h-4 w-4" />
+                      </button>
+                    </Motion.div>
+                  )}
+                />
+              </div>
+            </Motion.div>
+          )}
+        </AnimatePresence>
 
         <div className="flex items-center gap-1 border-t border-white/[0.07] px-2 py-1.5">
           <button
@@ -256,27 +273,33 @@ const ReviewInput = ({ initialContent = '', onSave, disabled = false }) => {
         </div>
       </div>
 
-      {pickingGif && (
-        <GifPicker
-          onClose={() => setPickingGif(false)}
-          onPick={(picked) => {
-            setGif(picked)
-            setPickingGif(false)
-          }}
-        />
-      )}
+      <AnimatePresence initial={false}>
+        {pickingGif && (
+          <Motion.div {...UNFOLD}>
+            <GifPicker
+              onClose={() => setPickingGif(false)}
+              onPick={(picked) => {
+                setGif(picked)
+                setPickingGif(false)
+              }}
+            />
+          </Motion.div>
+        )}
+      </AnimatePresence>
 
       <div className="flex items-center justify-between gap-3">
         <p className="text-xs text-muted" aria-live="polite">
           {uploading ? 'Uploading images...' : status}
         </p>
-        <button
+        <Motion.button
           type="submit"
           disabled={!canPost}
-          className="rounded-full bg-paper px-5 py-2 text-sm font-medium text-black transition-opacity hover:opacity-90 disabled:opacity-30"
+          whileTap={{ scale: 0.95 }}
+          className="inline-flex items-center gap-2 rounded-full bg-paper px-5 py-2 text-sm font-medium text-black transition-opacity hover:opacity-90 disabled:opacity-30"
         >
+          {saving && <span aria-hidden="true" className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-black/25 border-t-black" />}
           {saving ? 'Saving...' : initialContent ? 'Update' : 'Post'}
-        </button>
+        </Motion.button>
       </div>
     </form>
   )

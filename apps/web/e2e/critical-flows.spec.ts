@@ -898,7 +898,7 @@ test.describe('Critical user flows', () => {
     await expect(page.getByRole('button', { name: 'Add images' })).toBeDisabled()
     await page.getByRole('button', { name: /^post$/i }).click()
     await expect(page.getByText(/review posted\./i)).toBeVisible()
-    await expect(page.getByRole('img', { name: 'headphones on' })).toBeVisible()
+    await expect(page.getByRole('article').getByRole('img', { name: 'headphones on' })).toBeVisible()
   })
 
   test('guests cannot fetch or see album reviews', async ({ page }) => {

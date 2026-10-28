@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useState } from 'react'
+import { AnimatePresence, motion as Motion } from 'framer-motion'
 import { FiRefreshCw } from 'react-icons/fi'
 
 import ReviewCard from './ReviewCard.jsx'
 import { fetchAlbumReviews } from '../../services/socialService.js'
 
-const ReviewsList = ({ albumId }) => {
+// `refreshKey` refetches in place (after posting), so the new review slides in instead of the list reloading.
+const ReviewsList = ({ albumId, refreshKey }) => {
   const [reviews, setReviews] = useState([])
   const [nextCursor, setNextCursor] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -15,7 +17,6 @@ const ReviewsList = ({ albumId }) => {
     let cancelled = false
 
     const load = async () => {
-      setLoading(true)
       setError(false)
       try {
         const result = await fetchAlbumReviews(albumId)
@@ -34,7 +35,7 @@ const ReviewsList = ({ albumId }) => {
     return () => {
       cancelled = true
     }
-  }, [albumId])
+  }, [albumId, refreshKey])
 
   const loadMore = useCallback(async () => {
     if (!nextCursor || loadingMore) return
@@ -83,9 +84,20 @@ const ReviewsList = ({ albumId }) => {
 
   return (
     <div className="border-t border-white/[0.07]">
-      {reviews.map((review) => (
-        <ReviewCard key={review.id} review={review} />
-      ))}
+      <AnimatePresence initial={false}>
+        {reviews.map((review) => (
+          <Motion.div
+            key={review.id}
+            layout="position"
+            initial={{ opacity: 0, y: -16 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
+          >
+            <ReviewCard review={review} />
+          </Motion.div>
+        ))}
+      </AnimatePresence>
 
       {nextCursor && (
         <button

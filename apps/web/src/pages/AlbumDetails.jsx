@@ -458,7 +458,7 @@ const AlbumDetails = () => {
             </p>
           )}
 
-          {isSignedIn && <ReviewsList key={reviewKey} albumId={album.id} />}
+          {isSignedIn && <ReviewsList refreshKey={reviewKey} albumId={album.id} />}
         </section>
       </div>
     </PageTransition>
