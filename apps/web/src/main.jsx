@@ -7,6 +7,7 @@ import App from './App.jsx'
 import { ListsProvider } from './context/ListsContext.jsx'
 import { RatingsProvider } from './context/RatingsContext.jsx'
 import { homeSectionsQueryOptions } from './queries/homeSections.js'
+import { meBootstrapQueryOptions } from './queries/meBootstrap.js'
 import './index.css'
 
 const queryClient = new QueryClient({
@@ -25,6 +26,7 @@ const queryClient = new QueryClient({
 if (window.location.pathname === '/') {
   void queryClient.prefetchQuery(homeSectionsQueryOptions)
 }
+void queryClient.prefetchQuery(meBootstrapQueryOptions)
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>

@@ -20,6 +20,11 @@ export const searchRoutes = new Elysia()
     try {
       const { data, correctedQuery, hasMore, nextOffset, total } = await searchReleases(q, { limit, offset })
       const withStats = await attachMusicoCommunityStats(data)
+      set.headers ??= {}
+      // Results are the same for everyone; same edge policy as /api/home, never caching an empty page.
+      set.headers['Cache-Control'] = data.length
+        ? 'public, max-age=60, s-maxage=300, stale-while-revalidate=21000'
+        : 'no-store'
       return { data: withStats, correctedQuery, hasMore, nextOffset, total }
     } catch (error) {
       console.error('[search] error', error instanceof Error ? error.message : String(error))

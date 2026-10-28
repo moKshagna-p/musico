@@ -85,6 +85,20 @@
       "when": 1792857649721,
       "tag": "0011_album_artwork",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1793184233254,
+      "tag": "0012_sloppy_jackal",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1793184843442,
+      "tag": "0013_album_disc_label",
+      "breakpoints": true
     }
   ]
 }

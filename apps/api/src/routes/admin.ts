@@ -1,6 +1,7 @@
 import { Elysia } from 'elysia'
 import { desc, eq, ilike, inArray, or, sql } from 'drizzle-orm'
 import { db } from '../core/db'
+import { avatarUrl } from '../core/avatar'
 import {
   activity,
   adminUser,
@@ -52,7 +53,7 @@ export const adminRoutes = new Elysia({ prefix: '/api/admin' })
               id: user.id,
               name: user.name,
               email: user.email,
-              image: user.image,
+              image: avatarUrl(),
               createdAt: user.createdAt,
             })
             .from(user)
@@ -69,7 +70,7 @@ export const adminRoutes = new Elysia({ prefix: '/api/admin' })
               id: user.id,
               name: user.name,
               email: user.email,
-              image: user.image,
+              image: avatarUrl(),
               createdAt: user.createdAt,
             })
             .from(user)
@@ -92,7 +93,7 @@ export const adminRoutes = new Elysia({ prefix: '/api/admin' })
               id: user.id,
               name: user.name,
               email: user.email,
-              image: user.image,
+              image: avatarUrl(),
               createdAt: user.createdAt,
             })
             .from(user)
@@ -165,7 +166,7 @@ export const adminRoutes = new Elysia({ prefix: '/api/admin' })
             id: user.id,
             name: user.name,
             email: user.email,
-            image: user.image,
+            image: avatarUrl(),
             createdAt: user.createdAt,
           })
           .from(user)
@@ -218,7 +219,7 @@ export const adminRoutes = new Elysia({ prefix: '/api/admin' })
         id: user.id,
         name: user.name,
         email: user.email,
-        image: user.image,
+        image: avatarUrl(),
         createdAt: user.createdAt,
       })
       .from(user)
@@ -324,7 +325,7 @@ export const adminRoutes = new Elysia({ prefix: '/api/admin' })
             content: userReview.content,
             updatedAt: userReview.updatedAt,
             userName: user.name,
-            userImage: user.image,
+            userImage: avatarUrl(),
           })
           .from(userReview)
           .innerJoin(user, eq(user.id, userReview.userId))
@@ -423,7 +424,7 @@ export const adminRoutes = new Elysia({ prefix: '/api/admin' })
         createdAt: userReview.createdAt,
         updatedAt: userReview.updatedAt,
         userName: user.name,
-        userImage: user.image,
+        userImage: avatarUrl(),
       })
       .from(userReview)
       .innerJoin(user, eq(user.id, userReview.userId))

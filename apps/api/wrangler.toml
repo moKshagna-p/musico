@@ -6,6 +6,10 @@ compatibility_flags = ["nodejs_compat"]
 [build]
 command = "cd ../.. && bun install --frozen-lockfile"
 
+# Run next to Neon (Singapore) instead of at the visitor's edge: most requests make several sequential DB round trips.
+[placement]
+mode = "smart"
+
 [observability]
 enabled = true
 

@@ -17,57 +17,55 @@ import {
 import { MAX_LISTS_PER_USER, MAX_ALBUMS_PER_LIST } from '../core/constants'
 import { isRecord, readBoundedText, readIdentifier } from './validation'
 
+export const loadMyLists = async (userId: string) => {
+  const rows = await db
+    .select({ list: userList, album: userListAlbum })
+    .from(userList)
+    .leftJoin(userListAlbum, eq(userListAlbum.listId, userList.id))
+    .where(eq(userList.userId, userId))
+
+  const listsById = new Map<string, typeof userList.$inferSelect>()
+  const albumsByList = new Map<string, (typeof userListAlbum.$inferSelect)[]>()
+  rows.forEach(({ list, album }) => {
+    listsById.set(list.id, list)
+    if (!album) return
+    const group = albumsByList.get(list.id) ?? []
+    group.push(album)
+    albumsByList.set(list.id, group)
+  })
+
+  return [...listsById.values()]
+    .sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime())
+    .map((list) => {
+      const listAlbums = (albumsByList.get(list.id) ?? [])
+        .sort((a, b) => b.addedAt.getTime() - a.addedAt.getTime())
+        .map((album) => {
+          return {
+            id: album.albumId,
+            name: album.name,
+            cover: album.cover,
+            artists: Array.isArray(album.artists) ? album.artists : [],
+            releaseYear: album.releaseYear,
+            addedAt: album.addedAt.getTime(),
+          }
+        })
+
+      return {
+        id: list.id,
+        name: list.name,
+        albums: listAlbums,
+        createdAt: list.createdAt.getTime(),
+        updatedAt: list.updatedAt.getTime(),
+      }
+    })
+}
+
 export const listRoutes = new Elysia({ prefix: '/api' })
   .get('/me/lists', async ({ request, set }) => {
     const authUser = await ensureAuthenticated(request, set)
     if (!authUser) return { error: 'Unauthorized.' }
 
-    const rows = await db
-      .select({ list: userList, album: userListAlbum })
-      .from(userList)
-      .leftJoin(userListAlbum, eq(userListAlbum.listId, userList.id))
-      .where(eq(userList.userId, authUser.id))
-
-    if (!rows.length) {
-      set.headers ??= {}
-      set.headers['Cache-Control'] = 'no-store'
-      return { data: [] }
-    }
-
-    const listsById = new Map<string, typeof userList.$inferSelect>()
-    const albumsByList = new Map<string, (typeof userListAlbum.$inferSelect)[]>()
-    rows.forEach(({ list, album }) => {
-      listsById.set(list.id, list)
-      if (!album) return
-      const group = albumsByList.get(list.id) ?? []
-      group.push(album)
-      albumsByList.set(list.id, group)
-    })
-
-    const data = [...listsById.values()]
-      .sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime())
-      .map((list) => {
-        const listAlbums = (albumsByList.get(list.id) ?? [])
-          .sort((a, b) => b.addedAt.getTime() - a.addedAt.getTime())
-          .map((album) => {
-            return {
-              id: album.albumId,
-              name: album.name,
-              cover: album.cover,
-              artists: Array.isArray(album.artists) ? album.artists : [],
-              releaseYear: album.releaseYear,
-              addedAt: album.addedAt.getTime(),
-            }
-          })
-
-        return {
-          id: list.id,
-          name: list.name,
-          albums: listAlbums,
-          createdAt: list.createdAt.getTime(),
-          updatedAt: list.updatedAt.getTime(),
-        }
-      })
+    const data = await loadMyLists(authUser.id)
 
     set.headers ??= {}
     set.headers['Cache-Control'] = 'no-store'

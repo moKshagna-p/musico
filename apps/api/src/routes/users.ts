@@ -1,8 +1,10 @@
 import { Elysia } from 'elysia'
 import { and, desc, eq, inArray, lt, sql, ilike, or } from 'drizzle-orm'
 import { db } from '../core/db'
+import { avatarPath, avatarUrl, isOwnAvatarUrl, parseInlineAvatar, toAvatarUrl } from '../core/avatar'
 import {
   user,
+  userAvatar,
   userProfile,
   userRating,
   userReview,
@@ -24,26 +26,59 @@ import {
   getProfileReleasePreviewMap,
   parseProfileImage,
   normalizeEmail,
+  isMissingTableError,
 } from '../core/utils'
 import { USERNAME_REGEX, MAX_BIO_LENGTH } from '../core/constants'
 import { isRecord, readBoolean, readBoundedText, readIdentifier, readRating } from './validation'
 
+export const loadMyRatings = async (userId: string) => {
+  const rows = await db.select().from(userRating).where(eq(userRating.userId, userId))
+  return rows.reduce(
+    (acc, row) => {
+      acc[row.albumId] = {
+        rating: row.rating,
+        timestamp: row.updatedAt.getTime(),
+      }
+      return acc
+    },
+    {} as Record<string, { rating: number; timestamp: number }>,
+  )
+}
+
+// Falls back to an inline data URL still in user.image (not yet moved, or user_avatar not migrated).
+const readAvatar = async (userId: string) => {
+  const [stored] = await db
+    .select({ contentType: userAvatar.contentType, data: userAvatar.data })
+    .from(userAvatar)
+    .where(eq(userAvatar.userId, userId))
+    .limit(1)
+    .catch((error) => {
+      if (isMissingTableError(error, 'user_avatar')) return []
+      throw error
+    })
+  if (stored) return stored
+  const [row] = await db.select({ image: user.image }).from(user).where(eq(user.id, userId)).limit(1)
+  return parseInlineAvatar(row?.image)
+}
+
 export const userRoutes = new Elysia({ prefix: '/api' })
+  .get('/avatars/:userId', async ({ params, set }) => {
+    const userId = readIdentifier(params?.userId)
+    const avatar = userId ? await readAvatar(userId) : null
+    if (!avatar) {
+      set.status = 404
+      return { error: 'Avatar not found.' }
+    }
+    // URLs carry ?v=<timestamp>, so a changed avatar gets a new URL.
+    return new Response(Buffer.from(avatar.data, 'base64'), {
+      headers: { 'Content-Type': avatar.contentType, 'Cache-Control': 'public, max-age=31536000, immutable' },
+    })
+  })
   .get('/me/ratings', async ({ request, set }) => {
     const authUser = await ensureAuthenticated(request, set)
     if (!authUser) return { error: 'Unauthorized.' }
 
-    const rows = await db.select().from(userRating).where(eq(userRating.userId, authUser.id))
-    const data = rows.reduce(
-      (acc, row) => {
-        acc[row.albumId] = {
-          rating: row.rating,
-          timestamp: row.updatedAt.getTime(),
-        }
-        return acc
-      },
-      {} as Record<string, { rating: number; timestamp: number }>,
-    )
+    const data = await loadMyRatings(authUser.id)
 
     set.headers ??= {}
     set.headers['Cache-Control'] = 'no-store'
@@ -415,7 +450,7 @@ export const userRoutes = new Elysia({ prefix: '/api' })
         username: profile.username,
         bio: profile.bio,
         isPublic: profile.isPublic,
-        image: authUser.image ?? null,
+        image: toAvatarUrl(authUser),
         followerCount,
         followingCount,
         stats: {
@@ -488,7 +523,10 @@ export const userRoutes = new Elysia({ prefix: '/api' })
       updates.isPublic = isPublic
     }
 
-    if (typed.image !== undefined) {
+    // The client echoes back the /api/avatars link it was given; that means "unchanged", not a new image URL.
+    if (typeof typed.image === 'string' && isOwnAvatarUrl(typed.image, authUser.id)) {
+      // leave the stored avatar as is
+    } else if (typed.image !== undefined) {
       if (typed.image === null) {
         userUpdates.image = null
       } else if (typeof typed.image !== 'string') {
@@ -517,6 +555,19 @@ export const userRoutes = new Elysia({ prefix: '/api' })
       .where(eq(userProfile.userId, authUser.id))
 
     if (Object.keys(userUpdates).length) {
+      const avatar = parseInlineAvatar(userUpdates.image as string | null)
+      try {
+        if (avatar) {
+          const values = { userId: authUser.id, ...avatar, updatedAt: now }
+          await db.insert(userAvatar).values(values).onConflictDoUpdate({ target: userAvatar.userId, set: values })
+          userUpdates.image = avatarPath(authUser.id, now)
+        } else if ('image' in userUpdates) {
+          await db.delete(userAvatar).where(eq(userAvatar.userId, authUser.id))
+        }
+      } catch (error) {
+        // Before the user_avatar migration is applied, keep storing the data URL inline.
+        if (!isMissingTableError(error, 'user_avatar')) throw error
+      }
       await db
         .update(user)
         .set({ ...userUpdates, updatedAt: now })
@@ -533,7 +584,7 @@ export const userRoutes = new Elysia({ prefix: '/api' })
         username: updatedProfile?.username ?? null,
         bio: updatedProfile?.bio ?? '',
         isPublic: updatedProfile?.isPublic ?? true,
-        image: updatedUser?.image ?? null,
+        image: updatedUser ? toAvatarUrl(updatedUser) : null,
       },
     }
   })
@@ -570,7 +621,7 @@ export const userRoutes = new Elysia({ prefix: '/api' })
       .select({
         id: user.id,
         name: user.name,
-        image: user.image,
+        image: avatarUrl(),
         username: userProfile.username,
       })
       .from(user)
@@ -610,7 +661,7 @@ export const userRoutes = new Elysia({ prefix: '/api' })
         bio: userProfile.bio,
         isPublic: userProfile.isPublic,
         name: user.name,
-        image: user.image,
+        image: avatarUrl(),
       })
       .from(userProfile)
       .innerJoin(user, eq(user.id, userProfile.userId))
@@ -863,7 +914,7 @@ export const userRoutes = new Elysia({ prefix: '/api' })
 
     const followingIds = following.map((f) => f.followingId)
     const [users, profiles] = await Promise.all([
-      db.select().from(user).where(inArray(user.id, followingIds)),
+      db.select({ id: user.id, name: user.name, image: avatarUrl() }).from(user).where(inArray(user.id, followingIds)),
       db.select().from(userProfile).where(inArray(userProfile.userId, followingIds)),
     ])
 
@@ -892,7 +943,7 @@ export const userRoutes = new Elysia({ prefix: '/api' })
 
     const followerIds = followers.map((f) => f.followerId)
     const [users, profiles] = await Promise.all([
-      db.select().from(user).where(inArray(user.id, followerIds)),
+      db.select({ id: user.id, name: user.name, image: avatarUrl() }).from(user).where(inArray(user.id, followerIds)),
       db.select().from(userProfile).where(inArray(userProfile.userId, followerIds)),
     ])
 
@@ -934,7 +985,7 @@ export const userRoutes = new Elysia({ prefix: '/api' })
           listsRows,
         ] = await Promise.all([
           // User data (name, image)
-          db.select({ name: user.name, image: user.image }).from(user).where(eq(user.id, authUser.id)),
+          db.select({ name: user.name, image: avatarUrl() }).from(user).where(eq(user.id, authUser.id)),
           // Ratings
           db.select().from(userRating).where(eq(userRating.userId, authUser.id)),
           // Rating summary

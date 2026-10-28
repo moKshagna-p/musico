@@ -25,8 +25,8 @@ const Home = () => {
   const loading = homeSectionsQuery.isLoading && !homeSectionsQuery.data
   const topAlbum = mostHappeningAlbums[0]
 
-  const handleAlbumSelect = (id) => {
-    navigate(`/album/${id}`, { state: { from: '/', query: '' } })
+  const handleAlbumSelect = (id, album) => {
+    navigate(`/album/${id}`, { state: { from: '/', query: '', album } })
   }
 
   return (
@@ -41,7 +41,7 @@ const Home = () => {
           <div className="flex flex-col gap-8 md:flex-row md:items-end md:gap-10">
             {/* Phones skip the sleeve: it would cover the artist photo, and the same cover leads the chart row below. */}
             <div className="hidden w-56 shrink-0 pr-16 md:block tablet:w-72 tablet:pr-24">
-              <VinylSleeve src={topAlbum.cover} alt={topAlbum.name} out spin loading="eager" />
+              <VinylSleeve src={topAlbum.cover} label={topAlbum.discLabel} alt={topAlbum.name} out spin loading="eager" />
             </div>
             <div className="min-w-0 max-w-2xl">
               <p className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-black/30 px-3 py-1 text-xs font-medium text-paper/90 backdrop-blur">
@@ -57,7 +57,7 @@ const Home = () => {
               </p>
               <Link
                 to={`/album/${topAlbum.id}`}
-                state={{ from: '/', query: '' }}
+                state={{ from: '/', query: '', album: topAlbum }}
                 className="mt-8 inline-flex items-center gap-2 rounded-full bg-paper px-6 py-3 text-sm font-semibold text-black transition-transform hover:scale-[1.03]"
               >
                 Open album <FiArrowUpRight aria-hidden="true" />

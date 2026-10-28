@@ -4,6 +4,17 @@ import api from './apiClient.js'
  * Professional Profile Data Service using Axios apiClient
  */
 
+// Ratings, lists and admin flag in one request; null when signed out.
+export const fetchMyBootstrap = async () => {
+  try {
+    const response = await api.get('/api/me/bootstrap')
+    return response.data ?? null
+  } catch (error) {
+    if (error?.status === 401) return null
+    throw error
+  }
+}
+
 export const fetchMyRatings = async () => {
   const response = await api.get('/api/me/ratings')
   // Axios interceptor returns response.data directly

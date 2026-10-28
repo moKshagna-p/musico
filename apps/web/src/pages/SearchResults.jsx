@@ -97,7 +97,7 @@ const SearchResults = () => {
               loading={isPending}
               error={data ? null : error?.message}
               correctedQuery={correctedQuery}
-              onSelect={(id) => navigate(`/album/${id}`, { state: { from: '/search', query } })}
+              onSelect={(id, album) => navigate(`/album/${id}`, { state: { from: '/search', query, album } })}
             />
             {isFetchNextPageError && (
               <p role="alert" className="mt-4 text-center text-sm text-red-300">

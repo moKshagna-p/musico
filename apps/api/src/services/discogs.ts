@@ -1300,11 +1300,9 @@ export const searchReleases = async (query: string, options: SearchOptions = {})
 export const getReleaseDetails = async (releaseId: string): Promise<ReleaseDetails> => {
   if (!releaseId) throw new Error('Release id missing')
 
-  // 1. Check in-memory LRU first (fastest)
   const memoryCached = releaseMemoryCache.get(releaseId)
   if (memoryCached) return memoryCached
 
-  // 2. Check persistent DB cache next
   try {
     const cached = await getCachedReleaseDetails(releaseId)
     if (cached) {
@@ -1312,16 +1310,14 @@ export const getReleaseDetails = async (releaseId: string): Promise<ReleaseDetai
       return cached
     }
   } catch {
-    // Ignore release cache read failures and continue to live fetch.
+    // Fall through to a live fetch.
   }
 
-  // 3. Check for deduplication (if already fetching this album, join that request)
   const inFlight = releaseRequestsInFlight.get(releaseId)
   if (inFlight) return inFlight
 
-  // 4. Create a fetch promise to share with other callers
   const fetchPromise = (async () => {
-    // Extract the real Discogs ID and type from the prefixed ID
+    // Ids are prefixed "m:" (master) or "r:" (release).
     const isMaster = releaseId.startsWith('m:')
     const isRelease = releaseId.startsWith('r:')
     const cleanId = isMaster || isRelease ? releaseId.slice(2) : releaseId
@@ -1330,12 +1326,8 @@ export const getReleaseDetails = async (releaseId: string): Promise<ReleaseDetai
       const normalized = normalizeRelease(payload, fallbackTrackCount)
       if (!normalized) throw new Error('Unable to normalize release')
       normalized.id = releaseId
-      
-      // Store in memory LRU
       releaseMemoryCache.set(releaseId, normalized)
-      void upsertReleaseDetailsCache(normalized).catch(() => {
-        // Ignore DB cache write failures.
-      })
+      void upsertReleaseDetailsCache(normalized).catch(() => {})
       return normalized
     }
 
@@ -1373,14 +1365,11 @@ export const getReleaseDetails = async (releaseId: string): Promise<ReleaseDetai
     }
   })()
 
-  // Register for deduplication
   releaseRequestsInFlight.set(releaseId, fetchPromise)
 
   try {
-    const result = await fetchPromise
-    return result
+    return await fetchPromise
   } finally {
-    // Cleanup flight map so future requests can happen if cache expires
     releaseRequestsInFlight.delete(releaseId)
   }
 }

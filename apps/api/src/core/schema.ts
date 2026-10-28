@@ -104,6 +104,13 @@ export const albumArtwork = pgTable('album_artwork', {
   checkedAt: timestamp('checkedAt', { withTimezone: true, mode: 'date' }).notNull(),
 })
 
+// Photo of the record's center label from the Cover Art Archive; a null label records that none exists.
+export const albumDiscLabel = pgTable('album_disc_label', {
+  albumId: text('albumId').primaryKey(),
+  label: text('label'),
+  checkedAt: timestamp('checkedAt', { withTimezone: true, mode: 'date' }).notNull(),
+})
+
 export const storedTrendingAlbum = pgTable(
   'stored_trending_album',
   {
@@ -238,6 +245,16 @@ export const adminUser = pgTable(
   },
   (table) => [index('admin_user_granted_by_idx').on(table.grantedByUserId)],
 )
+
+// Uploaded avatar bytes (base64, no data: prefix), kept out of user so session lookups stay small.
+export const userAvatar = pgTable('user_avatar', {
+  userId: text('userId')
+    .primaryKey()
+    .references(() => user.id, { onDelete: 'cascade' }),
+  contentType: text('contentType').notNull(),
+  data: text('data').notNull(),
+  updatedAt: timestamp('updatedAt', { withTimezone: true, mode: 'date' }).notNull(),
+})
 
 // ── Social profile (separate table to avoid touching Better Auth's user table) ──
 
