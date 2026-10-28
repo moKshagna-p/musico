@@ -61,11 +61,19 @@ test('activity writes expose completion so routes can await persistence', async 
 })
 
 test('rate limiting keys on the visitor behind the Vercel rewrite, not the shared proxy IP', async () => {
-  const { getClientIp } = await import('./utils')
-  const viaVercel = new Request('https://api.test/', {
-    headers: { 'cf-connecting-ip': '76.76.21.1', 'x-vercel-forwarded-for': '203.0.113.7, 10.0.0.1' },
+  const script = `
+    const { getClientIp } = await import('./src/core/utils.ts')
+    const ip = (headers) => getClientIp(new Request('https://api.test/', { headers }))
+    console.log(JSON.stringify([
+      ip({ 'cf-connecting-ip': '76.76.21.1', 'x-vercel-forwarded-for': '203.0.113.7, 10.0.0.1' }),
+      ip({ 'cf-connecting-ip': '198.51.100.2' }),
+      ip({ 'cf-connecting-ip': '198.51.100.2', 'x-vercel-forwarded-for': 'not-an-ip' }),
+    ]))
+  `
+  const child = Bun.spawn([process.execPath, '--eval', script], {
+    cwd: new URL('../..', import.meta.url).pathname, stdout: 'pipe', stderr: 'pipe',
   })
-  expect(getClientIp(viaVercel)).toBe('203.0.113.7')
-  expect(getClientIp(new Request('https://api.test/', { headers: { 'cf-connecting-ip': '198.51.100.2' } }))).toBe('198.51.100.2')
-  expect(getClientIp(new Request('https://api.test/', { headers: { 'x-vercel-forwarded-for': 'not-an-ip', 'cf-connecting-ip': '198.51.100.2' } }))).toBe('198.51.100.2')
+  const [exitCode, stdout, stderr] = await Promise.all([child.exited, new Response(child.stdout).text(), new Response(child.stderr).text()])
+  expect(exitCode, stderr).toBe(0)
+  expect(JSON.parse(stdout)).toEqual(['203.0.113.7', '198.51.100.2', '198.51.100.2'])
 })
