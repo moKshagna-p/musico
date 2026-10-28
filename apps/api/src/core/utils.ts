@@ -145,10 +145,13 @@ export const parseProfileImage = (value: unknown) => {
 export const normalizeAlbumId = (value: unknown) => String(value ?? '').trim()
 export const normalizeEmail = (value: unknown) => String(value ?? '').trim().toLowerCase()
 
-export const isMissingAdminTableError = (error: unknown) => {
-  const message = String((error as { message?: string })?.message ?? '')
-  return message.toLowerCase().includes('relation "admin_user" does not exist')
-}
+// Drizzle wraps driver errors ("Failed query: ..."), so the Postgres message is on the cause.
+export const isMissingTableError = (error: unknown, table: string) =>
+  [error, (error as { cause?: unknown })?.cause].some((e) =>
+    String((e as { message?: string })?.message ?? '').toLowerCase().includes(`relation "${table}" does not exist`),
+  )
+
+export const isMissingAdminTableError = (error: unknown) => isMissingTableError(error, 'admin_user')
 
 export const getReleasePreviewMap = async (albumIds: unknown[]) => {
   const uniqueAlbumIds = [...new Set(albumIds.map(normalizeAlbumId).filter(Boolean))].slice(0, MAX_RELEASE_PREVIEW_LOOKUPS)

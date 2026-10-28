@@ -239,6 +239,16 @@ export const adminUser = pgTable(
   (table) => [index('admin_user_granted_by_idx').on(table.grantedByUserId)],
 )
 
+// Uploaded avatar bytes (base64, no data: prefix), kept out of user so session lookups stay small.
+export const userAvatar = pgTable('user_avatar', {
+  userId: text('userId')
+    .primaryKey()
+    .references(() => user.id, { onDelete: 'cascade' }),
+  contentType: text('contentType').notNull(),
+  data: text('data').notNull(),
+  updatedAt: timestamp('updatedAt', { withTimezone: true, mode: 'date' }).notNull(),
+})
+
 // ── Social profile (separate table to avoid touching Better Auth's user table) ──
 
 export const userProfile = pgTable(

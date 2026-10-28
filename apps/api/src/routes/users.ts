@@ -1,9 +1,10 @@
 import { Elysia } from 'elysia'
 import { and, desc, eq, inArray, lt, sql, ilike, or } from 'drizzle-orm'
 import { db } from '../core/db'
-import { avatarUrl, decodeInlineAvatar, isOwnAvatarUrl, toAvatarUrl } from '../core/avatar'
+import { avatarPath, avatarUrl, isOwnAvatarUrl, parseInlineAvatar, toAvatarUrl } from '../core/avatar'
 import {
   user,
+  userAvatar,
   userProfile,
   userRating,
   userReview,
@@ -25,6 +26,7 @@ import {
   getProfileReleasePreviewMap,
   parseProfileImage,
   normalizeEmail,
+  isMissingTableError,
 } from '../core/utils'
 import { USERNAME_REGEX, MAX_BIO_LENGTH } from '../core/constants'
 import { isRecord, readBoolean, readBoundedText, readIdentifier, readRating } from './validation'
@@ -43,18 +45,33 @@ export const loadMyRatings = async (userId: string) => {
   )
 }
 
+// Falls back to an inline data URL still in user.image (not yet moved, or user_avatar not migrated).
+const readAvatar = async (userId: string) => {
+  const [stored] = await db
+    .select({ contentType: userAvatar.contentType, data: userAvatar.data })
+    .from(userAvatar)
+    .where(eq(userAvatar.userId, userId))
+    .limit(1)
+    .catch((error) => {
+      if (isMissingTableError(error, 'user_avatar')) return []
+      throw error
+    })
+  if (stored) return stored
+  const [row] = await db.select({ image: user.image }).from(user).where(eq(user.id, userId)).limit(1)
+  return parseInlineAvatar(row?.image)
+}
+
 export const userRoutes = new Elysia({ prefix: '/api' })
   .get('/avatars/:userId', async ({ params, set }) => {
     const userId = readIdentifier(params?.userId)
-    const [row] = userId ? await db.select({ image: user.image }).from(user).where(eq(user.id, userId)).limit(1) : []
-    const avatar = decodeInlineAvatar(row?.image)
+    const avatar = userId ? await readAvatar(userId) : null
     if (!avatar) {
       set.status = 404
       return { error: 'Avatar not found.' }
     }
-    // URLs carry ?v=<updatedAt>, so a changed avatar gets a new URL.
-    return new Response(avatar.bytes, {
-      headers: { 'Content-Type': avatar.type, 'Cache-Control': 'public, max-age=31536000, immutable' },
+    // URLs carry ?v=<timestamp>, so a changed avatar gets a new URL.
+    return new Response(Buffer.from(avatar.data, 'base64'), {
+      headers: { 'Content-Type': avatar.contentType, 'Cache-Control': 'public, max-age=31536000, immutable' },
     })
   })
   .get('/me/ratings', async ({ request, set }) => {
@@ -538,6 +555,19 @@ export const userRoutes = new Elysia({ prefix: '/api' })
       .where(eq(userProfile.userId, authUser.id))
 
     if (Object.keys(userUpdates).length) {
+      const avatar = parseInlineAvatar(userUpdates.image as string | null)
+      try {
+        if (avatar) {
+          const values = { userId: authUser.id, ...avatar, updatedAt: now }
+          await db.insert(userAvatar).values(values).onConflictDoUpdate({ target: userAvatar.userId, set: values })
+          userUpdates.image = avatarPath(authUser.id, now)
+        } else {
+          await db.delete(userAvatar).where(eq(userAvatar.userId, authUser.id))
+        }
+      } catch (error) {
+        // Before the user_avatar migration is applied, keep storing the data URL inline.
+        if (!isMissingTableError(error, 'user_avatar')) throw error
+      }
       await db
         .update(user)
         .set({ ...userUpdates, updatedAt: now })
