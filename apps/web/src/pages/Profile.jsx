@@ -484,7 +484,7 @@ const Profile = () => {
 
       <div className="mx-auto w-full max-w-6xl py-4 tablet:py-8">
         <ProfileCover src={socialProfile?.cover} />
-        <header className="flex flex-col gap-8 border-b border-white/[0.07] pb-10 md:flex-row md:items-end md:justify-between">
+        <header className="flex flex-col gap-8 pb-10 md:flex-row md:items-end md:justify-between">
           <div className="flex min-w-0 flex-col gap-6 sm:flex-row sm:items-end">
             {socialProfile?.image ? (
               <img
