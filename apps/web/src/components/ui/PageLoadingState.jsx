@@ -57,7 +57,10 @@ export const UserListLoadingState = () => (
 export const DiscoverPageSkeleton = () => (
   <section aria-busy="true" aria-label="Loading discover" className="space-y-20">
     <div className="mx-auto max-w-3xl pt-6 text-center tablet:pt-14">
-      <div className="skeleton mx-auto h-24 w-4/5 rounded-2xl tablet:h-[4.25rem]" />
+      <div aria-hidden="true" className="relative font-display text-5xl leading-[0.95] tablet:text-7xl">
+        <span className="invisible">Dig through the vault</span>
+        <div className="skeleton absolute inset-y-0 left-[10%] w-4/5 rounded-2xl" />
+      </div>
       <div className="skeleton mx-auto mt-6 h-4 w-72 max-w-full rounded-full" />
       <div className="mt-10">
         <SearchBarSkeleton />
