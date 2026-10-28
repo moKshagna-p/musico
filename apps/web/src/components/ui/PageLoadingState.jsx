@@ -285,6 +285,14 @@ export const ProfilePageSkeleton = ({ own = false }) => (
           </div>
         </div>
 
+        <div className="my-14 grid gap-6 md:grid-cols-[16rem_1fr]">
+          <div>
+            <div className="skeleton h-[30px] w-44 rounded-lg tablet:h-9" />
+            <div className="skeleton mt-3 h-3.5 w-48 rounded-full" />
+          </div>
+          <div className="skeleton h-48 rounded-xl" />
+        </div>
+
         <div className="mb-8">
           <SectionHeadingSkeleton />
         </div>
@@ -296,6 +304,15 @@ export const ProfilePageSkeleton = ({ own = false }) => (
               <div className="skeleton mt-2.5 h-3 w-1/2 rounded-full" />
             </div>
           ))}
+        </div>
+
+        <div className="mt-24 grid gap-8 md:grid-cols-[16rem_1fr]">
+          <div>
+            <div className="skeleton h-[30px] w-52 rounded-lg tablet:h-9" />
+            <div className="skeleton mt-3 h-3.5 w-48 rounded-full" />
+            <div className="skeleton mt-6 h-16 w-40 rounded-xl" />
+          </div>
+          <div className="skeleton h-[140px] rounded-xl" />
         </div>
 
         <div className="mb-10 mt-24">
