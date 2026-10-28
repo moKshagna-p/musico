@@ -3,7 +3,7 @@ import { and, asc, desc, eq, inArray, notInArray, sql } from 'drizzle-orm'
 import { db } from '../core/db'
 import { avatarUrl } from '../core/avatar'
 import { isKlipyUrl, mediaUrl } from '../core/media'
-import { reviewMedia, user, userReview } from '../core/schema'
+import { reviewMedia, user, userProfile, userReview } from '../core/schema'
 import {
   ensureAuthenticated,
   getCanonicalAlbumMetadata,
@@ -231,10 +231,12 @@ export const reviewRoutes = new Elysia()
         content: userReview.content,
         updatedAt: userReview.updatedAt,
         userName: user.name,
+        userUsername: userProfile.username,
         userImage: avatarUrl(),
       })
       .from(userReview)
       .innerJoin(user, eq(user.id, userReview.userId))
+      .leftJoin(userProfile, eq(userProfile.userId, userReview.userId))
       .where(eq(userReview.albumId, albumId))
       .orderBy(desc(userReview.updatedAt))
       .limit(limit)
@@ -265,7 +267,7 @@ export const reviewRoutes = new Elysia()
         id: r.id,
         content: r.content,
         createdAt: r.updatedAt.getTime(),
-        user: { name: r.userName, image: r.userImage },
+        user: { name: r.userName, username: r.userUsername, image: r.userImage },
         media: mediaRows.filter((row) => row.reviewId === r.id).map(toMedia),
       })),
     }

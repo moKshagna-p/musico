@@ -1,5 +1,11 @@
+import { Link } from 'react-router-dom'
+
 import RatingStars from '../ui/RatingStars.jsx'
 import ReviewMedia from './ReviewMedia.jsx'
+
+// Reviewers without a username yet can't be linked to.
+const ReviewerLink = ({ username, ...props }) =>
+  username ? <Link to={`/profile/${username}`} {...props} /> : <div {...props} />
 
 const ReviewCard = ({ review }) => {
   const { content, media, user: reviewer, rating, createdAt } = review
@@ -11,17 +17,19 @@ const ReviewCard = ({ review }) => {
   return (
     <article className="border-b border-white/[0.07] py-6">
       <div className="flex items-start justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-sm font-semibold text-paper/70 ring-1 ring-white/10">
-            {displayName.charAt(0).toUpperCase()}
-          </div>
-          <div>
-            <span className="text-sm font-medium text-paper">{displayName}</span>
-            {username && (
-              <span className="ml-1.5 text-xs text-muted">@{username}</span>
-            )}
-          </div>
-        </div>
+        <ReviewerLink username={username} className="group flex min-w-0 items-center gap-3">
+          {reviewer?.image ? (
+            <img src={reviewer.image} alt="" loading="lazy" decoding="async" className="h-10 w-10 shrink-0 rounded-full object-cover ring-1 ring-white/10" />
+          ) : (
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-semibold text-paper/70 ring-1 ring-white/10">
+              {displayName.charAt(0).toUpperCase()}
+            </span>
+          )}
+          <span className="min-w-0 leading-tight">
+            <span className="block truncate text-sm font-medium text-paper group-hover:underline">{displayName}</span>
+            {username && <span className="block truncate text-xs text-muted">@{username}</span>}
+          </span>
+        </ReviewerLink>
 
         {rating != null && (
           <RatingStars value={Number(rating)} readOnly size="sm" align="left" />
