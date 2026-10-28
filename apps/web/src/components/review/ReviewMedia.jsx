@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { AnimatePresence, motion as Motion } from 'framer-motion'
 import { FiChevronLeft, FiChevronRight, FiX } from 'react-icons/fi'
+
+import { morph } from '../../utils/morph.js'
 
 // Tweet-style layouts: one item keeps its shape, 2-4 share a 16:9 frame (the first of three runs full height).
 const FRAME = 'grid aspect-[16/9] grid-cols-2 gap-0.5 overflow-hidden rounded-2xl border border-white/10'
@@ -54,14 +55,11 @@ const MediaLightbox = ({ items, index, onIndexChange, onClose }) => {
   }, [items.length, onClose, step])
 
   return createPortal(
-    <Motion.div
+    // Opening and closing animate as a View Transition (the tile zooms in, the page crossfades), see ReviewMedia.
+    <div
       role="dialog"
       aria-modal="true"
       aria-label="Image viewer"
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      transition={{ duration: 0.15 }}
       onClick={onClose}
       className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-black/90 p-4 backdrop-blur-sm"
     >
@@ -78,6 +76,7 @@ const MediaLightbox = ({ items, index, onIndexChange, onClose }) => {
       <img
         src={item.url}
         alt={item.alt || ''}
+        data-lightbox-image=""
         onClick={(event) => event.stopPropagation()}
         className="max-h-[85svh] max-w-full rounded-lg object-contain"
       />
@@ -107,20 +106,28 @@ const MediaLightbox = ({ items, index, onIndexChange, onClose }) => {
           </button>
         </>
       )}
-    </Motion.div>,
+    </div>,
     document.body,
   )
 }
 
 const ReviewMedia = ({ media = [] }) => {
   const [openIndex, setOpenIndex] = useState(null)
+  const rootRef = useRef(null)
   const images = media.filter((item) => item.kind === 'image')
-  const close = useCallback(() => setOpenIndex(null), [])
+  const tile = (index) => rootRef.current?.querySelector(`[data-tile="${index}"]`)
+  const lightboxImage = () => document.querySelector('[data-lightbox-image]')
+  const open = (index) => morph(() => setOpenIndex(index), { from: tile(index), to: lightboxImage, name: 'review-media' })
+  // Shrinks back into whichever tile the viewer ended on.
+  const close = useCallback(
+    () => morph(() => setOpenIndex(null), { from: lightboxImage(), to: () => tile(openIndex), name: 'review-media' }),
+    [openIndex],
+  )
 
   if (!media.length) return null
 
   return (
-    <div className="mt-4">
+    <div ref={rootRef} className="mt-4">
       <MediaGrid
         items={media}
         renderTile={(item, index) =>
@@ -130,17 +137,15 @@ const ReviewMedia = ({ media = [] }) => {
               <span className="absolute bottom-2 left-2 rounded bg-black/70 px-1.5 py-0.5 text-[11px] font-semibold text-paper">GIF</span>
             </div>
           ) : (
-            <button type="button" onClick={() => setOpenIndex(index)} aria-label={item.alt ? `View image: ${item.alt}` : 'View image'} className="block h-full w-full">
-              <img src={item.url} alt={item.alt || ''} width={item.width} height={item.height} loading="lazy" decoding="async" className="h-full w-full object-cover transition-opacity hover:opacity-90" />
+            <button type="button" onClick={() => open(index)} aria-label={item.alt ? `View image: ${item.alt}` : 'View image'} className="block h-full w-full">
+              <img data-tile={index} src={item.url} alt={item.alt || ''} width={item.width} height={item.height} loading="lazy" decoding="async" className="h-full w-full object-cover transition-opacity hover:opacity-90" />
             </button>
           )
         }
       />
-      <AnimatePresence>
-        {openIndex !== null && images[openIndex] && (
-          <MediaLightbox items={images} index={openIndex} onIndexChange={setOpenIndex} onClose={close} />
-        )}
-      </AnimatePresence>
+      {openIndex !== null && images[openIndex] && (
+        <MediaLightbox items={images} index={openIndex} onIndexChange={setOpenIndex} onClose={close} />
+      )}
     </div>
   )
 }
