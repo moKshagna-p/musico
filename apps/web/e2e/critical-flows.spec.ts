@@ -844,6 +844,63 @@ test.describe('Critical user flows', () => {
     await expect(page.locator('p', { hasText: /incredible production and timeless grooves\./i }).first()).toBeVisible()
   })
 
+  test('reviews carry images with alt text, open in a viewer, and GIFs replace images', async ({ page }) => {
+    await signIn(page)
+    await page.goto('/album/m:1002')
+    await expect(page.getByRole('heading', { name: 'Random Access Memories' })).toBeVisible()
+
+    // A real PNG, so the browser's decode-and-shrink step runs.
+    const png = await page.evaluate(async () => {
+      const canvas = document.createElement('canvas')
+      canvas.width = 640
+      canvas.height = 480
+      canvas.getContext('2d').fillRect(0, 0, 640, 480)
+      const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/png'))
+      return Array.from(new Uint8Array(await blob.arrayBuffer()))
+    })
+    const file = (name) => ({ name, mimeType: 'image/png', buffer: Buffer.from(png) })
+
+    await page.locator('input[type="file"][multiple]').setInputFiles([file('one.png'), file('two.png')])
+    await expect(page.getByRole('button', { name: 'Add image description' })).toHaveCount(2)
+    // Images and a GIF are either/or.
+    await expect(page.getByRole('button', { name: 'Add a GIF' })).toBeDisabled()
+
+    await page.getByRole('button', { name: 'Add image description' }).first().click()
+    await page.getByLabel(/describe this image/i).fill('Gatefold sleeve on the turntable')
+    await page.getByLabel(/describe this image/i).press('Enter')
+
+    const savedReviews = []
+    page.on('request', (request) => {
+      if (request.url().includes('/api/me/reviews/') && request.method() === 'PUT') savedReviews.push(request.postDataJSON())
+    })
+    await page.getByPlaceholder(/write a short review/i).fill('Sounds even better on wax.')
+    await page.getByRole('button', { name: /^post$/i }).click()
+    await expect(page.getByText(/review posted\./i)).toBeVisible()
+
+    // Both uploads finished (in either order) and keep their place and alt text.
+    const { media } = savedReviews[0]
+    expect(media.map((item) => item.alt)).toEqual(['Gatefold sleeve on the turntable', ''])
+    expect(new Set(media.map((item) => item.id))).toEqual(new Set(['media-1', 'media-2']))
+    // The composer clears after posting.
+    await expect(page.getByPlaceholder(/write a short review/i)).toHaveValue('')
+
+    await page.getByRole('button', { name: 'View image: Gatefold sleeve on the turntable' }).click()
+    const viewer = page.getByRole('dialog', { name: 'Image viewer' })
+    await expect(viewer.getByText('Gatefold sleeve on the turntable')).toBeVisible()
+    await page.keyboard.press('ArrowRight')
+    await expect(viewer.getByText('Gatefold sleeve on the turntable')).toHaveCount(0)
+    await page.keyboard.press('Escape')
+    await expect(viewer).toHaveCount(0)
+
+    await page.getByRole('button', { name: 'Add a GIF' }).click()
+    await page.getByLabel('Search GIFs').fill('headphones')
+    await page.getByRole('button', { name: 'headphones on' }).click()
+    await expect(page.getByRole('button', { name: 'Add images' })).toBeDisabled()
+    await page.getByRole('button', { name: /^post$/i }).click()
+    await expect(page.getByText(/review posted\./i)).toBeVisible()
+    await expect(page.getByRole('img', { name: 'headphones on' })).toBeVisible()
+  })
+
   test('guests cannot fetch or see album reviews', async ({ page }) => {
     let reviewRequests = 0
     await page.route('**/api/albums/*/reviews*', async (route) => {

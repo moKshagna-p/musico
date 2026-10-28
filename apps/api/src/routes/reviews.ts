@@ -1,15 +1,52 @@
 import { Elysia } from 'elysia'
-import { desc, eq, sql } from 'drizzle-orm'
+import { and, asc, desc, eq, inArray, notInArray, sql } from 'drizzle-orm'
 import { db } from '../core/db'
 import { avatarUrl } from '../core/avatar'
-import { user, userReview } from '../core/schema'
+import { isKlipyUrl, mediaUrl } from '../core/media'
+import { reviewMedia, user, userReview } from '../core/schema'
 import {
   ensureAuthenticated,
   getCanonicalAlbumMetadata,
+  isMissingTableError,
   recordActivity,
 } from '../core/utils'
-import { MAX_REVIEW_LENGTH } from '../core/constants'
-import { isRecord, readBoundedText, readIdentifier } from './validation'
+import { MAX_ALT_TEXT_LENGTH, MAX_MEDIA_PER_REVIEW, MAX_REVIEW_LENGTH } from '../core/constants'
+import { isRecord, readBoundedInteger, readBoundedText, readIdentifier } from './validation'
+
+type MediaRow = { id: string; kind: 'image' | 'gif'; key: string | null; url: string | null; width: number; height: number; alt: string }
+const toMedia = (row: MediaRow) => ({
+  id: row.id,
+  kind: row.kind,
+  url: row.kind === 'image' ? mediaUrl(row.key ?? '') : row.url ?? '',
+  width: row.width,
+  height: row.height,
+  alt: row.alt,
+})
+
+// Up to four uploaded images or one KLIPY GIF, like a tweet. Returns null when the shape is wrong.
+export const readReviewMedia = (body: Record<string, unknown> | null) => {
+  const rawImages = body?.media ?? []
+  if (!Array.isArray(rawImages) || rawImages.length > MAX_MEDIA_PER_REVIEW) return null
+  const images: { id: string; alt: string }[] = []
+  for (const item of rawImages) {
+    const id = isRecord(item) ? readIdentifier(item.id) : null
+    const alt = isRecord(item) ? readBoundedText(item.alt ?? '', MAX_ALT_TEXT_LENGTH) : null
+    if (!id || alt === null || images.some((image) => image.id === id)) return null
+    images.push({ id, alt })
+  }
+
+  if (body?.gif === undefined || body.gif === null) return { images, gif: null }
+  const raw = isRecord(body.gif) ? body.gif : null
+  const size = { defaultValue: 0, min: 1, max: 10000 }
+  const gif = raw && {
+    url: isKlipyUrl(raw.url) ? String(raw.url) : '',
+    width: readBoundedInteger(raw.width, size) ?? 0,
+    height: readBoundedInteger(raw.height, size) ?? 0,
+    alt: readBoundedText(raw.alt ?? '', MAX_ALT_TEXT_LENGTH),
+  }
+  if (!gif?.url || !gif.width || !gif.height || gif.alt === null || images.length) return null
+  return { images, gif: { ...gif, alt: gif.alt } }
+}
 
 export const reviewRoutes = new Elysia()
   .put('/api/me/reviews/:albumId', async ({ request, params, body, set }) => {
@@ -23,10 +60,18 @@ export const reviewRoutes = new Elysia()
     }
 
     const typedBody = isRecord(body) ? body : null
-    const rawContent = readBoundedText(typedBody?.content, MAX_REVIEW_LENGTH)
-    const content = rawContent?.slice(0, MAX_REVIEW_LENGTH) ?? ''
+    const content = readBoundedText(typedBody?.content ?? '', MAX_REVIEW_LENGTH)
+    const media = readReviewMedia(typedBody)
 
-    if (!content) {
+    if (content === null) {
+      set.status = 400
+      return { error: `Reviews can be up to ${MAX_REVIEW_LENGTH} characters.` }
+    }
+    if (!media) {
+      set.status = 400
+      return { error: 'Attach up to 4 images or 1 GIF.' }
+    }
+    if (!content && !media.images.length && !media.gif) {
       set.status = 400
       return { error: 'Review content cannot be empty.' }
     }
@@ -39,11 +84,31 @@ export const reviewRoutes = new Elysia()
       releaseYear: typedBody?.releaseYear,
     })
 
+    const [existing] = await db
+      .select({ id: userReview.id })
+      .from(userReview)
+      .where(and(eq(userReview.userId, authUser.id), eq(userReview.albumId, albumId)))
+      .limit(1)
+    const reviewId = existing?.id ?? crypto.randomUUID()
+    const imageIds = media.images.map((image) => image.id)
+
+    // Only the author's own uploads, not yet on another review.
+    const uploads = imageIds.length
+      ? await db
+          .select({ id: reviewMedia.id, reviewId: reviewMedia.reviewId, key: reviewMedia.key, width: reviewMedia.width, height: reviewMedia.height })
+          .from(reviewMedia)
+          .where(and(inArray(reviewMedia.id, imageIds), eq(reviewMedia.userId, authUser.id), eq(reviewMedia.kind, 'image')))
+      : []
+    if (uploads.length !== imageIds.length || uploads.some((upload) => upload.reviewId && upload.reviewId !== reviewId)) {
+      set.status = 400
+      return { error: 'An image is no longer available. Remove it and try again.' }
+    }
+
     const now = new Date()
-    const result = await db
+    const saveReview = db
       .insert(userReview)
       .values({
-        id: crypto.randomUUID(),
+        id: reviewId,
         userId: authUser.id,
         albumId,
         albumName: meta.name,
@@ -60,6 +125,40 @@ export const reviewRoutes = new Elysia()
         },
       })
       .returning()
+    const gifId = crypto.randomUUID()
+    // Dropped media is detached, not deleted: the cron removes it (and its R2 object) a day later.
+    const saveMedia = [
+      db
+        .update(reviewMedia)
+        .set({ reviewId: null })
+        .where(and(eq(reviewMedia.reviewId, reviewId), imageIds.length ? notInArray(reviewMedia.id, imageIds) : undefined)),
+      ...media.images.map((image, position) =>
+        db
+          .update(reviewMedia)
+          .set({ reviewId, position, alt: image.alt })
+          .where(and(eq(reviewMedia.id, image.id), eq(reviewMedia.userId, authUser.id))),
+      ),
+      ...(media.gif
+        ? [db.insert(reviewMedia).values({ id: gifId, userId: authUser.id, reviewId, kind: 'gif', ...media.gif, createdAt: now })]
+        : []),
+    ]
+
+    let result: (typeof userReview.$inferSelect)[]
+    try {
+      ;[result] = await db.batch([saveReview, ...saveMedia])
+    } catch (error) {
+      // Text-only reviews keep working until the review_media migration is applied.
+      if (!isMissingTableError(error, 'review_media') || imageIds.length || media.gif) throw error
+      result = await saveReview
+    }
+
+    const savedMedia = [
+      ...media.images.map((image) => {
+        const upload = uploads.find((row) => row.id === image.id)!
+        return toMedia({ ...upload, kind: 'image', url: null, alt: image.alt })
+      }),
+      ...(media.gif ? [toMedia({ id: gifId, kind: 'gif', key: null, ...media.gif })] : []),
+    ]
 
     await recordActivity({
       userId: authUser.id,
@@ -75,6 +174,7 @@ export const reviewRoutes = new Elysia()
         ...result[0],
         createdAt: result[0]?.createdAt.getTime(),
         updatedAt: result[0]?.updatedAt.getTime(),
+        media: savedMedia,
       },
     }
   })
@@ -139,12 +239,34 @@ export const reviewRoutes = new Elysia()
       .orderBy(desc(userReview.updatedAt))
       .limit(limit)
 
+    const mediaRows = reviews.length
+      ? await db
+          .select({
+            id: reviewMedia.id,
+            reviewId: reviewMedia.reviewId,
+            kind: reviewMedia.kind,
+            key: reviewMedia.key,
+            url: reviewMedia.url,
+            width: reviewMedia.width,
+            height: reviewMedia.height,
+            alt: reviewMedia.alt,
+          })
+          .from(reviewMedia)
+          .where(inArray(reviewMedia.reviewId, reviews.map((r) => r.id)))
+          .orderBy(asc(reviewMedia.position))
+          .catch((error) => {
+            if (isMissingTableError(error, 'review_media')) return []
+            throw error
+          })
+      : []
+
     return {
       data: reviews.map((r) => ({
         id: r.id,
         content: r.content,
         createdAt: r.updatedAt.getTime(),
         user: { name: r.userName, image: r.userImage },
+        media: mediaRows.filter((row) => row.reviewId === r.id).map(toMedia),
       })),
     }
   })

@@ -70,6 +70,7 @@ export const env = new Proxy({} as Record<string, unknown>, {
       case 'HOMEPAGE_REFRESH_MINIMAL': return get('HOMEPAGE_REFRESH_MINIMAL') === 'true'
       case 'CRON_SECRET': return sanitizeOptionalSecret(get('CRON_SECRET'))
       case 'FANART_API_KEY': return sanitizeOptionalSecret(get('FANART_API_KEY'))
+      case 'KLIPY_API_KEY': return sanitizeOptionalSecret(get('KLIPY_API_KEY'))
       default: return undefined
     }
   },
@@ -98,4 +99,5 @@ export const env = new Proxy({} as Record<string, unknown>, {
   HOMEPAGE_REFRESH_MINIMAL: boolean
   CRON_SECRET: string | undefined
   FANART_API_KEY: string | undefined
+  KLIPY_API_KEY: string | undefined
 }

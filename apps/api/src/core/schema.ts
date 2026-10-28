@@ -329,6 +329,31 @@ export const userReview = pgTable(
   ],
 )
 
+// Images on a review (bytes in R2, see core/media.ts) and KLIPY GIFs (linked, never stored).
+// reviewId is null between upload and posting, and goes null again when the review is deleted or the media dropped;
+// the cron sweeps those rows and their objects. userId has no foreign key so a deleted account's uploads get swept too.
+export const reviewMedia = pgTable(
+  'review_media',
+  {
+    id: text('id').primaryKey(),
+    userId: text('userId').notNull(),
+    reviewId: text('reviewId').references(() => userReview.id, { onDelete: 'set null' }),
+    kind: text('kind').$type<'image' | 'gif'>().notNull(),
+    key: text('key'),
+    url: text('url'),
+    size: integer('size').notNull().default(0),
+    width: integer('width').notNull(),
+    height: integer('height').notNull(),
+    alt: text('alt').notNull().default(''),
+    position: integer('position').notNull().default(0),
+    createdAt: timestamp('createdAt', { withTimezone: true, mode: 'date' }).notNull(),
+  },
+  (table) => [
+    index('review_media_review_id_idx').on(table.reviewId),
+    index('review_media_user_created_at_idx').on(table.userId, table.createdAt),
+  ],
+)
+
 // ── Activity feed events ──
 
 export const activityTypeEnum = pgEnum('activity_type', ['rated', 'reviewed', 'listed', 'followed'])

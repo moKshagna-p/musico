@@ -1,7 +1,8 @@
 import RatingStars from '../ui/RatingStars.jsx'
+import ReviewMedia from './ReviewMedia.jsx'
 
 const ReviewCard = ({ review }) => {
-  const { content, user: reviewer, rating, createdAt } = review
+  const { content, media, user: reviewer, rating, createdAt } = review
 
   const timeAgo = formatTimeAgo(createdAt)
   const displayName = reviewer?.name ?? 'Anonymous'
@@ -27,7 +28,8 @@ const ReviewCard = ({ review }) => {
         )}
       </div>
 
-      <p className="mt-4 text-[17px] leading-relaxed text-paper/90">{content}</p>
+      {content && <p className="mt-4 text-[17px] leading-relaxed text-paper/90">{content}</p>}
+      <ReviewMedia media={media} />
       {timeAgo && <p className="mt-3 text-xs text-muted">{timeAgo}</p>}
     </article>
   )

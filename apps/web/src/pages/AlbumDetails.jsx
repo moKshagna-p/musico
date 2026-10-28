@@ -440,9 +440,11 @@ const AlbumDetails = () => {
           {isSignedIn ? (
             <ReviewInput
               albumId={album.id}
-              onSave={async (content) => {
+              onSave={async ({ content, media, gif }) => {
                 await saveMyReview(album.id, {
                   content,
+                  media,
+                  gif,
                   albumName: album.name,
                   albumCover: album.cover,
                   albumArtists: album.artists,
