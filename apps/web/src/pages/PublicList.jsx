@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { FiShare2 } from 'react-icons/fi'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useLocation, useNavigate, useParams } from 'react-router-dom'
 
 import AlbumTile from '../components/album/AlbumTile.jsx'
 import PageTransition from '../components/ui/PageTransition.jsx'
@@ -11,12 +11,16 @@ import { fetchPublicList } from '../services/socialService.js'
 const PublicList = () => {
   const { listId } = useParams()
   const navigate = useNavigate()
+  const location = useLocation()
+  // The list card already has the name, count, and first covers; show them while the rest loads.
+  const seed = location.state?.list?.id === listId ? location.state.list : undefined
   const [copied, setCopied] = useState(false)
 
   const publicListQuery = useQuery({
     queryKey: ['public-list', listId],
     queryFn: () => fetchPublicList(listId),
     enabled: Boolean(listId),
+    placeholderData: seed,
     staleTime: 1000 * 60 * 5,
     gcTime: 1000 * 60 * 30,
     retry: false,
@@ -24,6 +28,9 @@ const PublicList = () => {
   })
 
   const list = publicListQuery.data
+  const loadingRest = publicListQuery.isPlaceholderData
+  const albumCount = list?.albumCount ?? list?.albums?.length ?? 0
+  const pendingTiles = loadingRest ? Math.max(0, albumCount - (list?.albums?.length ?? 0)) : 0
 
   const handleShare = async () => {
     try {
@@ -73,9 +80,9 @@ const PublicList = () => {
 
         <header className="mb-14 flex flex-col gap-6 border-b border-white/[0.07] pb-10 pt-6 md:flex-row md:items-end md:justify-between tablet:pt-12">
           <div className="min-w-0">
-            <p className="text-sm text-muted">A list by {list.owner?.name ?? 'Unknown'}</p>
+            <p className="text-sm text-muted">{list.owner ? `A list by ${list.owner.name}` : '\u00a0'}</p>
             <h1 className="mt-3 break-words font-display text-5xl leading-[0.95] text-paper tablet:text-7xl">{list.name}</h1>
-            <p className="mt-4 text-sm text-muted">{list.albumCount ?? list.albums?.length ?? 0} albums</p>
+            <p className="mt-4 text-sm text-muted">{albumCount} albums</p>
           </div>
 
           <button
@@ -88,7 +95,7 @@ const PublicList = () => {
           </button>
         </header>
 
-        {list.albums?.length > 0 ? (
+        {albumCount > 0 ? (
           <div className="grid grid-cols-2 gap-x-5 gap-y-10 md:grid-cols-3 lg:grid-cols-4 tablet:gap-x-8 tablet:gap-y-14">
             {list.albums.map((album) => (
               <AlbumTile
@@ -99,6 +106,14 @@ const PublicList = () => {
                 artist={Array.isArray(album.artists) ? album.artists[0] : ''}
                 meta={album.releaseYear}
               />
+            ))}
+            {Array.from({ length: pendingTiles }, (_, index) => (
+              <div key={`pending-${index}`} aria-hidden="true">
+                <div className="pr-[12%]">
+                  <div className="aspect-square w-full rounded-[4px] bg-gradient-to-r from-white/10 via-white/5 to-white/10 bg-[length:220px_100%] motion-safe:animate-shimmer" />
+                </div>
+                <div className="mt-4 h-5 w-2/3 rounded bg-white/[0.06]" />
+              </div>
             ))}
           </div>
         ) : (

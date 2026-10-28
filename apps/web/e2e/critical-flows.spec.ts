@@ -77,6 +77,36 @@ test.describe('Critical user flows', () => {
     await expect(page.getByTestId('track-number').first()).toBeVisible()
   })
 
+  test('list cards open the list instantly and load the remaining albums', async ({ page }) => {
+    const albums = albumCatalog.slice(0, 2).concat(albumCatalog).slice(0, 5).map((album, index) => ({
+      id: `${album.id}-${index}`, name: `${album.name} ${index + 1}`, cover: album.cover, artists: album.artists, releaseYear: album.releaseYear,
+    }))
+    await page.route('**/api/me/dashboard', (route) => route.fulfill({ json: {
+      ratings: {}, ratingSummary: { totalRated: 0, averageRating: 0 }, recentRatings: [],
+      profile: { id: 'profile-e2e', userId: 'user-e2e', username: 'e2e-user', bio: '', name: 'E2E User', image: null, followerCount: 0, followingCount: 0 },
+      lists: [{ id: 'list-top', name: 'Top Albums', albums: albums.slice(0, 4), albumCount: 5 }],
+    } }))
+    let releaseList: () => void = () => {}
+    const listHeld = new Promise<void>((resolve) => { releaseList = resolve })
+    await page.route('**/api/lists/list-top', async (route) => {
+      await listHeld
+      await route.fulfill({ json: { data: { id: 'list-top', name: 'Top Albums', owner: { id: 'user-e2e', name: 'E2E User', username: 'e2e-user' }, albums } } })
+    })
+
+    await signIn(page)
+    await page.goto('/profile')
+    await page.getByRole('link', { name: /Top Albums/ }).click()
+    await expect(page).toHaveURL('/lists/list-top')
+    await expect(page.getByRole('heading', { level: 1, name: 'Top Albums' })).toBeVisible()
+    await expect(page.getByText('5 albums')).toBeVisible()
+    await expect(page.getByRole('heading', { name: albums[3].name })).toBeVisible()
+    await expect(page.getByRole('heading', { name: albums[4].name })).toHaveCount(0)
+
+    releaseList()
+    await expect(page.getByRole('heading', { name: albums[4].name })).toBeVisible()
+    await expect(page.getByText('A list by E2E User')).toBeVisible()
+  })
+
   test('navbar pages render their data and album links open details', async ({ page }) => {
     const browserErrors: string[] = []
     page.on('console', (message) => {
