@@ -1,5 +1,4 @@
-// High-resolution album covers. Discogs serves covers at 600px at most, while
-// Apple Music has the same artwork at up to 3000px. Lookups happen on demand,
+// Official album covers from Apple Music, which are cleaner than Discogs scans. Lookups happen on demand,
 // a few per request, and every answer (including "Apple has no match") is kept
 // in Postgres so each album is only looked up once.
 
@@ -18,7 +17,10 @@ export type ArtworkStore = {
   write: (rows: ArtworkRow[]) => Promise<unknown>
 }
 
-const COVER_SIZE = 1200
+// Cards and the album hero render at most ~520 device px; 1200px covers were ~500KB each, 600px ~135KB.
+const COVER_SIZE = 600
+// Apple encodes the size in the URL, so covers stored at an older size are resized on the way out.
+const toCoverSize = (url: string) => url.replace(/\/\d+x\d+bb\.jpg$/, `/${COVER_SIZE}x${COVER_SIZE}bb.jpg`)
 // Apple renders uncached search pages in 2-3s; each album is looked up once and the answer stored.
 const LOOKUP_TIMEOUT_MS = 5000
 const RECHECK_MISS_MS = 1000 * 60 * 60 * 24 * 30
@@ -114,6 +116,6 @@ export const attachHdCovers = async <T extends AlbumLike>(
 
   return releases.map((release) => {
     const cover = known.get(release.id)?.cover
-    return cover ? { ...release, cover } : release
+    return cover ? { ...release, cover: toCoverSize(cover) } : release
   })
 }
