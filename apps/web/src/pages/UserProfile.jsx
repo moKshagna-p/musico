@@ -90,9 +90,9 @@ const UserProfile = () => {
         <header className="flex flex-col gap-8 pb-10 md:flex-row md:items-end md:justify-between">
           <div className="flex min-w-0 flex-col gap-6 sm:flex-row sm:items-end">
             {profile.image ? (
-              <img src={profile.image} alt="" className="h-24 w-24 shrink-0 rounded-full object-cover ring-1 ring-white/10 tablet:h-32 tablet:w-32" />
+              <img src={profile.image} alt="" className="motion-safe:animate-[avatarPop_0.7s_cubic-bezier(0.16,1,0.3,1)_both] h-24 w-24 shrink-0 rounded-full object-cover ring-1 ring-white/10 tablet:h-32 tablet:w-32" />
             ) : (
-              <div className="vinyl relative flex h-24 w-24 shrink-0 items-center justify-center tablet:h-32 tablet:w-32">
+              <div className="vinyl relative flex h-24 w-24 shrink-0 motion-safe:animate-[avatarPop_0.7s_cubic-bezier(0.16,1,0.3,1)_both] items-center justify-center tablet:h-32 tablet:w-32">
                 <span className="relative flex h-[40%] w-[40%] items-center justify-center rounded-full bg-paper font-display text-2xl text-black">
                   {profile.name?.charAt(0)?.toUpperCase() ?? '?'}
                 </span>
