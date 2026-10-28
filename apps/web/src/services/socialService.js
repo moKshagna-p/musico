@@ -1,22 +1,20 @@
 import api from './apiClient.js'
 
-export const updateMyProfile = async ({ username, bio, image }) => {
+export const updateMyProfile = async ({ username, bio, image, cover }) => {
   const payload = {}
   if (username !== undefined) payload.username = username
   if (bio !== undefined) payload.bio = bio
   if (image !== undefined) payload.image = image
+  if (cover !== undefined) payload.cover = cover
 
   const response = await api.put('/api/me/profile', payload)
   return response.data ?? null
 }
 
-export const checkUsernameAvailability = async (username) => {
-  try {
-    const response = await api.get('/api/username/check', { params: { username } })
-    return response.data ?? { available: false, valid: false }
-  } catch {
-    return { available: false, valid: false }
-  }
+export const checkUsernameAvailability = async (username, { signal } = {}) => {
+  const response = await api.get('/api/username/check', { params: { username }, signal })
+  if (!response.data) throw new Error('Unable to check username.')
+  return response.data
 }
 
 export const fetchUserProfile = async (username) => {

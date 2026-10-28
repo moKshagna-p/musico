@@ -137,6 +137,7 @@ export const installApiMocks = async (page: Page) => {
   }
 
   let signedIn = false
+  let username = 'e2e-user'
   const adminIds = new Set<string>()
   const bootstrapAdminEmail = 'mokshagnareddy45@gmail.com'
 
@@ -336,6 +337,7 @@ export const installApiMocks = async (page: Page) => {
           createdAt: Date.now(),
           user: {
             name: user.name,
+            username,
             image: user.image,
           },
         }],
@@ -540,7 +542,7 @@ export const installApiMocks = async (page: Page) => {
       return json(route, {
         data: {
           userId: user.id,
-          username: 'e2e-user',
+          username,
           name: user.name,
           bio: 'E2E profile',
           image: null,
@@ -556,6 +558,18 @@ export const installApiMocks = async (page: Page) => {
       })
     }
 
+    if (pathname === '/api/username/check' && method === 'GET') {
+      const requested = url.searchParams.get('username') ?? ''
+      return json(route, { data: { valid: true, available: requested !== 'taken-name' } })
+    }
+
+    if (pathname === '/api/me/profile' && method === 'PUT') {
+      if (!signedIn) return json(route, { error: 'Unauthorized.' }, 401)
+      const body = await parseBody(route)
+      if (typeof body.username === 'string') username = body.username
+      return json(route, { data: { username, bio: 'E2E profile', isPublic: true, image: user.image, cover: null } })
+    }
+
     if (pathname === '/api/me/dashboard' && method === 'GET') {
       if (!signedIn) return json(route, { error: 'Unauthorized.' }, 401)
       return json(route, {
@@ -565,7 +579,7 @@ export const installApiMocks = async (page: Page) => {
         profile: {
           id: 'profile-e2e',
           userId: user.id,
-          username: 'e2e-user',
+          username,
           bio: 'E2E profile',
           name: user.name,
           image: user.image,

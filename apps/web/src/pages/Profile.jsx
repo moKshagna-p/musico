@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { FiEdit2, FiLogOut, FiUpload, FiX } from 'react-icons/fi'
 import { Link, useNavigate } from 'react-router-dom'
 
@@ -11,6 +12,7 @@ import ListCard from '../components/list/ListCard.jsx'
 import AlbumSlotMachine from '../components/album/AlbumSlotMachine.jsx'
 import CoverImage from '../components/ui/CoverImage.jsx'
 import UsernameSetup from '../components/user/UsernameSetup.jsx'
+import ProfileCover from '../components/user/ProfileCover.jsx'
 import { useAuth } from '../hooks/useAuth.js'
 import { useDashboard } from '../hooks/useDashboard.js'
 import { fetchMyFollowers, fetchMyFollowing, updateMyProfile } from '../services/socialService.js'
@@ -60,6 +62,18 @@ const FollowListModal = ({ title, users, loading, onClose }) => (
   </div>
 )
 
+// Phone photos run several MB; a banner only needs ~1600px across, which keeps uploads well under the 2MB limit.
+const toCoverDataUrl = async (file) => {
+  const bitmap = await createImageBitmap(file)
+  const scale = Math.min(1, 1600 / bitmap.width)
+  const canvas = document.createElement('canvas')
+  canvas.width = Math.round(bitmap.width * scale)
+  canvas.height = Math.round(bitmap.height * scale)
+  canvas.getContext('2d').drawImage(bitmap, 0, 0, canvas.width, canvas.height)
+  bitmap.close()
+  return canvas.toDataURL('image/jpeg', 0.85)
+}
+
 const formatReviewedAt = (timestamp) => {
   if (!timestamp) return ''
 
@@ -74,6 +88,7 @@ const formatReviewedAt = (timestamp) => {
 
 const Profile = () => {
   const navigate = useNavigate()
+  const queryClient = useQueryClient()
   const { user, isPending, signOutCurrentUser } = useAuth()
   const { dashboard, isLoading: dashboardLoading } = useDashboard()
 
@@ -83,6 +98,9 @@ const Profile = () => {
   const [showEditModal, setShowEditModal] = useState(false)
   const [editBio, setEditBio] = useState('')
   const [editImage, setEditImage] = useState('')
+  const [editCover, setEditCover] = useState('')
+  const [coverChanged, setCoverChanged] = useState(false)
+  const [convertingCover, setConvertingCover] = useState(false)
   const [savingProfile, setSavingProfile] = useState(false)
   const [profileStatus, setProfileStatus] = useState('')
   const [showFollowersModal, setShowFollowersModal] = useState(false)
@@ -92,6 +110,9 @@ const Profile = () => {
   const [followersLoading, setFollowersLoading] = useState(false)
   const [followingLoading, setFollowingLoading] = useState(false)
   const fileInputRef = useRef(null)
+  const coverInputRef = useRef(null)
+  const coverSelectionRef = useRef(0)
+  const canEditProfile = Boolean(dashboard?.profile && socialProfile)
 
   useEffect(() => {
     if (!isPending && !user) {
@@ -101,7 +122,7 @@ const Profile = () => {
 
   // Use batched dashboard data instead of separate API calls
   useEffect(() => {
-    if (dashboard) {
+    if (dashboard?.profile) {
       const profile = {
         id: dashboard.profile?.id,
         userId: dashboard.profile?.userId,
@@ -109,44 +130,59 @@ const Profile = () => {
         bio: dashboard.profile?.bio,
         name: dashboard.profile?.name,
         image: dashboard.profile?.image,
+        cover: dashboard.profile?.cover,
         followerCount: dashboard.profile?.followerCount ?? 0,
         followingCount: dashboard.profile?.followingCount ?? 0,
         recentRatings: dashboard.recentRatings ?? [],
       }
       setSocialProfile(profile)
-      setEditBio(profile.bio ?? '')
-      setEditImage(profile.image ?? '')
       if (!profile.username) {
         setShowUsernameSetup(true)
       }
     }
   }, [dashboard])
 
+  const closeEditModal = useCallback(() => {
+    coverSelectionRef.current += 1
+    setConvertingCover(false)
+    setShowEditModal(false)
+  }, [])
+
   const openEditModal = useCallback(() => {
+    if (!canEditProfile) return
+    coverSelectionRef.current += 1
+    setConvertingCover(false)
     setEditBio(socialProfile?.bio ?? '')
     setEditImage(socialProfile?.image ?? '')
+    setEditCover(socialProfile?.cover ?? '')
+    setCoverChanged(false)
     setProfileStatus('')
     setShowEditModal(true)
-  }, [socialProfile])
+  }, [socialProfile, canEditProfile])
 
   const handleProfileSave = useCallback(async () => {
-    if (savingProfile) return
+    if (savingProfile || convertingCover) return
+    const selection = coverSelectionRef.current
     setSavingProfile(true)
     setProfileStatus('')
     try {
       const updated = await updateMyProfile({
         bio: editBio.trim(),
         image: editImage.trim(),
+        cover: coverChanged ? editCover : undefined,
       })
       setSocialProfile((prev) => ({ ...prev, ...updated }))
-      setProfileStatus('Saved.')
-      setTimeout(() => setShowEditModal(false), 600)
+      await queryClient.invalidateQueries({ queryKey: ['dashboard', user.id], exact: true })
+      if (selection === coverSelectionRef.current) setProfileStatus('Saved.')
+      setTimeout(() => {
+        if (selection === coverSelectionRef.current) closeEditModal()
+      }, 600)
     } catch (err) {
-      setProfileStatus(err?.message ?? 'Failed to update profile.')
+      if (selection === coverSelectionRef.current) setProfileStatus(err?.message ?? 'Failed to update profile.')
     } finally {
       setSavingProfile(false)
     }
-  }, [editBio, editImage, savingProfile])
+  }, [editBio, editImage, editCover, coverChanged, savingProfile, convertingCover, closeEditModal, queryClient, user?.id])
 
   const openFollowers = useCallback(async () => {
     setShowFollowersModal(true)
@@ -201,6 +237,26 @@ const Profile = () => {
     }
     reader.readAsDataURL(file)
     event.target.value = ''
+  }, [])
+
+  const handleCoverFileChange = useCallback(async (event) => {
+    const file = event.target.files?.[0]
+    event.target.value = ''
+    if (!file) return
+    const selection = ++coverSelectionRef.current
+    setConvertingCover(true)
+    setProfileStatus('')
+    try {
+      const cover = await toCoverDataUrl(file)
+      if (selection === coverSelectionRef.current) {
+        setEditCover(cover)
+        setCoverChanged(true)
+      }
+    } catch {
+      if (selection === coverSelectionRef.current) setProfileStatus('Unable to read that image.')
+    } finally {
+      if (selection === coverSelectionRef.current) setConvertingCover(false)
+    }
   }, [])
 
   const ratedItems = useMemo(
@@ -311,10 +367,10 @@ const Profile = () => {
       {/* Edit Profile Modal */}
       {showEditModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-md">
-          <div className="relative mx-4 w-full max-w-md rounded-3xl border border-white/10 bg-[#0b0b0a]/95 shadow-[0_40px_120px_-20px_rgba(0,0,0,1)] p-8">
+          <div className="relative mx-4 max-h-[90svh] w-full max-w-md overflow-y-auto rounded-3xl border border-white/10 bg-[#0b0b0a]/95 shadow-[0_40px_120px_-20px_rgba(0,0,0,1)] p-8">
             <button
               type="button"
-              onClick={() => setShowEditModal(false)}
+              onClick={closeEditModal}
               className="absolute right-4 top-4 p-1 text-muted transition-colors hover:text-white"
               aria-label="Close"
             >
@@ -322,7 +378,7 @@ const Profile = () => {
             </button>
 
             <h2 className="font-display text-3xl text-paper">Edit Profile</h2>
-            <p className="mt-1 text-sm text-muted">Update your bio and profile picture.</p>
+            <p className="mt-1 text-sm text-muted">Update your bio, profile picture, and cover.</p>
 
             <div className="mt-6 space-y-5">
               {socialProfile?.username && (
@@ -386,6 +442,48 @@ const Profile = () => {
                 />
               </div>
 
+              <div>
+                <label className="block text-sm text-muted">Cover</label>
+                <div className="mt-2 overflow-hidden rounded-lg border border-outline/60 bg-canvas/30">
+                  {editCover ? (
+                    <img src={editCover} alt="" className="aspect-[3/1] w-full object-cover" />
+                  ) : (
+                    <div className="aspect-[3/1] w-full bg-white/[0.03]" />
+                  )}
+                  <div className="flex flex-wrap gap-3 p-4">
+                    <button
+                      type="button"
+                      onClick={() => coverInputRef.current?.click()}
+                      className="inline-flex items-center gap-2 rounded-full border border-white/12 px-4 py-2 text-sm text-paper/80 transition-colors hover:border-white/30 hover:text-paper"
+                    >
+                      <FiUpload aria-hidden="true" />
+                      Upload Cover
+                    </button>
+                    {editCover && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          coverSelectionRef.current += 1
+                          setConvertingCover(false)
+                          setEditCover('')
+                          setCoverChanged(true)
+                        }}
+                        className="rounded-full border border-white/12 px-4 py-2 text-sm text-paper/80 transition-colors hover:border-white/30 hover:text-paper"
+                      >
+                        Remove
+                      </button>
+                    )}
+                  </div>
+                </div>
+                <input
+                  ref={coverInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={handleCoverFileChange}
+                  className="hidden"
+                />
+              </div>
+
               {profileStatus && (
                 <p className={`text-xs ${profileStatus === 'Saved.' ? 'text-green-400' : 'text-red-400'}`} aria-live="polite">
                   {profileStatus}
@@ -396,14 +494,14 @@ const Profile = () => {
                 <button
                   type="button"
                   onClick={handleProfileSave}
-                  disabled={savingProfile}
+                  disabled={savingProfile || convertingCover}
                   className="flex-1 rounded-full bg-paper py-3 text-sm font-medium text-black transition-opacity hover:opacity-90 disabled:opacity-40"
                 >
-                  {savingProfile ? 'Saving...' : 'Save Changes'}
+                  {convertingCover ? 'Preparing cover...' : savingProfile ? 'Saving...' : 'Save Changes'}
                 </button>
                 <button
                   type="button"
-                  onClick={() => setShowEditModal(false)}
+                  onClick={closeEditModal}
                   className="rounded-full border border-white/12 px-5 py-3 text-sm text-paper/80 transition-colors hover:border-white/30 hover:text-paper"
                 >
                   Cancel
@@ -415,7 +513,8 @@ const Profile = () => {
       )}
 
       <div className="mx-auto w-full max-w-6xl py-4 tablet:py-8">
-        <header className="flex flex-col gap-8 border-b border-white/[0.07] pb-10 md:flex-row md:items-end md:justify-between">
+        <ProfileCover src={socialProfile?.cover} />
+        <header className="flex flex-col gap-8 pb-10 md:flex-row md:items-end md:justify-between">
           <div className="flex min-w-0 flex-col gap-6 sm:flex-row sm:items-end">
             {socialProfile?.image ? (
               <img
@@ -465,7 +564,7 @@ const Profile = () => {
                 Set Username
               </button>
             )}
-            <button type="button" onClick={openEditModal} className="inline-flex items-center gap-2 rounded-full border border-white/12 px-4 py-2 text-sm text-paper/80 transition-colors hover:border-white/30 hover:text-paper">
+            <button type="button" onClick={openEditModal} disabled={!canEditProfile} className="inline-flex items-center gap-2 rounded-full border border-white/12 px-4 py-2 text-sm text-paper/80 transition-colors hover:border-white/30 hover:text-paper disabled:opacity-40">
               <FiEdit2 aria-hidden="true" />
               Edit Profile
             </button>

@@ -23,3 +23,8 @@ export const parseInlineAvatar = (image: string | null | undefined) => {
 }
 export const isOwnAvatarUrl = (value: string, userId: string) =>
   value.trim().startsWith(`${env.BETTER_AUTH_URL}${AVATAR_PATH}${userId}?`)
+
+const COVER_PATH = '/api/covers/'
+export const coverUrl = (userId: string, at: Date) => `${env.BETTER_AUTH_URL}${COVER_PATH}${userId}?v=${at.getTime()}`
+export const isOwnCoverUrl = (value: string, userId: string) =>
+  value.trim().startsWith(`${env.BETTER_AUTH_URL}${COVER_PATH}${userId}?`)
