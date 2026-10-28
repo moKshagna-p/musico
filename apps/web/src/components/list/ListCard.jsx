@@ -11,6 +11,7 @@ const ListCard = ({ list }) => {
   return (
     <Link
       to={`/lists/${list.id}`}
+      state={{ list }}
       className="group relative block overflow-hidden rounded-3xl border border-white/[0.07] bg-white/[0.02] p-5 transition-colors duration-300 hover:border-white/20 hover:bg-white/[0.035] tablet:p-6"
     >
       {/* Ambient tint from the first cover */}

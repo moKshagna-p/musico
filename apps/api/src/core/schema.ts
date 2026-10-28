@@ -256,6 +256,16 @@ export const userAvatar = pgTable('user_avatar', {
   updatedAt: timestamp('updatedAt', { withTimezone: true, mode: 'date' }).notNull(),
 })
 
+// Profile banner bytes, stored like userAvatar.
+export const userCover = pgTable('user_cover', {
+  userId: text('userId')
+    .primaryKey()
+    .references(() => user.id, { onDelete: 'cascade' }),
+  contentType: text('contentType').notNull(),
+  data: text('data').notNull(),
+  updatedAt: timestamp('updatedAt', { withTimezone: true, mode: 'date' }).notNull(),
+})
+
 // ── Social profile (separate table to avoid touching Better Auth's user table) ──
 
 export const userProfile = pgTable(

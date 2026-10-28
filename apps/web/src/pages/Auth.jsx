@@ -4,6 +4,8 @@ import { useNavigate } from 'react-router-dom'
 import PageTransition from '../components/ui/PageTransition.jsx'
 import { AuthPageSkeleton } from '../components/ui/PageLoadingState.jsx'
 import { useAuth } from '../hooks/useAuth.js'
+import { USERNAME_STATUS_TEXT, cleanUsername, useUsernameStatus } from '../hooks/useUsernameStatus.js'
+import { updateMyProfile } from '../services/socialService.js'
 
 const Auth = () => {
   const navigate = useNavigate()
@@ -11,6 +13,8 @@ const Auth = () => {
 
   const [mode, setMode] = useState('sign-in')
   const [name, setName] = useState('')
+  const [username, setUsername] = useState('')
+  const { status: usernameStatus, retry: retryUsernameCheck } = useUsernameStatus(mode === 'sign-up' ? username : '')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [submitting, setSubmitting] = useState(false)
@@ -31,6 +35,10 @@ const Auth = () => {
   const onSubmit = async (event) => {
     event.preventDefault()
     setError('')
+    if (mode === 'sign-up' && usernameStatus !== 'available') {
+      setError(usernameStatus === 'error' ? USERNAME_STATUS_TEXT.error : usernameStatus === 'checking' ? 'Still checking that username…' : 'Pick an available username.')
+      return
+    }
     setSubmitting(true)
 
     const payload = {
@@ -44,7 +52,7 @@ const Auth = () => {
           ? await signInWithEmail(payload)
           : await signUpWithEmail({
               ...payload,
-              name: name.trim() || email.trim().split('@')[0],
+              name: name.trim() || username,
             })
 
       if (result?.error) {
@@ -63,6 +71,9 @@ const Auth = () => {
         setError('Authentication succeeded, but the session is taking longer than expected. Refresh and try again.')
         return
       }
+
+      // If someone grabbed the name in the meantime, Profile still prompts for one.
+      if (mode === 'sign-up') await updateMyProfile({ username }).catch(() => {})
 
       navigate('/', { replace: true })
     } catch {
@@ -145,6 +156,42 @@ const Auth = () => {
                   className="w-full rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-3.5 text-paper placeholder:text-muted/70 outline-none transition focus:border-white/35 focus:bg-white/[0.05] focus-visible:outline-none"
                   placeholder="Your name"
                 />
+              </div>
+            )}
+
+            {mode === 'sign-up' && (
+              <div>
+                <label htmlFor="username" className="mb-1.5 block text-sm text-muted">
+                  Username
+                </label>
+                <div className="relative">
+                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted">@</span>
+                  <input
+                    id="username"
+                    name="username"
+                    required
+                    value={username}
+                    onChange={(event) => setUsername(cleanUsername(event.target.value))}
+                    autoComplete="username"
+                    spellCheck={false}
+                    maxLength={24}
+                    aria-describedby="username-status"
+                    className="w-full rounded-2xl border border-white/10 bg-white/[0.03] py-3.5 pl-9 pr-4 text-paper placeholder:text-muted/70 outline-none transition focus:border-white/35 focus:bg-white/[0.05] focus-visible:outline-none"
+                    placeholder="yourname"
+                  />
+                </div>
+                <p
+                  id="username-status"
+                  aria-live="polite"
+                  className={`mt-1.5 min-h-4 text-xs ${usernameStatus === 'available' ? 'text-green-400' : usernameStatus === 'checking' ? 'text-muted' : 'text-red-400'}`}
+                >
+                  {USERNAME_STATUS_TEXT[usernameStatus] ?? ''}
+                  {usernameStatus === 'error' && (
+                    <button type="button" onClick={() => retryUsernameCheck()} className="ml-2 underline">
+                      Retry username check
+                    </button>
+                  )}
+                </p>
               </div>
             )}
 

@@ -1,4 +1,4 @@
-import { sql, eq, inArray } from 'drizzle-orm'
+import { and, sql, eq, inArray, isNull } from 'drizzle-orm'
 import { db } from './db'
 import { auth } from '../auth'
 import { env } from './env'
@@ -396,7 +396,7 @@ export const recordActivity = (params: {
   metadata?: Record<string, unknown>
 }) => {
   const now = new Date()
-  return db.insert(activity)
+  const insert = db.insert(activity)
     .values({
       id: crypto.randomUUID(),
       userId: params.userId,
@@ -408,6 +408,20 @@ export const recordActivity = (params: {
       metadata: params.metadata ?? {},
       createdAt: now,
     })
+  // Changing a rating, editing a review or re-following replaces the earlier feed entry instead of stacking another.
+  // `listed` keeps one entry per add, since the same album can go into several lists.
+  const write = params.type === 'listed'
+    ? insert
+    : db.batch([
+      db.delete(activity).where(and(
+        eq(activity.userId, params.userId),
+        eq(activity.type, params.type),
+        params.albumId ? eq(activity.albumId, params.albumId) : isNull(activity.albumId),
+        params.targetUserId ? eq(activity.targetUserId, params.targetUserId) : isNull(activity.targetUserId),
+      )),
+      insert,
+    ])
+  return write
     .catch((err) =>
       log('error', 'activity.record_failed', {
         userId: params.userId,

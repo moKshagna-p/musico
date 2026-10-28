@@ -1,10 +1,11 @@
 import { Elysia } from 'elysia'
 import { and, desc, eq, inArray, lt, sql, ilike, or } from 'drizzle-orm'
 import { db } from '../core/db'
-import { avatarPath, avatarUrl, isOwnAvatarUrl, parseInlineAvatar, toAvatarUrl } from '../core/avatar'
+import { avatarPath, avatarUrl, coverUrl, isOwnAvatarUrl, isOwnCoverUrl, parseInlineAvatar, toAvatarUrl } from '../core/avatar'
 import {
   user,
   userAvatar,
+  userCover,
   userProfile,
   userRating,
   userReview,
@@ -61,6 +62,28 @@ const readAvatar = async (userId: string) => {
   return parseInlineAvatar(row?.image)
 }
 
+const ignoreMissingCoverTable = (error: unknown) => {
+  if (isMissingTableError(error, 'user_cover')) return []
+  throw error
+}
+
+// Null until the user uploads a cover (or before the user_cover migration is applied).
+const loadCoverUrl = async (userId: string) => {
+  const [row] = await db
+    .select({ updatedAt: userCover.updatedAt })
+    .from(userCover)
+    .where(eq(userCover.userId, userId))
+    .limit(1)
+    .catch(ignoreMissingCoverTable)
+  return row ? coverUrl(userId, row.updatedAt) : null
+}
+
+// Image URLs carry ?v=<timestamp>, so a changed image gets a new URL.
+const imageResponse = ({ contentType, data }: { contentType: string; data: string }) =>
+  new Response(Buffer.from(data, 'base64'), {
+    headers: { 'Content-Type': contentType, 'Cache-Control': 'public, max-age=31536000, immutable' },
+  })
+
 export const userRoutes = new Elysia({ prefix: '/api' })
   .get('/avatars/:userId', async ({ params, set }) => {
     const userId = readIdentifier(params?.userId)
@@ -69,10 +92,23 @@ export const userRoutes = new Elysia({ prefix: '/api' })
       set.status = 404
       return { error: 'Avatar not found.' }
     }
-    // URLs carry ?v=<timestamp>, so a changed avatar gets a new URL.
-    return new Response(Buffer.from(avatar.data, 'base64'), {
-      headers: { 'Content-Type': avatar.contentType, 'Cache-Control': 'public, max-age=31536000, immutable' },
-    })
+    return imageResponse(avatar)
+  })
+  .get('/covers/:userId', async ({ params, set }) => {
+    const userId = readIdentifier(params?.userId)
+    const [cover] = userId
+      ? await db
+          .select({ contentType: userCover.contentType, data: userCover.data })
+          .from(userCover)
+          .where(eq(userCover.userId, userId))
+          .limit(1)
+          .catch(ignoreMissingCoverTable)
+      : []
+    if (!cover) {
+      set.status = 404
+      return { error: 'Cover not found.' }
+    }
+    return imageResponse(cover)
   })
   .get('/me/ratings', async ({ request, set }) => {
     const authUser = await ensureAuthenticated(request, set)
@@ -543,7 +579,23 @@ export const userRoutes = new Elysia({ prefix: '/api' })
       }
     }
 
-    if (!Object.keys(updates).length && !Object.keys(userUpdates).length) {
+    if (typed.cover !== undefined && typed.cover !== null && typeof typed.cover !== 'string') {
+      set.status = 400
+      return { error: 'Cover must be an image data URL or null.' }
+    }
+
+    // Same contract as image: own link = unchanged, null/'' = remove, data URL = new upload.
+    let cover: ReturnType<typeof parseInlineAvatar> | undefined
+    if (typed.cover !== undefined && !(typeof typed.cover === 'string' && isOwnCoverUrl(typed.cover, authUser.id))) {
+      const raw = typeof typed.cover === 'string' ? typed.cover.trim() : typed.cover
+      cover = raw ? parseInlineAvatar(parseProfileImage(raw)) : null
+      if (raw && (!cover || Buffer.from(cover.data, 'base64').byteLength > 2 * 1024 * 1024)) {
+        set.status = 400
+        return { error: 'Cover must be a PNG, JPEG, WebP, GIF, or AVIF image under 2MB.' }
+      }
+    }
+
+    if (!Object.keys(updates).length && !Object.keys(userUpdates).length && cover === undefined) {
       set.status = 400
       return { error: 'No valid fields to update.' }
     }
@@ -570,8 +622,18 @@ export const userRoutes = new Elysia({ prefix: '/api' })
       }
     }
 
-    const [updatedProfile] = await db.select().from(userProfile).where(eq(userProfile.userId, authUser.id)).limit(1)
-    const [updatedUser] = await db.select().from(user).where(eq(user.id, authUser.id)).limit(1)
+    if (cover) {
+      const values = { userId: authUser.id, ...cover, updatedAt: now }
+      await db.insert(userCover).values(values).onConflictDoUpdate({ target: userCover.userId, set: values })
+    } else if (cover === null) {
+      await db.delete(userCover).where(eq(userCover.userId, authUser.id))
+    }
+
+    const [[updatedProfile], [updatedUser], updatedCover] = await Promise.all([
+      db.select().from(userProfile).where(eq(userProfile.userId, authUser.id)).limit(1),
+      db.select().from(user).where(eq(user.id, authUser.id)).limit(1),
+      loadCoverUrl(authUser.id),
+    ])
 
     set.headers ??= {}
     set.headers['Cache-Control'] = 'no-store'
@@ -581,6 +643,7 @@ export const userRoutes = new Elysia({ prefix: '/api' })
         bio: updatedProfile?.bio ?? '',
         isPublic: updatedProfile?.isPublic ?? true,
         image: updatedUser ? toAvatarUrl(updatedUser) : null,
+        cover: updatedCover,
       },
     }
   })
@@ -678,7 +741,7 @@ export const userRoutes = new Elysia({ prefix: '/api' })
       return { error: 'This profile is private.' }
     }
 
-    const [followerCountRows, followingCountRows, isFollowingRows, ratingSummaryRows, recentRatingsRows, listsRows, ratingActivityRows, recentReviewMetaRows] = await Promise.all([
+    const [followerCountRows, followingCountRows, isFollowingRows, ratingSummaryRows, recentRatingsRows, listsRows, ratingActivityRows, recentReviewMetaRows, cover] = await Promise.all([
       db.select({ count: sql<number>`count(*)` }).from(userFollow).where(eq(userFollow.followingId, profile.userId)),
       db.select({ count: sql<number>`count(*)` }).from(userFollow).where(eq(userFollow.followerId, profile.userId)),
       authUser?.id
@@ -735,6 +798,7 @@ export const userRoutes = new Elysia({ prefix: '/api' })
         .where(eq(userReview.userId, profile.userId))
         .orderBy(desc(userReview.updatedAt))
         .limit(50),
+      loadCoverUrl(profile.userId),
     ])
 
     const listIds = listsRows.map((l) => l.id)
@@ -833,6 +897,7 @@ export const userRoutes = new Elysia({ prefix: '/api' })
         name: profile.name,
         bio: profile.bio,
         image: profile.image,
+        cover,
         isOwnProfile,
         isFollowing,
         followerCount,
@@ -979,6 +1044,7 @@ export const userRoutes = new Elysia({ prefix: '/api' })
           followerCountRows,
           followingCountRows,
           listsRows,
+          cover,
         ] = await Promise.all([
           // User data (name, image)
           db.select({ name: user.name, image: avatarUrl() }).from(user).where(eq(user.id, authUser.id)),
@@ -1032,6 +1098,7 @@ export const userRoutes = new Elysia({ prefix: '/api' })
           db.select({ count: sql<number>`count(*)` }).from(userFollow).where(eq(userFollow.followerId, authUser.id)),
           // Lists
           db.select().from(userList).where(eq(userList.userId, authUser.id)),
+          loadCoverUrl(authUser.id),
         ])
 
        const followerCount = Number(followerCountRows[0]?.count ?? 0)
@@ -1153,6 +1220,7 @@ export const userRoutes = new Elysia({ prefix: '/api' })
             bio: profile.bio,
             name: userRow[0]?.name ?? null,
             image: userRow[0]?.image ?? null,
+            cover,
             followerCount,
             followingCount,
           },

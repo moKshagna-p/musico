@@ -361,25 +361,27 @@ const Feed = () => {
           ) : items.length === 0 ? (
             <EmptyFeed navigate={navigate} />
           ) : (
-            <div className="divide-y divide-white/[0.06] border-y border-white/[0.06]">
-              <AnimatePresence mode="popLayout">
-                {items.map((item, i) => (
-                  <Motion.div
-                    key={item.id}
-                    initial={shouldReduceMotion ? false : { opacity: 0, y: 8 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={shouldReduceMotion ? { opacity: 0 } : { opacity: 0, scale: 0.98 }}
-                    transition={{
-                      delay: Math.min(i * 0.03, 0.3),
-                      duration: 0.3,
-                      ease: [0.16, 1, 0.3, 1],
-                    }}
-                    layout={!shouldReduceMotion}
-                  >
-                    <ActivityCard item={item} />
-                  </Motion.div>
-                ))}
-              </AnimatePresence>
+            <>
+              <div className="divide-y divide-white/[0.06] border-y border-white/[0.06]">
+                <AnimatePresence mode="popLayout">
+                  {items.map((item, i) => (
+                    <Motion.div
+                      key={item.id}
+                      initial={shouldReduceMotion ? false : { opacity: 0, y: 8 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={shouldReduceMotion ? { opacity: 0 } : { opacity: 0, scale: 0.98 }}
+                      transition={{
+                        delay: Math.min(i * 0.03, 0.3),
+                        duration: 0.3,
+                        ease: [0.16, 1, 0.3, 1],
+                      }}
+                      layout={!shouldReduceMotion}
+                    >
+                      <ActivityCard item={item} />
+                    </Motion.div>
+                  ))}
+                </AnimatePresence>
+              </div>
 
               {hasMore && (
                 <Motion.button
@@ -388,7 +390,7 @@ const Feed = () => {
                   disabled={loadingMore}
                   initial={shouldReduceMotion ? false : { opacity: 0 }}
                   animate={{ opacity: 1 }}
-                  className="w-full rounded-full border border-white/10 py-3.5 text-sm text-muted transition-colors hover:border-white/25 hover:text-paper disabled:opacity-40"
+                  className="mt-6 w-full rounded-full border border-white/10 py-3.5 text-sm text-muted transition-colors hover:border-white/25 hover:text-paper disabled:opacity-40"
                 >
                   {loadingMore ? (
                     <span className="inline-flex items-center gap-2">
@@ -400,7 +402,7 @@ const Feed = () => {
                   )}
                 </Motion.button>
               )}
-            </div>
+            </>
           )}
         </section>
       </div>

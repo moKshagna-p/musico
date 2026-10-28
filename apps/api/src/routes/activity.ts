@@ -2,7 +2,7 @@ import { Elysia } from 'elysia'
 import { desc, eq, inArray } from 'drizzle-orm'
 import { db } from '../core/db'
 import { avatarUrl } from '../core/avatar'
-import { activity, user, userFollow } from '../core/schema'
+import { activity, user, userFollow, userProfile } from '../core/schema'
 import { ensureAuthenticated } from '../core/utils'
 
 type FeedRow = {
@@ -16,16 +16,18 @@ type FeedRow = {
   metadata: unknown
   createdAt: Date
   userName: string
+  userUsername: string | null
   userImage: string | null
 }
 
-type FeedUser = Pick<typeof user.$inferSelect, 'name' | 'image'>
+type FeedUser = Pick<typeof user.$inferSelect, 'name' | 'image'> & { username: string | null }
 
-export const toFeedItem = ({ userName, userImage, createdAt, ...item }: FeedRow, targetUser?: FeedUser) => ({
+export const toFeedItem = ({ userName, userUsername, userImage, createdAt, ...item }: FeedRow, targetUser?: FeedUser) => ({
   ...item,
   createdAt: createdAt.getTime(),
   user: {
     name: userName,
+    username: userUsername,
     image: userImage,
   },
   ...(targetUser ? { targetUser } : {}),
@@ -64,10 +66,12 @@ export const activityRoutes = new Elysia()
         metadata: activity.metadata,
         createdAt: activity.createdAt,
         userName: user.name,
+        userUsername: userProfile.username,
         userImage: avatarUrl(),
       })
       .from(activity)
       .innerJoin(user, eq(user.id, activity.userId))
+      .leftJoin(userProfile, eq(userProfile.userId, activity.userId))
       .where(inArray(activity.userId, followingIds))
       .orderBy(desc(activity.createdAt))
       .limit(limit)
@@ -76,8 +80,9 @@ export const activityRoutes = new Elysia()
       .map((item) => item.targetUserId)
       .filter((id): id is string => Boolean(id)))]
     const targetUsers = targetUserIds.length
-      ? await db.select({ id: user.id, name: user.name, image: avatarUrl() })
+      ? await db.select({ id: user.id, name: user.name, username: userProfile.username, image: avatarUrl() })
         .from(user)
+        .leftJoin(userProfile, eq(userProfile.userId, user.id))
         .where(inArray(user.id, targetUserIds))
       : []
     const targetUsersById = new Map(targetUsers.map(({ id, ...targetUser }) => [id, targetUser]))

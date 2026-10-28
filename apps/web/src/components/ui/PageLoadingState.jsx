@@ -98,13 +98,13 @@ export const SearchResultsPageSkeleton = () => (
 export const FeedItemsSkeleton = () => (
   <div role="status" aria-label="Loading feed" className="divide-y divide-white/[0.06] border-y border-white/[0.06]">
     {createSkeletonArray(5).map((_, index) => (
-      <div key={index} className="flex gap-4 px-1 py-5">
-        <div className="skeleton h-16 w-16 shrink-0 rounded-[3px]" />
-        <div className="min-w-0 flex-1 pt-1">
-          <div className="skeleton h-3.5 w-4/5 rounded-full" />
-          <div className="skeleton mt-2.5 h-3.5 w-1/2 rounded-full" />
-          <div className="skeleton mt-3.5 h-2.5 w-16 rounded-full" />
+      <div key={index} className="flex items-start gap-3.5 py-5">
+        <div className="skeleton h-10 w-10 shrink-0 rounded-full" />
+        <div className="min-w-0 flex-1 pt-1.5">
+          <div className="skeleton h-3.5 w-3/5 rounded-full" />
+          <div className="skeleton mt-3 h-2.5 w-1/5 rounded-full" />
         </div>
+        <div className="skeleton h-14 w-14 shrink-0 rounded-[3px] tablet:h-16 tablet:w-16" />
       </div>
     ))}
   </div>
