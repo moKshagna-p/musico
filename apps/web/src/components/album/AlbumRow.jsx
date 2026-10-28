@@ -3,6 +3,7 @@ import { FiChevronLeft, FiChevronRight } from 'react-icons/fi'
 
 import AlbumCard from './AlbumCard.jsx'
 import { WIDE_GUTTER } from '../ui/Billboard.jsx'
+import { AlbumCardSkeleton } from '../ui/LoadingSkeleton.jsx'
 import { createSkeletonArray } from '../../utils/helpers.js'
 
 // Equal gutters on both sides; card width is solved so exactly --n cards fill the row (cqw = scroller content width).
@@ -61,10 +62,18 @@ const AlbumRow = ({ title, note, albums = [], loading, error, onSelect, ranked =
         >
           {loading
             ? createSkeletonArray(6).map((_, index) => (
-                <div key={index} aria-hidden="true" className={`${ITEM_WIDTH} shrink-0 space-y-3`}>
-                  <div className="aspect-square rounded-[4px] bg-gradient-to-r from-white/[0.03] via-white/[0.07] to-white/[0.03] bg-[length:400px_100%] motion-safe:animate-shimmer" />
-                  <div className="h-4 w-3/4 rounded-full bg-white/[0.06]" />
-                  <div className="h-3.5 w-1/2 rounded-full bg-white/[0.04]" />
+                <div key={index} className={`${ITEM_WIDTH} shrink-0`}>
+                  {ranked ? (
+                    // Leaves the rank numeral's column empty so the cards land where they will sit.
+                    <div className="flex">
+                      <div className="w-[30%] shrink-0" />
+                      <div className="-ml-[3%] min-w-0 flex-1">
+                        <AlbumCardSkeleton />
+                      </div>
+                    </div>
+                  ) : (
+                    <AlbumCardSkeleton />
+                  )}
                 </div>
               ))
             : albums.map((album, index) => (

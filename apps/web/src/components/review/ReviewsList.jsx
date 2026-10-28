@@ -52,9 +52,18 @@ const ReviewsList = ({ albumId }) => {
 
   if (loading) {
     return (
-      <div className="space-y-3">
+      // Mirrors ReviewCard.
+      <div aria-busy="true" aria-label="Loading reviews" className="border-t border-white/[0.07]">
         {Array.from({ length: 3 }).map((_, i) => (
-          <div key={i} className="h-24 rounded-2xl bg-gradient-to-r from-white/[0.06] via-white/[0.03] to-white/[0.06] bg-[length:240px_100%] motion-safe:animate-shimmer" />
+          <div key={i} className="border-b border-white/[0.07] py-6">
+            <div className="flex items-center gap-3">
+              <div className="skeleton h-9 w-9 rounded-full" />
+              <div className="skeleton h-3.5 w-32 rounded-full" />
+            </div>
+            <div className="skeleton mt-5 h-3.5 w-full rounded-full" />
+            <div className="skeleton mt-3 h-3.5 w-2/3 rounded-full" />
+            <div className="skeleton mt-5 h-2.5 w-16 rounded-full" />
+          </div>
         ))}
       </div>
     )

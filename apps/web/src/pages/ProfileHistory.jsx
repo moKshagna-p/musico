@@ -5,6 +5,7 @@ import { useNavigate } from 'react-router-dom'
 import AlbumTile from '../components/album/AlbumTile.jsx'
 import { ALBUM_GRID_CLASS } from '../components/album/AlbumGrid.jsx'
 import LoadingSkeleton from '../components/ui/LoadingSkeleton.jsx'
+import { ListeningHistoryPageSkeleton } from '../components/ui/PageLoadingState.jsx'
 import BackButton from '../components/ui/BackButton.jsx'
 import PageTransition from '../components/ui/PageTransition.jsx'
 import { useAuth } from '../hooks/useAuth.js'
@@ -77,7 +78,11 @@ const ProfileHistory = () => {
   }, [historyQuery.data])
 
   if (isPending || !user) {
-    return null
+    return (
+      <PageTransition>
+        <ListeningHistoryPageSkeleton />
+      </PageTransition>
+    )
   }
 
   return (
@@ -119,7 +124,7 @@ const ProfileHistory = () => {
 
         {historyQuery.isLoading ? (
           <div className={ALBUM_GRID_CLASS} aria-busy="true" aria-label="Loading rated albums">
-            <LoadingSkeleton count={8} />
+            <LoadingSkeleton count={8} tile />
           </div>
         ) : null}
 
