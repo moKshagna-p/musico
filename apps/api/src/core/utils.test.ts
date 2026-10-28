@@ -43,7 +43,7 @@ test('activity writes expose completion so routes can await persistence', async 
     mock.module('./src/services/discogs.ts', () => ({ getReleaseDetails: async () => ({}) }))
     const { recordActivity } = await import('./src/core/utils.ts')
     let complete = false
-    const pending = recordActivity({ userId: 'demo', type: 'rated' })
+    const pending = recordActivity({ userId: 'demo', type: 'listed' })
     const awaitable = !!pending && typeof pending.then === 'function'
     const waiter = Promise.resolve(pending).then(() => { complete = true })
     await Promise.resolve()
@@ -76,4 +76,34 @@ test('rate limiting keys on the visitor behind the Vercel rewrite, not the share
   const [exitCode, stdout, stderr] = await Promise.all([child.exited, new Response(child.stdout).text(), new Response(child.stderr).text()])
   expect(exitCode, stderr).toBe(0)
   expect(JSON.parse(stdout)).toEqual(['203.0.113.7', '198.51.100.2', '198.51.100.2'])
+})
+
+test('re-rating replaces the earlier feed entry in one batch instead of stacking a new one', async () => {
+  const script = `
+    import { mock } from 'bun:test'
+    const { PgDialect } = await import('drizzle-orm/pg-core')
+    const batches = []
+    mock.module('./src/core/db.ts', () => ({ db: {
+      insert: () => ({ values: (row) => ({ op: 'insert', row }) }),
+      delete: () => ({ where: (filter) => ({ op: 'delete', filter }) }),
+      batch: async (queries) => { batches.push(queries) },
+    } }))
+    mock.module('./src/services/discogs.ts', () => ({ getReleaseDetails: async () => ({}) }))
+    const { recordActivity } = await import('./src/core/utils.ts')
+    await recordActivity({ userId: 'u1', type: 'rated', albumId: 'a1', metadata: { rating: 4 } })
+    const [del, ins] = batches[0]
+    const where = new PgDialect().sqlToQuery(del.filter)
+    console.log(JSON.stringify({ count: batches.length, ops: [del.op, ins.op], where, rating: ins.row.metadata.rating }))
+  `
+  const child = Bun.spawn([process.execPath, '--eval', script], {
+    cwd: new URL('../..', import.meta.url).pathname, stdout: 'pipe', stderr: 'pipe',
+  })
+  const [exitCode, stdout, stderr] = await Promise.all([child.exited, new Response(child.stdout).text(), new Response(child.stderr).text()])
+  expect(exitCode, stderr).toBe(0)
+  const { count, ops, where, rating } = JSON.parse(stdout)
+  expect(count).toBe(1)
+  expect(ops).toEqual(['delete', 'insert'])
+  expect(where.sql).toContain('"targetUserId" is null')
+  expect(where.params).toEqual(['u1', 'rated', 'a1'])
+  expect(rating).toBe(4)
 })
