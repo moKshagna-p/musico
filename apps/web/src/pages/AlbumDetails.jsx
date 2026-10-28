@@ -196,19 +196,11 @@ const AlbumDetails = () => {
     }
   }
 
+  // Opened from inside the app: step back through history, so this button, the browser's back button and
+  // swipe gestures all return to the same scroll position with the cover flying home (utils/morph.js).
   const goBack = () => {
-    const from = location.state?.from
-    const query = location.state?.query
-    
-    if (from === '/search' && query) {
-      navigate(`/search?q=${encodeURIComponent(query)}`)
-    } else if (from === '/discover') {
-      navigate('/discover')
-    } else if (from === '/') {
-      navigate('/')
-    } else {
-      navigate('/discover')
-    }
+    if (location.key !== 'default') navigate(-1)
+    else navigate('/discover')
   }
 
   if (loading) {
@@ -255,11 +247,12 @@ const AlbumDetails = () => {
 
           <div className="flex flex-col gap-8 md:flex-row md:items-end md:gap-10">
             <div className="w-44 shrink-0 pr-14 tablet:w-64 tablet:pr-20">
-              <VinylSleeve src={album.cover} label={album.discLabel} alt={album.name} out spin loading="eager" />
+              <VinylSleeve src={album.cover} label={album.discLabel} alt={album.name} out spin loading="eager" data-album-cover={album.id} />
             </div>
 
             <header className="min-w-0">
-              <p className="text-sm font-medium text-paper/70">
+              {/* Links from profiles, lists and the feed only seed name and cover; hold this line's space until the rest loads. */}
+              <p className={`text-sm font-medium text-paper/70 ${loadingTracks && !albumGenres?.length ? 'invisible' : ''}`}>
                 {formatReleaseDate(album.releaseDate, album.releaseYear)}, {genreLine}
               </p>
               <h1 className="mt-3 text-balance break-words font-display text-5xl leading-[0.92] text-paper tablet:text-7xl">{album.name}</h1>

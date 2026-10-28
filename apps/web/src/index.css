@@ -82,3 +82,37 @@ body {
     scroll-behavior: auto !important;
   }
 }
+
+/* Shared-element morphs started by utils/morph.js */
+/* The cover flight is the showpiece: slow enough to follow, easing in and settling softly. */
+::view-transition-group(album-cover) {
+  animation-duration: 0.8s;
+  animation-timing-function: cubic-bezier(0.5, 0, 0.15, 1);
+}
+::view-transition-group(review-media) {
+  animation-duration: 0.45s;
+  animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
+}
+/* Fade through instead of crossfading, so two pages never show at once: the old one leaves quickly,
+   the new one arrives just behind it while the cover is still in flight. */
+::view-transition-old(root) {
+  animation: 0.2s ease-in both vtFadeOut;
+}
+::view-transition-new(root) {
+  animation: 0.4s ease-out 0.15s both vtFadeIn;
+}
+@keyframes vtFadeOut { to { opacity: 0; } }
+@keyframes vtFadeIn { from { opacity: 0; } }
+
+/* The album page's record waits behind the sleeve until the cover lands, then slides out. */
+@keyframes vinylPullOut {
+  0%, 35% { opacity: 0; transform: translateX(0); }
+  45% { opacity: 1; transform: translateX(0); }
+  100% { opacity: 1; transform: translateX(40%); }
+}
+/* The tile is cropped and the viewer is not; fill the moving box so the crop opens up instead of stretching. */
+::view-transition-old(review-media),
+::view-transition-new(review-media) {
+  height: 100%;
+  object-fit: cover;
+}

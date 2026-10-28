@@ -2,7 +2,8 @@ import { useState } from 'react'
 
 import CoverImage from './CoverImage.jsx'
 
-// A record sleeve with its disc behind it. `out` pulls the disc halfway out;
+// A record sleeve with its disc behind it. `out` pulls the disc halfway out (sliding it out on mount, after a cover
+// morph has landed);
 // otherwise it slides out (right, or `up` like pulling from a crate) on hover of the nearest `.group`.
 // `label` is a photo of the record's real center label; without one the disc shows the cover art.
 // Label photos show a ring of the actual vinyl in their corners, so colored records get colored grooves.
@@ -37,15 +38,15 @@ const readVinylColor = (image) => {
   return Math.max(r, g, b) - Math.min(r, g, b) < 40 ? null : `rgb(${r} ${g} ${b})`
 }
 
-const VinylSleeve = ({ src, label, alt = '', out = false, pull = 'right', spin = false, size = 640, loading = 'lazy', sizes, className = '' }) => {
+const VinylSleeve = ({ src, label, alt = '', out = false, pull = 'right', spin = false, size = 640, loading = 'lazy', sizes, className = '', ...props }) => {
   const [vinylColor, setVinylColor] = useState(null)
   return (
-    <div className={`relative aspect-square ${className}`}>
+    <div className={`relative aspect-square ${className}`} {...props}>
       <div
         aria-hidden="true"
         style={vinylColor ? { '--vinyl': vinylColor } : undefined}
         className={`vinyl absolute inset-[4%] transition-transform duration-700 ease-[cubic-bezier(0.16,1,0.3,1)] ${
-          out ? 'translate-x-[40%]' : HOVER_PULL[pull]
+          out ? 'translate-x-[40%] motion-safe:animate-[vinylPullOut_1.1s_cubic-bezier(0.16,1,0.3,1)_0.5s_both]' : HOVER_PULL[pull]
         }`}
       >
         <div className={`absolute inset-[33%] overflow-hidden rounded-full ring-1 ring-black ${spin ? 'motion-safe:animate-[vinylSpin_9s_linear_infinite]' : ''}`}>
@@ -70,7 +71,8 @@ const VinylSleeve = ({ src, label, alt = '', out = false, pull = 'right', spin =
           <span className="absolute left-1/2 top-1/2 h-[12%] w-[12%] -translate-x-1/2 -translate-y-1/2 rounded-full bg-black" />
         </div>
       </div>
-      <div className="relative h-full w-full overflow-hidden rounded-[4px] bg-panel shadow-sleeve">
+      {/* Only the sleeve flies in cover morphs (utils/morph.js); the disc stays put and fades with the page. */}
+      <div data-sleeve="" className="relative h-full w-full overflow-hidden rounded-[4px] bg-panel shadow-sleeve">
         <CoverImage
           src={src}
           alt={alt}

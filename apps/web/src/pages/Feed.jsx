@@ -324,7 +324,11 @@ const CircleSummary = ({ items, meId }) => {
             const [first] = album.people.values()
             return (
               <li key={album.albumId}>
-                <Link to={`/album/${album.albumId}`} className="group flex items-center gap-3">
+                <Link
+                  to={`/album/${album.albumId}`}
+                  state={{ album: { id: album.albumId, name: album.albumName, cover: album.albumCover } }}
+                  className="group flex items-center gap-3"
+                >
                   <CoverImage src={album.albumCover} alt="" width={44} height={44} loading="lazy" className="h-11 w-11 shrink-0 rounded-[3px] object-cover shadow-sleeve" />
                   <span className="min-w-0">
                     <span className="block truncate text-sm text-paper group-hover:underline">{album.albumName || 'Untitled album'}</span>

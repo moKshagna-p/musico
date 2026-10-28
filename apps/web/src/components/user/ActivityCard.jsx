@@ -81,9 +81,11 @@ const AlbumEntry = ({ album }) => {
     )),
   ].filter(Boolean)
 
+  const albumState = { album: { id: albumId, name: albumName, cover: albumCover } }
+
   return (
     <li className="flex items-start gap-3">
-      <Link to={`/album/${albumId}`} className="shrink-0" tabIndex={-1} aria-hidden="true">
+      <Link to={`/album/${albumId}`} state={albumState} className="shrink-0" tabIndex={-1} aria-hidden="true">
         <CoverImage
           src={albumCover}
           alt=""
@@ -94,7 +96,7 @@ const AlbumEntry = ({ album }) => {
         />
       </Link>
       <div className="min-w-0 flex-1">
-        <Link to={`/album/${albumId}`} className="block truncate font-medium text-paper hover:underline">
+        <Link to={`/album/${albumId}`} state={albumState} className="block truncate font-medium text-paper hover:underline">
           {albumName || 'Untitled album'}
         </Link>
         <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-sm text-muted">

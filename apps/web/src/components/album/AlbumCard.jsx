@@ -1,8 +1,9 @@
-import { memo } from 'react'
+import { memo, useRef } from 'react'
 import { motion } from 'framer-motion'
 import { FaStar } from 'react-icons/fa'
 import { useRatings } from '../../hooks/useRatings.js'
 import { formatReleaseDate } from '../../utils/helpers.js'
+import { morph } from '../../utils/morph.js'
 import VinylSleeve from '../ui/VinylSleeve.jsx'
 
 const MotionArticle = motion.article
@@ -13,8 +14,16 @@ const AlbumCard = ({ album, onSelect }) => {
   const genres = Array.isArray(album.genres) ? album.genres.filter(Boolean) : []
   const meta = [formatReleaseDate(album.releaseDate, album.releaseYear), genres[0]].filter(Boolean).join(', ')
 
+  const sleeveRef = useRef(null)
+
+  // The sleeve grows into the album page's sleeve.
   const handleNavigate = () => {
-    onSelect?.(album.id, album)
+    if (!onSelect) return
+    morph(() => onSelect(album.id, album), {
+      from: sleeveRef.current?.querySelector('[data-sleeve]'),
+      to: () => document.querySelector('[data-album-cover] [data-sleeve]'),
+      name: 'album-cover',
+    })
   }
 
   return (
@@ -33,6 +42,8 @@ const AlbumCard = ({ album, onSelect }) => {
       className="group relative flex cursor-pointer flex-col gap-3 rounded-md text-paper focus-visible:outline-offset-4"
     >
       <VinylSleeve
+        ref={sleeveRef}
+        data-album-card={album.id}
         src={album.cover}
         label={album.discLabel}
         alt={album.name}

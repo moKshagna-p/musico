@@ -602,6 +602,7 @@ const Profile = () => {
               {recentlyRated.map((album) => (
                 <Link
                   to={`/album/${album.albumId}`}
+                  state={{ album: { id: album.albumId, name: album.name, cover: album.cover, artists: album.artists ?? [] } }}
                   key={album.albumId}
                   className="group w-[180px] flex-none snap-start tablet:w-[200px]"
                 >
