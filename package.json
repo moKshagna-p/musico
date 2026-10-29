@@ -12,7 +12,7 @@
     "postcss": "8.5.17"
   },
   "scripts": {
-    "prepare": "node .husky/install.mjs",
+    "prepare": "bun .husky/install.mjs",
     "check:bun": "node ./scripts/check-bun.mjs",
     "dev": "npm run check:bun && mprocs",
     "dev:turbo": "npm run check:bun && turbo run dev --parallel",
