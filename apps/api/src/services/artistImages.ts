@@ -179,7 +179,7 @@ const findArtistMbid = async (name: string, fetcher: Fetcher) => {
   const search = await fetchWithTimeout(fetcher, `https://musicbrainz.org/ws/2/artist/?query=${query}&fmt=json&limit=5`, {
     headers: { 'User-Agent': MUSICBRAINZ_UA, Accept: 'application/json' },
   })
-  if (!search.ok) return null
+  if (!search.ok) throw new Error(`MusicBrainz returned ${search.status}`)
   const { artists = [] } = (await search.json()) as { artists?: Array<{ id?: string; name?: string }> }
   const mbid = pickByName(artists, name, (item) => item.name)?.id
   return mbid && MBID.test(mbid) ? mbid : null
@@ -191,7 +191,10 @@ type FanartArtist = Partial<Record<'artistbackground' | 'hdmusiclogo' | 'musiclo
 // fanart.tv keys artists by MusicBrainz id.
 const getFanartArtist = async (mbid: string, fetcher: Fetcher, apiKey: string) => {
   const response = await fetchWithTimeout(fetcher, `https://webservice.fanart.tv/v3/music/${mbid}?api_key=${encodeURIComponent(apiKey)}`)
-  return response.ok ? ((await response.json()) as FanartArtist) : null
+  // 404 means fanart.tv has no art for the artist; anything else is a failure, not a miss.
+  if (response.status === 404) return null
+  if (!response.ok) throw new Error(`fanart.tv returned ${response.status}`)
+  return (await response.json()) as FanartArtist
 }
 
 const mostLiked = (images: FanartImage[] = []) =>
@@ -271,16 +274,20 @@ export const findArtistLogo = async (
     const logo = String(artist?.strArtistLogo ?? '').replace(/^http:\/\//, 'https://')
     if (/^https:\/\/(r2|www)\.theaudiodb\.com\/images\/media\/artist\/logo\//i.test(logo)) return logo
 
-    const fanartKey = keys.fanart
-    const fanartLogo = fanartKey
-      ? await attempt('fanart', name, async () => {
+    let fanartFailed = false
+    let fanartLogo: string | null = null
+    if (keys.fanart) {
+      try {
         const mbid = artist?.strArtistMBID && MBID.test(artist.strArtistMBID) ? artist.strArtistMBID : await findArtistMbid(name, fetcher)
-        const fanart = mbid ? await getFanartArtist(mbid, fetcher, fanartKey) : null
-        return mostLiked(fanart?.hdmusiclogo) ?? mostLiked(fanart?.musiclogo)
-      })
-      : null
-    // Throwing skips the cache, so a logo TheAudioDB couldn't serve this minute is looked up again next time.
-    if (!fanartLogo && audioDbFailed) throw new Error('TheAudioDB unavailable and fanart.tv has no logo')
+        const fanart = mbid ? await getFanartArtist(mbid, fetcher, keys.fanart) : null
+        fanartLogo = mostLiked(fanart?.hdmusiclogo) ?? mostLiked(fanart?.musiclogo)
+      } catch (error) {
+        fanartFailed = true
+        console.warn('[artist-logo] fanart failed', { name, error: error instanceof Error ? error.message : String(error) })
+      }
+    }
+    // Throwing skips the cache, so a logo a failing source couldn't serve is looked up again next time.
+    if (!fanartLogo && (audioDbFailed || fanartFailed)) throw new Error('A logo source failed and no logo was found')
     return fanartLogo
   })
 }

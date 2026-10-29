@@ -5,6 +5,8 @@ import { inkLogo } from '../../utils/logoInk.js'
 
 // Logos show at most 80px tall, so 160px of source covers 2x screens.
 const MAX_HEIGHT = 160
+// A missing logo may only mean its sources were down, so it is asked for again after this long.
+const MISS_STALE_MS = 10 * 60 * 1000
 
 // Repaints the logo for our dark heroes (utils/logoInk.js) and returns it as a data URL.
 const loadInkedLogo = async (name) => {
@@ -33,7 +35,7 @@ const ArtistName = ({ artists = [], className = '' }) => {
     queryKey: ['artist-logo', solo],
     queryFn: async () => ((await getArtistLogo(solo)) ? loadInkedLogo(solo) : null),
     enabled: Boolean(solo),
-    staleTime: Infinity,
+    staleTime: (query) => (query.state.data ? Infinity : MISS_STALE_MS),
     retry: false,
   })
 

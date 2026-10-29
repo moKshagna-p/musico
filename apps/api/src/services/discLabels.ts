@@ -89,17 +89,20 @@ const findCdArt = async (artist: string, album: string, releaseGroupId: string |
   if (audioDbArt) return audioDbArt
 
   const groupId = releaseGroupId ?? match?.strMusicBrainzID ?? undefined
+  let fanartError: unknown = null
   const fanart = keys.fanart && groupId && /^[0-9a-f-]{36}$/i.test(groupId)
     ? await getJson(`https://webservice.fanart.tv/v3/music/albums/${groupId}?api_key=${encodeURIComponent(keys.fanart)}`, fetcher)
+      .catch((error) => { fanartError = error; return null })
     : null
   const cdart: FanartImage[] = fanart?.albums?.[groupId ?? '']?.cdart ?? []
   const fanartArt = [...cdart]
     .sort((a, b) => Number(b.likes ?? 0) - Number(a.likes ?? 0))
     .map((image) => safeUrl(image.url, /^https:\/\/assets\.fanart\.tv\/fanart\/music\/.+\/cdart\//i))
     .find(Boolean) ?? null
-  // TheAudioDB might hold art once it answers again, so retry the album later rather than record a miss.
-  // Thrown without a status: TheAudioDB's rate limit is its own and must not pause MusicBrainz lookups.
-  if (!fanartArt && audioDbError) throw new Error(audioDbError instanceof Error ? audioDbError.message : String(audioDbError))
+  // A failing source might hold art once it answers again, so retry the album later rather than record a miss.
+  // Thrown without a status: TheAudioDB's and fanart.tv's limits are their own and must not pause MusicBrainz lookups.
+  const sourceError = audioDbError ?? fanartError
+  if (!fanartArt && sourceError) throw new Error(sourceError instanceof Error ? sourceError.message : String(sourceError))
   return fanartArt
 }
 
@@ -143,13 +146,11 @@ export const findDiscLabel = async (
     const label = entry.status === 'fulfilled' ? pickLabel(entry.value?.images) : null
     if (label) return label
   }
-  const albumGroup = matches.find((release) => release['release-group']?.['primary-type'] === 'Album') ?? matches[0]
-  const cdArt = await findCdArt(artist, album, albumGroup?.['release-group']?.id, keys, fetcher)
-  if (cdArt) return cdArt
-  // A failed pressing might hold the photo, so throw rather than record a miss; the album is retried later.
+  // A failed pressing might hold the photo, so throw rather than save CD art or a miss; the album is retried later.
   const failed = art.find((entry) => entry.status === 'rejected')
   if (failed) throw failed.reason
-  return null
+  const albumGroup = matches.find((release) => release['release-group']?.['primary-type'] === 'Album') ?? matches[0]
+  return findCdArt(artist, album, albumGroup?.['release-group']?.id, keys, fetcher)
 }
 
 const dbStore: DiscLabelStore = {

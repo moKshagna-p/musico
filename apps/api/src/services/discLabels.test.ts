@@ -128,3 +128,22 @@ test('uses fanart.tv while TheAudioDB is rate limited, and retries later when ne
   expect(failure.status).toBeUndefined()
   resetAudioDbRest()
 })
+
+test('fanart.tv failures retry the album without pausing MusicBrainz, and a failed pressing beats CD art', async () => {
+  resetAudioDbRest()
+  const GROUP = '48117b90-a16e-34ca-a514-19c702df1158'
+  const fetcher = (caaStatus: number) => async (url: string) => {
+    if (url.includes('musicbrainz.org')) return json({ releases: [{ ...pressing('v'), 'release-group': { id: GROUP, title: 'Rumours', 'primary-type': 'Album' } }] })
+    if (url.includes('coverartarchive.org')) return json({}, caaStatus)
+    if (url.includes('theaudiodb.com')) return json({ album: [{ strAlbum: 'Rumours', strArtist: 'Fleetwood Mac', strAlbumCDart: caaStatus === 404 ? null : 'https://r2.theaudiodb.com/images/media/album/cdart/rumours.png' }] })
+    if (url.includes('fanart.tv')) return json({}, 429)
+    return json({}, 404)
+  }
+  const keys = { audioDb: '123', fanart: 'key' }
+
+  const failure = await findDiscLabel('Fleetwood Mac', 'Rumours', fetcher(404), keys).catch((error) => error)
+  expect(failure.message).toBe('webservice.fanart.tv returned 429')
+  expect(failure.status).toBeUndefined()
+  // The vinyl photo might come back, so CD art isn't saved in its place while the archive is failing.
+  await expect(findDiscLabel('Fleetwood Mac', 'Rumours', fetcher(500), keys)).rejects.toThrow('coverartarchive.org returned 500')
+})

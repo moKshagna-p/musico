@@ -157,7 +157,21 @@ test('falls back to fanart.tv while TheAudioDB is rate limited, without caching 
 
   expect(await findArtistLogo('Metallica', fetcher(true), { audioDb: '123', fanart: 'key' })).toBe('https://assets.fanart.tv/fanart/music/x/hdmusiclogo/metallica.png')
   // TheAudioDB rests for a minute after a 429, and a logo neither source could serve is not cached as missing.
-  await expect(findArtistLogo('Ozzy Osbourne', fetcher(false), { audioDb: '123', fanart: 'key' })).rejects.toThrow('TheAudioDB unavailable')
+  await expect(findArtistLogo('Ozzy Osbourne', fetcher(false), { audioDb: '123', fanart: 'key' })).rejects.toThrow('A logo source failed')
   expect(audioDbCalls).toHaveLength(1)
   resetAudioDbRest()
+})
+
+test('does not cache a miss when fanart.tv fails', async () => {
+  const MBID = '2f4cd5a5-3bd1-4a5b-9b0d-2c5c1b7a8d11'
+  const fetcher = (fanartUp: boolean) => async (url: string) => {
+    if (url.includes('theaudiodb.com')) return json({ artists: [{ strArtist: 'Slint', strArtistLogo: null, strArtistMBID: MBID }] })
+    if (url.includes(`fanart.tv/v3/music/${MBID}`)) {
+      return fanartUp ? json({ hdmusiclogo: [{ url: 'https://assets.fanart.tv/fanart/music/x/hdmusiclogo/slint.png', likes: '1' }] }) : new Response('down', { status: 503 })
+    }
+    return new Response('not found', { status: 404 })
+  }
+
+  await expect(findArtistLogo('Slint', fetcher(false), { audioDb: '123', fanart: 'key' })).rejects.toThrow('A logo source failed')
+  expect(await findArtistLogo('Slint', fetcher(true), { audioDb: '123', fanart: 'key' })).toBe('https://assets.fanart.tv/fanart/music/x/hdmusiclogo/slint.png')
 })
