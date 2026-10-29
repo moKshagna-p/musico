@@ -66,9 +66,32 @@ export const fetchMyFollowers = async () => {
 
 // ── Reviews ──
 
-export const saveMyReview = async (albumId, { content, albumName, albumCover, albumArtists }) => {
-  const response = await api.put(`/api/me/reviews/${encodeURIComponent(albumId)}`, { content, albumName, albumCover, albumArtists })
+// media: [{ id, alt }] from uploadReviewImage, or gif: a picked GIF. Never both.
+export const saveMyReview = async (albumId, { content, albumName, albumCover, albumArtists, media = [], gif = null }) => {
+  const response = await api.put(`/api/me/reviews/${encodeURIComponent(albumId)}`, {
+    content,
+    albumName,
+    albumCover,
+    albumArtists,
+    media,
+    gif,
+  })
   return response.data ?? null
+}
+
+// The JSON default would make axios serialize the FormData; multipart lets the browser add the boundary.
+export const uploadReviewImage = async ({ blob, width, height }, { signal } = {}) => {
+  const form = new FormData()
+  form.append('file', blob)
+  form.append('width', String(width))
+  form.append('height', String(height))
+  const response = await api.post('/api/me/media', form, { headers: { 'Content-Type': 'multipart/form-data' }, signal })
+  return response.data
+}
+
+export const searchGifs = async (query, { page = 1, signal } = {}) => {
+  const response = await api.get('/api/gifs', { params: { q: query, page }, signal })
+  return Array.isArray(response.data) ? response.data : []
 }
 
 export const fetchAlbumReviews = async (albumId, { cursor, limit = 10 } = {}) => {

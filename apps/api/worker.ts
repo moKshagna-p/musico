@@ -44,5 +44,12 @@ export default {
         console.error('[worker.scheduled] homepage refresh failed', error instanceof Error ? error.message : String(error), error)
       }),
     )
+    context.waitUntil(
+      import('./src/core/media')
+        .then(({ sweepDetachedMedia }) => sweepDetachedMedia())
+        .catch((error) => {
+          console.error('[worker.scheduled] media sweep failed', error instanceof Error ? error.message : String(error), error)
+        }),
+    )
   },
 }

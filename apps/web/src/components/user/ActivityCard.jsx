@@ -1,71 +1,119 @@
+import { Fragment, useState } from 'react'
 import { Link } from 'react-router-dom'
 import CoverImage from '../ui/CoverImage.jsx'
 
-// One feed row: who (avatar + username), what they did in one sentence, when, and the album on the right.
-const ActivityCard = ({ item }) => {
-  const { type, user: actor, albumId, albumName, albumCover, targetUser, metadata, createdAt } = item
+// Long sittings show a few albums and fold the rest behind a button, so one busy person can't flood the feed.
+const VISIBLE_ALBUMS = 3
 
-  const albumLink = albumId ? (
-    <Link to={`/album/${albumId}`} className="font-medium text-paper hover:underline">
-      {albumName || 'an album'}
-    </Link>
-  ) : null
-
-  const listLink = metadata?.listId ? (
-    <Link to={`/lists/${metadata.listId}`} className="font-medium text-paper hover:underline">
-      {metadata.listName ?? 'a list'}
-    </Link>
-  ) : (
-    <span className="font-medium text-paper">{metadata?.listName ?? 'a list'}</span>
-  )
-
-  const sentence = {
-    rated: <>rated {albumLink}</>,
-    reviewed: <>reviewed {albumLink}</>,
-    listed: <>added {albumLink} to {listLink}</>,
-    followed: <>started following <PersonName person={targetUser} /></>,
-  }[type]
-  if (!sentence) return null
-
-  const rating = Number(metadata?.rating ?? 0)
+// One feed card: a person, when, and everything they did in that sitting (see groupFeed).
+const ActivityCard = ({ group }) => {
+  const { user: actor, albums, follows, createdAt } = group
+  const [expanded, setExpanded] = useState(false)
+  const folds = albums.length > VISIBLE_ALBUMS + 1 && !expanded
+  const shown = folds ? albums.slice(0, VISIBLE_ALBUMS) : albums
 
   return (
     <article className="flex items-start gap-3.5 py-5">
       <PersonAvatar person={actor} />
 
       <div className="min-w-0 flex-1 pt-0.5">
-        <p className="text-[15px] leading-snug text-muted">
-          <PersonName person={actor} /> {sentence}
+        <p className="flex items-baseline gap-2 text-[15px] leading-snug">
+          <PersonName person={actor} />
+          <time dateTime={new Date(createdAt).toISOString()} className="text-xs text-muted/70">
+            {formatTimeAgo(createdAt)}
+          </time>
         </p>
-        {type === 'rated' && rating > 0 && (
-          <p className="mt-1.5 text-sm tracking-[0.15em] text-paper" aria-label={`${rating} out of 5 stars`}>
-            {'★'.repeat(Math.floor(rating))}
-            {rating % 1 ? '½' : ''}
-          </p>
-        )}
-        {type === 'reviewed' && metadata?.snippet && (
-          <p className="mt-2 line-clamp-3 border-l border-white/15 pl-3 text-sm italic leading-relaxed text-paper/80">
-            &ldquo;{metadata.snippet}&rdquo;
-          </p>
-        )}
-        <time dateTime={new Date(createdAt).toISOString()} className="mt-1.5 block text-xs text-muted/70">
-          {formatTimeAgo(createdAt)}
-        </time>
-      </div>
 
-      {albumId && albumCover && (
-        <Link to={`/album/${albumId}`} className="shrink-0" tabIndex={-1} aria-hidden="true">
-          <CoverImage
-            src={albumCover}
-            alt=""
-            width={56}
-            height={56}
-            loading="lazy"
-            className="h-14 w-14 rounded-[3px] object-cover shadow-sleeve tablet:h-16 tablet:w-16"
-          />
-        </Link>
-      )}
+        {albums.length > 0 && (
+          <ul className="mt-3 space-y-3">
+            {shown.map((album) => (
+              <AlbumEntry key={album.albumId} album={album} />
+            ))}
+          </ul>
+        )}
+
+        {folds && (
+          <button
+            type="button"
+            onClick={() => setExpanded(true)}
+            className="mt-3 rounded-full border border-white/10 px-3.5 py-1.5 text-xs text-muted transition-colors hover:border-white/25 hover:text-paper"
+          >
+            Show {albums.length - VISIBLE_ALBUMS} more
+          </button>
+        )}
+
+        {follows.length > 0 && (
+          <p className={`${albums.length ? 'mt-3' : 'mt-1'} text-sm text-muted`}>
+            Started following{' '}
+            {follows.map((person, index) => (
+              <Fragment key={person.username ?? index}>
+                {index > 0 && (index === follows.length - 1 ? ' and ' : ', ')}
+                <PersonName person={person} />
+              </Fragment>
+            ))}
+          </p>
+        )}
+      </div>
     </article>
+  )
+}
+
+// Everything done to one album in a sitting, on one line: stars, review, and list adds.
+const AlbumEntry = ({ album }) => {
+  const { albumId, albumName, albumCover, rating, reviewed, snippet, lists } = album
+  const actions = [
+    rating > 0 && (
+      <span key="rating" className="tracking-[0.15em] text-paper" aria-label={`Rated ${rating} out of 5 stars`}>
+        {'★'.repeat(Math.floor(rating))}
+        {rating % 1 ? '½' : ''}
+      </span>
+    ),
+    reviewed && <span key="review">Reviewed</span>,
+    ...lists.map((list) => (
+      <span key={`list-${list.listId ?? list.listName}`}>
+        Added to{' '}
+        {list.listId ? (
+          <Link to={`/lists/${list.listId}`} className="text-paper/90 hover:underline">{list.listName ?? 'a list'}</Link>
+        ) : (
+          <span className="text-paper/90">{list.listName ?? 'a list'}</span>
+        )}
+      </span>
+    )),
+  ].filter(Boolean)
+
+  const albumState = { album: { id: albumId, name: albumName, cover: albumCover } }
+
+  return (
+    <li className="flex items-start gap-3">
+      <Link to={`/album/${albumId}`} state={albumState} className="shrink-0" tabIndex={-1} aria-hidden="true">
+        <CoverImage
+          src={albumCover}
+          alt=""
+          width={56}
+          height={56}
+          loading="lazy"
+          className="h-12 w-12 rounded-[3px] object-cover shadow-sleeve tablet:h-14 tablet:w-14"
+        />
+      </Link>
+      <div className="min-w-0 flex-1">
+        <Link to={`/album/${albumId}`} state={albumState} className="block truncate font-medium text-paper hover:underline">
+          {albumName || 'Untitled album'}
+        </Link>
+        <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-sm text-muted">
+          {actions.map((action, index) => (
+            <Fragment key={action.key}>
+              {index > 0 && <span aria-hidden="true" className="text-muted/40">·</span>}
+              {action}
+            </Fragment>
+          ))}
+        </p>
+        {snippet && (
+          <p className="mt-2 line-clamp-3 border-l border-white/15 pl-3 text-sm italic leading-relaxed text-paper/80">
+            &ldquo;{snippet}&rdquo;
+          </p>
+        )}
+      </div>
+    </li>
   )
 }
 
@@ -111,4 +159,5 @@ const formatTimeAgo = (timestamp) => {
   return `${months}mo ago`
 }
 
+export { PersonAvatar, PersonName }
 export default ActivityCard

@@ -33,3 +33,6 @@ release-summary.md
 *.sln
 *.sw?
 # trigger CI
+
+# Review images saved by the local Bun API (production uses R2)
+apps/api/.media/

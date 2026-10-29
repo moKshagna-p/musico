@@ -20,8 +20,21 @@ jobs:
     name: Build & Test
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 5
     env:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+      TEST_DATABASE_URL: postgres://postgres:test@127.0.0.1:5432/postgres
     
     steps:
       - name: 1. Checkout repository

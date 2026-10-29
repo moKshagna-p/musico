@@ -8,8 +8,9 @@ import { ProfilePageSkeleton, UserListLoadingState } from '../components/ui/Page
 import SectionHeading from '../components/ui/SectionHeading.jsx'
 import Stats from '../components/user/Stats.jsx'
 import TopGenres from '../components/user/TopGenres.jsx'
+import RatingSpread from '../components/user/RatingSpread.jsx'
+import ListeningDiary from '../components/user/ListeningDiary.jsx'
 import ListCard from '../components/list/ListCard.jsx'
-import AlbumSlotMachine from '../components/album/AlbumSlotMachine.jsx'
 import CoverImage from '../components/ui/CoverImage.jsx'
 import UsernameSetup from '../components/user/UsernameSetup.jsx'
 import ProfileCover from '../components/user/ProfileCover.jsx'
@@ -367,7 +368,7 @@ const Profile = () => {
       {/* Edit Profile Modal */}
       {showEditModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-md">
-          <div className="relative mx-4 max-h-[90svh] w-full max-w-md overflow-y-auto rounded-3xl border border-white/10 bg-[#0b0b0a]/95 shadow-[0_40px_120px_-20px_rgba(0,0,0,1)] p-8">
+          <div className="relative mx-4 max-h-[90svh] w-full max-w-md overflow-y-auto rounded-3xl border border-white/10 bg-[#0b0b0a]/95 shadow-[0_40px_120px_-20px_rgba(0,0,0,1)] p-6 sm:p-8">
             <button
               type="button"
               onClick={closeEditModal}
@@ -407,9 +408,9 @@ const Profile = () => {
                 <label className="block text-sm text-muted">Profile Picture</label>
                 <div className="mt-2 flex items-center gap-4 rounded-lg border border-outline/60 bg-canvas/30 p-4">
                   {editImage ? (
-                    <img src={editImage} alt="" className="h-16 w-16 rounded-full object-cover ring-1 ring-white/10" />
+                    <img src={editImage} alt="" className="h-16 w-16 shrink-0 rounded-full object-cover ring-1 ring-white/10" />
                   ) : (
-                    <div className="flex h-16 w-16 items-center justify-center rounded-full bg-outline/60 text-lg font-semibold text-muted">
+                    <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-outline/60 text-lg font-semibold text-muted">
                       {(user.name ?? user.email)?.charAt(0)?.toUpperCase() ?? '?'}
                     </div>
                   )}
@@ -446,9 +447,9 @@ const Profile = () => {
                 <label className="block text-sm text-muted">Cover</label>
                 <div className="mt-2 overflow-hidden rounded-lg border border-outline/60 bg-canvas/30">
                   {editCover ? (
-                    <img src={editCover} alt="" className="aspect-[3/1] w-full object-cover" />
+                    <img src={editCover} alt="" className="aspect-[2/1] w-full sm:aspect-[3/1] object-cover" />
                   ) : (
-                    <div className="aspect-[3/1] w-full bg-white/[0.03]" />
+                    <div className="aspect-[2/1] w-full bg-white/[0.03] sm:aspect-[3/1]" />
                   )}
                   <div className="flex flex-wrap gap-3 p-4">
                     <button
@@ -520,10 +521,10 @@ const Profile = () => {
               <img
                 src={socialProfile.image}
                 alt=""
-                className="h-24 w-24 shrink-0 rounded-full object-cover ring-1 ring-white/10 tablet:h-32 tablet:w-32"
+                className="motion-safe:animate-[avatarPop_0.7s_cubic-bezier(0.16,1,0.3,1)_both] h-24 w-24 shrink-0 rounded-full object-cover ring-1 ring-white/10 tablet:h-32 tablet:w-32"
               />
             ) : (
-              <div className="vinyl relative flex h-24 w-24 shrink-0 items-center justify-center tablet:h-32 tablet:w-32">
+              <div className="vinyl relative flex h-24 w-24 shrink-0 motion-safe:animate-[avatarPop_0.7s_cubic-bezier(0.16,1,0.3,1)_both] items-center justify-center tablet:h-32 tablet:w-32">
                 <span className="relative flex h-[40%] w-[40%] items-center justify-center rounded-full bg-paper font-display text-2xl text-black">
                   {(user.name ?? user.email)?.charAt(0)?.toUpperCase() ?? '?'}
                 </span>
@@ -578,6 +579,7 @@ const Profile = () => {
         <main className="mt-10 tablet:mt-16">
           <Stats ratedAlbums={statsSourceAlbums} totalRated={totalRated} averageRating={averageRating} />
           <TopGenres ratedAlbums={statsSourceAlbums} />
+          <RatingSpread ratings={ratedItems} averageRating={averageRating} />
 
           <section>
             <div className="mb-8">
@@ -600,6 +602,7 @@ const Profile = () => {
               {recentlyRated.map((album) => (
                 <Link
                   to={`/album/${album.albumId}`}
+                  state={{ album: { id: album.albumId, name: album.name, cover: album.cover, artists: album.artists ?? [] } }}
                   key={album.albumId}
                   className="group w-[180px] flex-none snap-start tablet:w-[200px]"
                 >
@@ -623,7 +626,7 @@ const Profile = () => {
             </div>
           </section>
 
-          {!dashboardLoading && <AlbumSlotMachine key={user.id} userId={user.id} lists={dashboard?.lists ?? []} />}
+          <ListeningDiary ratings={ratedItems} />
 
           <section className="mt-24">
             <div className="mb-10">

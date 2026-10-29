@@ -26,6 +26,15 @@ const json = (route: Route, body: unknown, status = 200) =>
     body: JSON.stringify(body),
   })
 
+// A 1x1 PNG stands in for every uploaded review image.
+const PIXEL_PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64')
+const gifSvg = (color: string) =>
+  `data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="320" height="240"><rect width="320" height="240" fill="${color}"/></svg>`)}`
+export const mockGifs = [
+  { id: 'gif-1', title: 'dancing record', url: gifSvg('#c92a2a'), preview: gifSvg('#c92a2a'), width: 320, height: 240 },
+  { id: 'gif-2', title: 'headphones on', url: gifSvg('#1971c2'), preview: gifSvg('#1971c2'), width: 320, height: 240 },
+]
+
 const parseBody = async (route: Route) => {
   const payload = route.request().postData()
   if (!payload) return {}
@@ -141,7 +150,9 @@ export const installApiMocks = async (page: Page) => {
   const adminIds = new Set<string>()
   const bootstrapAdminEmail = 'mokshagnareddy45@gmail.com'
 
-  const reviewsByAlbum = new Map<string, Array<{ id: string; content: string; user: { name: string; username: string }; createdAt: number; rating: number | null }>>()
+  type ReviewMedia = { id: string; kind: 'image' | 'gif'; url: string; width: number; height: number; alt: string }
+  const reviewsByAlbum = new Map<string, Array<{ id: string; content: string; user: { name: string; username: string }; createdAt: number; rating: number | null; media: ReviewMedia[] }>>()
+  const uploads = new Map<string, ReviewMedia>()
   const ratings = new Map<string, number>()
   const lists = [
     {
@@ -509,11 +520,38 @@ export const installApiMocks = async (page: Page) => {
       })
     }
 
+    if (pathname === '/api/me/media' && method === 'POST') {
+      if (!signedIn) return json(route, { error: 'Unauthorized.' }, 401)
+      const form = request.postDataBuffer()?.toString('latin1') ?? ''
+      const field = (name: string) => Number(new RegExp(`name="${name}"\\r\\n\\r\\n(\\d+)`).exec(form)?.[1])
+      const id = `media-${uploads.size + 1}`
+      const upload = { id, kind: 'image' as const, url: `${url.origin}/api/media/reviews/${user.id}/${id}.png`, width: field('width'), height: field('height'), alt: '' }
+      uploads.set(id, upload)
+      return json(route, { data: upload })
+    }
+
+    if (pathname.startsWith('/api/media/') && method === 'GET') {
+      return route.fulfill({ status: 200, contentType: 'image/png', body: PIXEL_PNG })
+    }
+
+    if (pathname === '/api/gifs' && method === 'GET') {
+      if (!signedIn) return json(route, { error: 'Unauthorized.' }, 401)
+      const query = url.searchParams.get('q')?.toLowerCase() ?? ''
+      return json(route, { data: mockGifs.filter((gif) => gif.title.includes(query)) })
+    }
+
     if (pathname.startsWith('/api/me/reviews/') && method === 'PUT') {
       const albumId = pathname.split('/').pop() ?? ''
       const body = await parseBody(route)
       const content = String(body.content ?? '').trim()
       const existing = reviewsByAlbum.get(albumId) ?? []
+      const images = (Array.isArray(body.media) ? body.media : []).map((item: { id: string; alt?: string }) => {
+        const upload = uploads.get(item.id)
+        if (!upload) throw new Error(`Unknown upload ${item.id}`)
+        return { ...upload, alt: item.alt ?? '' }
+      })
+      const gif = body.gif as { url: string; width: number; height: number; alt?: string } | null
+      const media = gif ? [{ id: 'gif-media', kind: 'gif' as const, alt: '', ...gif }] : images
       const created = {
         id: `review-${Math.random().toString(36).slice(2, 10)}`,
         content,
@@ -523,6 +561,7 @@ export const installApiMocks = async (page: Page) => {
         },
         createdAt: Date.now(),
         rating: ratings.get(albumId) ?? null,
+        media,
       }
       reviewsByAlbum.set(albumId, [created, ...existing])
       return json(route, {

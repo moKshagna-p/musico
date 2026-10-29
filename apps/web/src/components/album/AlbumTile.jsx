@@ -7,7 +7,12 @@ import VinylSleeve from '../ui/VinylSleeve.jsx'
 const AlbumTile = ({ to, cover, name, artist, rating, meta, headingLevel = 'h3' }) => {
   const Title = headingLevel
   return (
-    <Link to={to} className="group block rounded-md">
+    // Seed the album page with what's shown here, so it opens with the cover in place (and the cover morphs into it).
+    <Link
+      to={to}
+      state={{ album: { id: decodeURIComponent(to.slice('/album/'.length)), name, cover, artists: artist ? [artist] : [] } }}
+      className="group block rounded-md"
+    >
       <div className="pr-[12%] transition-transform duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] group-hover:-translate-y-1">
         <VinylSleeve src={cover} alt={name} size={320} sizes="(max-width: 768px) 50vw, 25vw" />
       </div>

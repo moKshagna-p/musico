@@ -1,0 +1,1 @@
+ALTER TABLE "review_media" ADD COLUMN "state" text DEFAULT 'ready' NOT NULL;

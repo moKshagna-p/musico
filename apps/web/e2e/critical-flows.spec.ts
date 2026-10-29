@@ -17,7 +17,7 @@ test.describe('Critical user flows', () => {
 
   test('auth flow signs in and navigates to home', async ({ page }) => {
     await signIn(page)
-    await expect(page.getByRole('link', { name: /profile/i })).toBeVisible()
+    await expect(page.getByRole('banner').getByRole('link', { name: /profile/i })).toBeVisible()
   })
 
   test('sign-up requires an available username and the feed addresses the user by it', async ({ page }) => {
@@ -36,7 +36,7 @@ test.describe('Critical user flows', () => {
     await page.locator('form').getByRole('button', { name: 'Create Account' }).click()
     await expect(page).toHaveURL('/')
 
-    await page.getByRole('link', { name: 'Feed', exact: true }).click()
+    await page.getByRole('banner').getByRole('link', { name: 'Feed', exact: true }).click()
     await expect(page.getByRole('link', { name: 'vinyl-fan', exact: true })).toHaveAttribute('href', '/profile/vinyl-fan')
   })
 
@@ -228,7 +228,7 @@ test.describe('Critical user flows', () => {
         window['coverConversions'][key][fail ? 'reject' : 'resolve']()
       }, { key: name, fail })
     }
-    const preview = page.locator('img.aspect-\\[3\\/1\\]')
+    const preview = page.locator('img.sm\\:aspect-\\[3\\/1\\]')
     await choose('old.png')
     await expect(page.getByRole('button', { name: 'Preparing cover...' })).toBeDisabled()
     expect(saves).toEqual([])
@@ -316,9 +316,9 @@ test.describe('Critical user flows', () => {
     await expect.poll(() => saves.length).toBe(1)
     expect(saves[0].cover).toMatch(/^data:image\/jpeg;base64,/)
     await page.getByRole('button', { name: 'Cancel', exact: true }).click()
-    await page.getByRole('link', { name: 'Home', exact: true }).click()
+    await page.getByRole('banner').getByRole('link', { name: 'Home', exact: true }).click()
     await expect(page.getByRole('heading', { name: /most happening right now/i })).toBeVisible()
-    await page.getByRole('link', { name: 'Profile', exact: true }).click()
+    await page.getByRole('banner').getByRole('link', { name: 'Profile', exact: true }).click()
     await page.getByRole('button', { name: 'Edit Profile' }).click()
     await page.getByLabel('Bio', { exact: true }).fill('New draft on the remounted profile')
     releaseUpload()
@@ -366,9 +366,9 @@ test.describe('Critical user flows', () => {
       await page.getByRole('button', { name: 'Save Changes' }).click()
     }
     const revisit = async () => {
-      await page.getByRole('link', { name: 'Home', exact: true }).click()
+      await page.getByRole('banner').getByRole('link', { name: 'Home', exact: true }).click()
       await expect(page.getByRole('heading', { name: /most happening right now/i })).toBeVisible()
-      await page.getByRole('link', { name: 'Profile', exact: true }).click()
+      await page.getByRole('banner').getByRole('link', { name: 'Profile', exact: true }).click()
       await expect(page.getByRole('heading', { name: 'E2E User' })).toBeVisible()
     }
     await saveCover()
@@ -446,9 +446,9 @@ test.describe('Critical user flows', () => {
     const revisitProfile = async () => {
       await expect.poll(() => dashboardRequests).toBe(saves.length + 1)
       const requestsBeforeNavigation = dashboardRequests
-      await page.getByRole('link', { name: 'Home', exact: true }).click()
+      await page.getByRole('banner').getByRole('link', { name: 'Home', exact: true }).click()
       await expect(page.getByRole('heading', { name: /most happening right now/i })).toBeVisible()
-      await page.getByRole('link', { name: 'Profile', exact: true }).click()
+      await page.getByRole('banner').getByRole('link', { name: 'Profile', exact: true }).click()
       await expect(page.getByRole('heading', { name: 'E2E User' })).toBeVisible()
       expect(dashboardRequests).toBe(requestsBeforeNavigation)
     }
@@ -514,7 +514,7 @@ test.describe('Critical user flows', () => {
     await page.getByLabel(/password/i).fill('password123')
     await page.locator('form').getByRole('button', { name: /^sign in$/i }).click()
 
-    await expect(page.getByRole('link', { name: /profile/i })).toBeVisible()
+    await expect(page.getByRole('banner').getByRole('link', { name: /profile/i })).toBeVisible()
     expect(signOutRequests).toBe(0)
   })
 
@@ -584,10 +584,10 @@ test.describe('Critical user flows', () => {
     await page.locator('article').filter({ hasText: 'Discovery' }).first().click()
     await expect(page).toHaveURL(/\/album\//)
     await expect(page.getByRole('heading', { name: 'Discovery' })).toHaveCount(1)
-    await page.getByRole('link', { name: 'Home', exact: true }).click()
+    await page.getByRole('banner').getByRole('link', { name: 'Home', exact: true }).click()
     await expect(page.getByRole('heading', { name: /most happening right now/i })).toBeVisible()
 
-    await page.getByRole('link', { name: 'Discover', exact: true }).click()
+    await page.getByRole('banner').getByRole('link', { name: 'Discover', exact: true }).click()
     await expect(page.getByRole('heading', { name: /dig through the vault/i })).toBeVisible()
     await expect(page.locator('article').filter({ hasText: 'Discovery' }).first()).toBeVisible()
 
@@ -602,16 +602,16 @@ test.describe('Critical user flows', () => {
     await page.getByRole('link', { name: 'Sign In', exact: true }).click()
     await expect(page).toHaveURL('/auth')
     await signIn(page)
-    await page.getByRole('link', { name: 'Feed', exact: true }).click()
+    await page.getByRole('banner').getByRole('link', { name: 'Feed', exact: true }).click()
     await expect(page.getByRole('heading', { name: 'Feed', exact: true })).toBeVisible()
     await page.getByRole('link', { name: 'Discovery', exact: true }).first().click()
     await expect(page).toHaveURL(/\/album\//)
     await expect(page.getByRole('heading', { name: 'Discovery' })).toHaveCount(1)
 
-    await page.getByRole('link', { name: 'Profile', exact: true }).click()
+    await page.getByRole('banner').getByRole('link', { name: 'Profile', exact: true }).click()
     await expect(page.getByRole('heading', { name: 'E2E User' })).toBeVisible()
 
-    await page.getByRole('link', { name: 'Home', exact: true }).click()
+    await page.getByRole('banner').getByRole('link', { name: 'Home', exact: true }).click()
     await expect(page.getByRole('heading', { name: /most happening right now/i })).toBeVisible()
     expect(browserErrors).toEqual([])
   })
@@ -842,6 +842,93 @@ test.describe('Critical user flows', () => {
 
     await expect(page.getByText(/review posted\./i)).toBeVisible()
     await expect(page.locator('p', { hasText: /incredible production and timeless grooves\./i }).first()).toBeVisible()
+  })
+
+  test('reviews carry images with alt text, open in a viewer, and GIFs replace images', async ({ page }) => {
+    await signIn(page)
+    await page.goto('/album/m:1002')
+    await expect(page.getByRole('heading', { name: 'Random Access Memories' })).toBeVisible()
+
+    // A real PNG, so the browser's decode-and-shrink step runs.
+    const png = await page.evaluate(async () => {
+      const canvas = document.createElement('canvas')
+      canvas.width = 640
+      canvas.height = 480
+      canvas.getContext('2d').fillRect(0, 0, 640, 480)
+      const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/png'))
+      return Array.from(new Uint8Array(await blob.arrayBuffer()))
+    })
+    const file = (name) => ({ name, mimeType: 'image/png', buffer: Buffer.from(png) })
+
+    await page.getByRole('button', { name: 'Add a GIF' }).click()
+    await expect(page.getByLabel('Search GIFs')).toBeVisible()
+    await page.locator('input[type="file"][multiple]').setInputFiles([file('one.png'), file('two.png')])
+    await expect(page.getByLabel('Search GIFs')).toHaveCount(0)
+    await expect(page.getByRole('button', { name: 'Add image description' })).toHaveCount(2)
+    // Images and a GIF are either/or.
+    await expect(page.getByRole('button', { name: 'Add a GIF' })).toBeDisabled()
+
+    await page.getByRole('button', { name: 'Add image description' }).first().click()
+    await page.getByLabel(/describe this image/i).fill('Gatefold sleeve on the turntable')
+    await page.getByLabel(/describe this image/i).press('Enter')
+
+    const savedReviews = []
+    let finishSave
+    let saving = new Promise((resolve) => { finishSave = resolve })
+    await page.route('**/api/me/reviews/*', async (route) => {
+      if (route.request().method() === 'PUT') await saving
+      await route.fallback()
+    })
+    page.on('request', (request) => {
+      if (request.url().includes('/api/me/reviews/') && request.method() === 'PUT') savedReviews.push(request.postDataJSON())
+    })
+    await page.getByPlaceholder(/write a short review/i).fill('Sounds even better on wax.')
+    await page.getByRole('button', { name: 'Edit image description' }).click()
+    await page.getByRole('button', { name: /^post$/i }).click()
+    await expect(page.getByLabel(/describe this image/i)).toBeDisabled()
+    await expect(page.getByRole('button', { name: 'Remove image' }).first()).toBeDisabled()
+    finishSave()
+    await expect(page.getByText(/review posted\./i)).toBeVisible()
+
+    // Both uploads finished (in either order) and keep their place and alt text.
+    const { media } = savedReviews[0]
+    expect(media.map((item) => item.alt)).toEqual(['Gatefold sleeve on the turntable', ''])
+    expect(new Set(media.map((item) => item.id))).toEqual(new Set(['media-1', 'media-2']))
+    // The composer clears after posting.
+    await expect(page.getByPlaceholder(/write a short review/i)).toHaveValue('')
+
+    const openingTile = page.getByRole('button', { name: 'View image: Gatefold sleeve on the turntable' })
+    await openingTile.click()
+    const viewer = page.getByRole('dialog', { name: 'Image viewer' })
+    await expect(viewer.getByText('Gatefold sleeve on the turntable')).toBeVisible()
+    await expect(viewer.getByRole('button', { name: 'Close', exact: true })).toBeFocused()
+    await page.keyboard.press('Shift+Tab')
+    await expect(viewer.getByRole('button', { name: 'Next image' })).toBeFocused()
+    await page.keyboard.press('Tab')
+    await expect(viewer.getByRole('button', { name: 'Close', exact: true })).toBeFocused()
+    await page.keyboard.press('ArrowRight')
+    await expect(viewer.getByText('Gatefold sleeve on the turntable')).toHaveCount(0)
+    await page.keyboard.press('Escape')
+    await expect(viewer).toHaveCount(0)
+    await expect(openingTile).toBeFocused()
+
+    await page.getByRole('button', { name: 'Add a GIF' }).click()
+    // Posting text while the picker is open must not allow a late GIF selection to change the submitted draft.
+    saving = new Promise((resolve) => { finishSave = resolve })
+    await page.getByPlaceholder(/write a short review/i).fill('Text while browsing GIFs')
+    await page.getByRole('button', { name: /^post$/i }).click()
+    await expect(page.getByLabel('Search GIFs')).toBeDisabled()
+    await expect(page.getByRole('button', { name: 'dancing record' })).toBeDisabled()
+    finishSave()
+    await expect(page.getByLabel('Search GIFs')).toHaveCount(0)
+    await expect(page.getByText(/review posted\./i)).toBeVisible()
+    await page.getByRole('button', { name: 'Add a GIF' }).click()
+    await page.getByLabel('Search GIFs').fill('headphones')
+    await page.getByRole('button', { name: 'headphones on' }).click()
+    await expect(page.getByRole('button', { name: 'Add images' })).toBeDisabled()
+    await page.getByRole('button', { name: /^post$/i }).click()
+    await expect(page.getByText(/review posted\./i)).toBeVisible()
+    await expect(page.getByRole('article').getByRole('img', { name: 'headphones on' })).toBeVisible()
   })
 
   test('guests cannot fetch or see album reviews', async ({ page }) => {
