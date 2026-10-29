@@ -125,7 +125,7 @@ If any of them are missing, the workflow fails before it tries to deploy.
 
 ## License
 
-[MIT](LICENSE). Use it, change it, build on it.
+[AGPL-3.0](LICENSE). Use it, change it, build on it. If you share or host a modified version, publish your source under the same license.
 
 ---
 
