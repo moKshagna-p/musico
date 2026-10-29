@@ -1,11 +1,12 @@
 import { useState } from 'react'
 
+import { CD_ART_CLASS, isCdArt } from '../../utils/discArt.js'
 import CoverImage from './CoverImage.jsx'
 
 // A record sleeve with its disc behind it. `out` pulls the disc halfway out (sliding it out on mount, after a cover
 // morph has landed);
 // otherwise it slides out (right, or `up` like pulling from a crate) on hover of the nearest `.group`.
-// `label` is a photo of the record's real center label; without one the disc shows the cover art.
+// `label` is a photo of the record's real center label, or a fan-made CD face; without one the disc shows the cover art.
 // Label photos show a ring of the actual vinyl in their corners, so colored records get colored grooves.
 const HOVER_PULL = {
   right: 'group-hover:translate-x-[16%] group-focus-visible:translate-x-[16%]',
@@ -40,6 +41,10 @@ const readVinylColor = (image) => {
 
 const VinylSleeve = ({ src, label, alt = '', out = false, pull = 'right', spin = false, size = 640, loading = 'lazy', sizes, className = '', ...props }) => {
   const [vinylColor, setVinylColor] = useState(null)
+  // The Cover Art Archive is served from archive.org; the disc falls back to the cover if the label is unreachable.
+  const [brokenLabel, setBrokenLabel] = useState(null)
+  const shown = label && label !== brokenLabel ? label : src
+  const isLabelPhoto = Boolean(label) && shown === label && !isCdArt(label)
   return (
     <div className={`relative aspect-square ${className}`} {...props}>
       <div
@@ -50,22 +55,17 @@ const VinylSleeve = ({ src, label, alt = '', out = false, pull = 'right', spin =
         }`}
       >
         <div className={`absolute inset-[33%] overflow-hidden rounded-full ring-1 ring-black ${spin ? 'motion-safe:animate-[vinylSpin_9s_linear_infinite]' : ''}`}>
-          {label || src ? (
+          {shown ? (
             <img
-              src={label || src}
+              src={shown}
               alt=""
               loading={loading}
               decoding="async"
               // archive.org allows cross-origin reads, which lets the canvas sample the label photo.
-              crossOrigin={label ? 'anonymous' : undefined}
-              onLoad={(event) => { if (label && event.currentTarget.src === label) setVinylColor(readVinylColor(event.currentTarget)) }}
-              // The Cover Art Archive is served from archive.org; fall back to the cover if it is unreachable.
-              onError={(event) => {
-                if (!src || event.currentTarget.src === src) return
-                event.currentTarget.removeAttribute('crossorigin')
-                event.currentTarget.src = src
-              }}
-              className="h-full w-full object-cover"
+              crossOrigin={isLabelPhoto ? 'anonymous' : undefined}
+              onLoad={(event) => { if (isLabelPhoto) setVinylColor(readVinylColor(event.currentTarget)) }}
+              onError={() => { if (shown === label && src) setBrokenLabel(label) }}
+              className={`h-full w-full object-cover ${shown === label && isCdArt(label) ? CD_ART_CLASS : ''}`}
             />
           ) : <div className="h-full w-full bg-paper/80" />}
           <span className="absolute left-1/2 top-1/2 h-[12%] w-[12%] -translate-x-1/2 -translate-y-1/2 rounded-full bg-black" />

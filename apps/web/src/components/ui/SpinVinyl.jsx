@@ -4,6 +4,7 @@ import { motion as Motion, useAnimationFrame, useMotionValue, useReducedMotion }
 import { Link } from 'react-router-dom'
 
 import { homeSectionsQueryOptions } from '../../queries/homeSections.js'
+import { CD_ART_CLASS, isCdArt } from '../../utils/discArt.js'
 
 // A record you can spin, in the spirit of the iPod click wheel on Apple Music's 404 page.
 // Drag it around (or flick it) and every STEP degrees of turning drops the next album's label on the platter.
@@ -128,7 +129,7 @@ const SpinVinyl = () => {
           className="absolute inset-[33%] overflow-hidden rounded-full bg-paper bg-cover bg-center ring-1 ring-black"
         >
           {album ? (
-            album.discLabel && <img key={album.discLabel} src={album.discLabel} alt="" draggable={false} decoding="async" className="h-full w-full object-cover" />
+            album.discLabel && <img key={album.discLabel} src={album.discLabel} alt="" draggable={false} decoding="async" className={`h-full w-full object-cover ${isCdArt(album.discLabel) ? CD_ART_CLASS : ''}`} />
           ) : (
             <span className="absolute left-1/2 top-[22%] -translate-x-1/2 font-display text-2xl text-black">musico</span>
           )}

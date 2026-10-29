@@ -4,6 +4,7 @@ import { FiArrowUpRight } from 'react-icons/fi'
 import { Link, useNavigate } from 'react-router-dom'
 
 import AlbumRow from '../components/album/AlbumRow.jsx'
+import ArtistName from '../components/ui/ArtistName.jsx'
 import Billboard, { WIDE_GUTTER } from '../components/ui/Billboard.jsx'
 import PageTransition from '../components/ui/PageTransition.jsx'
 import VinylSleeve from '../components/ui/VinylSleeve.jsx'
@@ -49,7 +50,7 @@ const Home = () => {
                 No. 1 on this week&rsquo;s chart
               </p>
               <h1 className="mt-5 text-balance font-display text-5xl leading-[0.92] text-paper tablet:text-7xl">{topAlbum.name}</h1>
-              <p className="mt-4 text-lg font-medium text-paper/85 tablet:text-xl">{topAlbum.artists?.join(', ')}</p>
+              <ArtistName artists={topAlbum.artists} className="mt-4 text-lg font-medium text-paper/85 tablet:text-xl" />
               <p className="mt-1 flex items-center gap-2 text-sm text-paper/60">
                 {topAlbum.releaseYear ?? ''}
                 {topAlbum.communityRating ? (
