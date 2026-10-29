@@ -147,10 +147,35 @@ const App = () => {
   // Back and forward return to where you were on that page; anything else starts at the top. A layout effect, so
   // the page is already in place when a cover morph (utils/morph.js) snapshots it.
   useLayoutEffect(() => {
-    window.scrollTo({ top: navigationType === 'POP' ? (scrollPositions.get(location.key) ?? 0) : 0, left: 0, behavior: 'instant' })
-    const save = () => scrollPositions.set(location.key, window.scrollY)
+    const top = navigationType === 'POP' ? (scrollPositions.get(location.key) ?? 0) : 0
+    let restoring = true
+    const observer = new ResizeObserver(() => restore())
+    const restore = () => {
+      window.scrollTo({ top, left: 0, behavior: 'instant' })
+      if (Math.abs(window.scrollY - top) <= 1) {
+        restoring = false
+        observer.disconnect()
+      }
+    }
+    observer.observe(document.body)
+    restore()
+    // A loading page may be shorter than the saved position. Keep it until the content grows or the user scrolls.
+    const save = () => { if (!restoring) scrollPositions.set(location.key, window.scrollY) }
+    const cancel = () => { restoring = false; observer.disconnect() }
+    const onKeyDown = (event) => {
+      if (['ArrowUp', 'ArrowDown', 'PageUp', 'PageDown', 'Home', 'End', ' '].includes(event.key)) cancel()
+    }
     window.addEventListener('scroll', save, { passive: true })
-    return () => window.removeEventListener('scroll', save)
+    window.addEventListener('wheel', cancel, { passive: true })
+    window.addEventListener('touchstart', cancel, { passive: true })
+    window.addEventListener('keydown', onKeyDown)
+    return () => {
+      observer.disconnect()
+      window.removeEventListener('scroll', save)
+      window.removeEventListener('wheel', cancel)
+      window.removeEventListener('touchstart', cancel)
+      window.removeEventListener('keydown', onKeyDown)
+    }
   }, [location.key, navigationType])
 
   return (

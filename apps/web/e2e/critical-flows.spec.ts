@@ -860,7 +860,10 @@ test.describe('Critical user flows', () => {
     })
     const file = (name) => ({ name, mimeType: 'image/png', buffer: Buffer.from(png) })
 
+    await page.getByRole('button', { name: 'Add a GIF' }).click()
+    await expect(page.getByLabel('Search GIFs')).toBeVisible()
     await page.locator('input[type="file"][multiple]').setInputFiles([file('one.png'), file('two.png')])
+    await expect(page.getByLabel('Search GIFs')).toHaveCount(0)
     await expect(page.getByRole('button', { name: 'Add image description' })).toHaveCount(2)
     // Images and a GIF are either/or.
     await expect(page.getByRole('button', { name: 'Add a GIF' })).toBeDisabled()
@@ -870,11 +873,21 @@ test.describe('Critical user flows', () => {
     await page.getByLabel(/describe this image/i).press('Enter')
 
     const savedReviews = []
+    let finishSave
+    let saving = new Promise((resolve) => { finishSave = resolve })
+    await page.route('**/api/me/reviews/*', async (route) => {
+      if (route.request().method() === 'PUT') await saving
+      await route.fallback()
+    })
     page.on('request', (request) => {
       if (request.url().includes('/api/me/reviews/') && request.method() === 'PUT') savedReviews.push(request.postDataJSON())
     })
     await page.getByPlaceholder(/write a short review/i).fill('Sounds even better on wax.')
+    await page.getByRole('button', { name: 'Edit image description' }).click()
     await page.getByRole('button', { name: /^post$/i }).click()
+    await expect(page.getByLabel(/describe this image/i)).toBeDisabled()
+    await expect(page.getByRole('button', { name: 'Remove image' }).first()).toBeDisabled()
+    finishSave()
     await expect(page.getByText(/review posted\./i)).toBeVisible()
 
     // Both uploads finished (in either order) and keep their place and alt text.
@@ -884,14 +897,31 @@ test.describe('Critical user flows', () => {
     // The composer clears after posting.
     await expect(page.getByPlaceholder(/write a short review/i)).toHaveValue('')
 
-    await page.getByRole('button', { name: 'View image: Gatefold sleeve on the turntable' }).click()
+    const openingTile = page.getByRole('button', { name: 'View image: Gatefold sleeve on the turntable' })
+    await openingTile.click()
     const viewer = page.getByRole('dialog', { name: 'Image viewer' })
     await expect(viewer.getByText('Gatefold sleeve on the turntable')).toBeVisible()
+    await expect(viewer.getByRole('button', { name: 'Close', exact: true })).toBeFocused()
+    await page.keyboard.press('Shift+Tab')
+    await expect(viewer.getByRole('button', { name: 'Next image' })).toBeFocused()
+    await page.keyboard.press('Tab')
+    await expect(viewer.getByRole('button', { name: 'Close', exact: true })).toBeFocused()
     await page.keyboard.press('ArrowRight')
     await expect(viewer.getByText('Gatefold sleeve on the turntable')).toHaveCount(0)
     await page.keyboard.press('Escape')
     await expect(viewer).toHaveCount(0)
+    await expect(openingTile).toBeFocused()
 
+    await page.getByRole('button', { name: 'Add a GIF' }).click()
+    // Posting text while the picker is open must not allow a late GIF selection to change the submitted draft.
+    saving = new Promise((resolve) => { finishSave = resolve })
+    await page.getByPlaceholder(/write a short review/i).fill('Text while browsing GIFs')
+    await page.getByRole('button', { name: /^post$/i }).click()
+    await expect(page.getByLabel('Search GIFs')).toBeDisabled()
+    await expect(page.getByRole('button', { name: 'dancing record' })).toBeDisabled()
+    finishSave()
+    await expect(page.getByLabel('Search GIFs')).toHaveCount(0)
+    await expect(page.getByText(/review posted\./i)).toBeVisible()
     await page.getByRole('button', { name: 'Add a GIF' }).click()
     await page.getByLabel('Search GIFs').fill('headphones')
     await page.getByRole('button', { name: 'headphones on' }).click()

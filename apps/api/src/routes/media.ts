@@ -1,8 +1,8 @@
 import { Elysia } from 'elysia'
-import { and, eq, gt, sql } from 'drizzle-orm'
+import { and, eq, sql } from 'drizzle-orm'
 
 import { db } from '../core/db'
-import { mediaKey, mediaStore, mediaUrl, parseMediaKey, sniffImage } from '../core/media'
+import { MEDIA_WRITE_LOCK, mediaKey, mediaStore, mediaUrl, parseMediaKey, sniffImage } from '../core/media'
 import { reviewMedia } from '../core/schema'
 import { ensureAuthenticated, isMissingTableError } from '../core/utils'
 import { MAX_MEDIA_BYTES, MAX_MEDIA_UPLOADS_PER_DAY, MEDIA_STORAGE_BUDGET_BYTES } from '../core/constants'
@@ -40,41 +40,53 @@ export const mediaRoutes = new Elysia({ prefix: '/api' })
     }
 
     try {
-      const [[usage], [recent]] = await Promise.all([
-        db.select({ bytes: sql<number>`coalesce(sum(${reviewMedia.size}), 0)::float8` }).from(reviewMedia),
-        db
-          .select({ count: sql<number>`count(*)::int` })
-          .from(reviewMedia)
-          .where(and(eq(reviewMedia.userId, authUser.id), gt(reviewMedia.createdAt, new Date(Date.now() - DAY_MS)))),
+      const id = crypto.randomUUID()
+      const key = mediaKey(authUser.id, id, extension)
+      const store = mediaStore()
+      // The row reserves both quotas before R2 is touched, including uploads still in flight.
+      const [, reservation] = await db.batch([
+        db.execute(MEDIA_WRITE_LOCK),
+        db.execute(sql`
+          with totals as (
+            select coalesce(sum(size), 0) as bytes,
+              count(*) filter (where "userId" = ${authUser.id}
+                and "createdAt" > ${new Date(Date.now() - DAY_MS).toISOString()}::timestamptz) as recent
+            from review_media
+          ), reserved as (
+            insert into review_media (id, "userId", kind, state, key, size, width, height, "createdAt")
+            select ${id}, ${authUser.id}, 'image', 'uploading', ${key}, ${bytes.byteLength}, ${width}, ${height}, now()
+            from totals where recent < ${MAX_MEDIA_UPLOADS_PER_DAY}
+              and bytes + ${bytes.byteLength} <= ${MEDIA_STORAGE_BUDGET_BYTES}
+            returning id
+          )
+          select recent, bytes, exists(select 1 from reserved) as reserved from totals
+        `),
       ])
-      if ((recent?.count ?? 0) >= MAX_MEDIA_UPLOADS_PER_DAY) {
-        set.status = 429
-        return { error: 'Daily image limit reached. Try again tomorrow.' }
-      }
-      // Stop taking uploads before the bucket outgrows R2's free tier.
-      if ((usage?.bytes ?? 0) + bytes.byteLength > MEDIA_STORAGE_BUDGET_BYTES) {
-        console.error('[media.upload] storage budget reached', { bytes: usage?.bytes })
+      const quota = reservation.rows[0] as { recent: number; bytes: number; reserved: boolean }
+      if (!quota.reserved) {
+        if (Number(quota.recent) >= MAX_MEDIA_UPLOADS_PER_DAY) {
+          set.status = 429
+          return { error: 'Daily image limit reached. Try again tomorrow.' }
+        }
+        console.error('[media.upload] storage budget reached', { bytes: quota.bytes })
         set.status = 507
         return { error: 'Image uploads are paused right now.' }
       }
 
-      const id = crypto.randomUUID()
-      const key = mediaKey(authUser.id, id, extension)
-      const store = mediaStore()
-      await store.put(key, bytes, parseMediaKey(key)!.contentType)
       try {
-        await db.insert(reviewMedia).values({
-          id,
-          userId: authUser.id,
-          kind: 'image',
-          key,
-          size: bytes.byteLength,
-          width,
-          height,
-          createdAt: new Date(),
-        })
+        await store.put(key, bytes, parseMediaKey(key)!.contentType)
+        const ready = await db.update(reviewMedia).set({ state: 'ready' })
+          .where(and(eq(reviewMedia.id, id), eq(reviewMedia.state, 'uploading'))).returning({ id: reviewMedia.id })
+        if (!ready.length) throw new Error('Upload expired before it finished.')
       } catch (error) {
-        await store.delete([key]).catch(() => {})
+        // A failed delete retains its reservation and is retried by the sweep.
+        await db.update(reviewMedia).set({ state: 'deleting' }).where(eq(reviewMedia.id, id))
+        try {
+          await store.delete([key])
+          await db.delete(reviewMedia).where(eq(reviewMedia.id, id))
+        } catch (cleanupError) {
+          console.error('[media.upload] cleanup failed', cleanupError)
+        }
         throw error
       }
 

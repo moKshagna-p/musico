@@ -1,4 +1,4 @@
-import { and, inArray, isNull, lt } from 'drizzle-orm'
+import { and, eq, inArray, isNull, lt, sql } from 'drizzle-orm'
 
 import { db } from './db'
 import { env } from './env'
@@ -94,17 +94,26 @@ export const isKlipyUrl = (value: unknown) => {
 const SWEEP_AFTER_MS = 1000 * 60 * 60 * 24
 const SWEEP_BATCH = 500
 
+// Take this in a separate statement of a READ COMMITTED batch so subsequent reads see the previous writer's commit.
+export const MEDIA_WRITE_LOCK = sql`select pg_advisory_xact_lock(750013)`
+
 // Uploads never posted, media dropped from an edited review, and media of deleted reviews.
 export const sweepDetachedMedia = async (now = new Date()) => {
-  const rows = await db
-    .select({ id: reviewMedia.id, key: reviewMedia.key })
+  const detached = and(isNull(reviewMedia.reviewId), lt(reviewMedia.createdAt, new Date(now.getTime() - SWEEP_AFTER_MS)))
+  const candidates = db.select({ id: reviewMedia.id })
     .from(reviewMedia)
-    .where(and(isNull(reviewMedia.reviewId), lt(reviewMedia.createdAt, new Date(now.getTime() - SWEEP_AFTER_MS))))
+    .where(detached)
     .limit(SWEEP_BATCH)
+  const [, rows] = await db.batch([
+    db.execute(MEDIA_WRITE_LOCK),
+    db.update(reviewMedia).set({ state: 'deleting' })
+      .where(and(detached, inArray(reviewMedia.id, candidates)))
+      .returning({ id: reviewMedia.id, key: reviewMedia.key }),
+  ])
   if (!rows.length) return 0
   const keys = rows.flatMap((row) => (row.key ? [row.key] : []))
-  // Objects first: a crash in between leaves rows to retry, never objects nothing points at.
+  // Claimed rows cannot be attached; keep them for retry if object deletion fails.
   if (keys.length) await mediaStore().delete(keys)
-  await db.delete(reviewMedia).where(inArray(reviewMedia.id, rows.map((row) => row.id)))
+  await db.delete(reviewMedia).where(and(eq(reviewMedia.state, 'deleting'), inArray(reviewMedia.id, rows.map((row) => row.id))))
   return rows.length
 }

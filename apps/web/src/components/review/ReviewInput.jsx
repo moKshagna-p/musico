@@ -48,6 +48,7 @@ const ReviewInput = ({ initialContent = '', onSave, disabled = false }) => {
         setStatus('Remove the GIF to add images.')
         return
       }
+      setPickingGif(false)
       const room = MAX_IMAGES - imagesRef.current.length
       if (files.length > room) setStatus(`You can add up to ${MAX_IMAGES} images.`)
       else setStatus('')
@@ -98,6 +99,7 @@ const ReviewInput = ({ initialContent = '', onSave, disabled = false }) => {
         setContent('')
         setImages([])
         setGif(null)
+        setPickingGif(false)
         setEditingAlt(null)
         setStatus(initialContent ? 'Review updated.' : 'Review posted.')
       } catch (err) {
@@ -167,6 +169,7 @@ const ReviewInput = ({ initialContent = '', onSave, disabled = false }) => {
                       )}
                       <button
                         type="button"
+                        disabled={disabled || saving}
                         onClick={() => removeImage(image.localId)}
                         aria-label="Remove image"
                         className="absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-full bg-black/75 text-paper backdrop-blur transition-colors hover:bg-black"
@@ -176,6 +179,7 @@ const ReviewInput = ({ initialContent = '', onSave, disabled = false }) => {
                       {image.status === 'done' && (
                         <button
                           type="button"
+                          disabled={disabled || saving}
                           onClick={() => setEditingAlt(editingAlt === image.localId ? null : image.localId)}
                           aria-label={image.alt ? 'Edit image description' : 'Add image description'}
                           className={`absolute bottom-2 left-2 rounded bg-black/75 px-1.5 py-0.5 text-[11px] font-semibold backdrop-blur transition-colors hover:bg-black ${
@@ -193,6 +197,7 @@ const ReviewInput = ({ initialContent = '', onSave, disabled = false }) => {
                     <span className="text-xs text-muted">Describe this image for people who can&apos;t see it</span>
                     <input
                       autoFocus
+                      disabled={disabled || saving}
                       value={altImage.alt}
                       onChange={(event) => patchImage(altImage.localId, { alt: event.target.value.replace(/[\r\n]+/g, ' ').slice(0, 1000) })}
                       onKeyDown={(event) => {
@@ -220,6 +225,7 @@ const ReviewInput = ({ initialContent = '', onSave, disabled = false }) => {
                       <span className="absolute bottom-2 left-2 rounded bg-black/70 px-1.5 py-0.5 text-[11px] font-semibold text-paper">GIF</span>
                       <button
                         type="button"
+                        disabled={disabled || saving}
                         onClick={() => setGif(null)}
                         aria-label="Remove GIF"
                         className="absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-full bg-black/75 text-paper backdrop-blur transition-colors hover:bg-black"
@@ -261,6 +267,7 @@ const ReviewInput = ({ initialContent = '', onSave, disabled = false }) => {
             type="file"
             accept="image/jpeg,image/png,image/webp,image/gif,image/heic,image/heif"
             multiple
+            disabled={disabled || saving}
             onChange={(event) => {
               addFiles(event.target.files)
               event.target.value = ''
@@ -276,13 +283,16 @@ const ReviewInput = ({ initialContent = '', onSave, disabled = false }) => {
       <AnimatePresence initial={false}>
         {pickingGif && (
           <Motion.div {...UNFOLD}>
-            <GifPicker
-              onClose={() => setPickingGif(false)}
-              onPick={(picked) => {
-                setGif(picked)
-                setPickingGif(false)
-              }}
-            />
+            <fieldset disabled={disabled || saving} className="min-w-0">
+              <GifPicker
+                onClose={() => setPickingGif(false)}
+                onPick={(picked) => {
+                  if (disabled || saving || imagesRef.current.length) return
+                  setGif(picked)
+                  setPickingGif(false)
+                }}
+              />
+            </fieldset>
           </Motion.div>
         )}
       </AnimatePresence>

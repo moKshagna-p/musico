@@ -14,6 +14,7 @@ const ListeningDiary = ({ ratings }) => {
   const { weeks, total, activeDays, longestStreak } = useMemo(() => listeningDiary(ratings), [ratings])
   const [hovered, setHovered] = useState(null)
   const [pinned, setPinned] = useState(null)
+  const [focusedDay, setFocusedDay] = useState(weeks.flat().length - 1)
   const today = weeks.at(-1)?.at(-1)
   const active = hovered ?? pinned
 
@@ -56,7 +57,7 @@ const ListeningDiary = ({ ratings }) => {
 
       <div className="min-w-0">
         <div
-          role="img"
+          role="group"
           aria-label={`${total} ratings across ${activeDays} days in the past year`}
           className="relative flex gap-[3px]"
           onPointerOver={(event) => {
@@ -65,6 +66,21 @@ const ListeningDiary = ({ ratings }) => {
             if (day) setHovered(day)
           }}
           onPointerLeave={() => setHovered(null)}
+          onFocus={(event) => {
+            const day = dayAt(event)
+            if (!day) return
+            setFocusedDay(Number(event.target.dataset.week) * 7 + Number(event.target.dataset.day))
+            setHovered(day)
+          }}
+          onBlur={() => setHovered(null)}
+          onKeyDown={(event) => {
+            const delta = { ArrowLeft: -7, ArrowRight: 7, ArrowUp: -1, ArrowDown: 1 }[event.key]
+            if (!delta || !event.target.matches('[data-week]')) return
+            event.preventDefault()
+            const cells = Array.from(event.currentTarget.querySelectorAll('[data-week]')).filter((cell) => cell.offsetWidth > 0)
+            const index = cells.indexOf(event.target)
+            cells[Math.max(0, Math.min(cells.length - 1, index + delta))]?.focus()
+          }}
           onClick={(event) => {
             const day = dayAt(event)
             if (day) setPinned((current) => (current?.entry === day.entry ? null : day))
@@ -93,11 +109,14 @@ const ListeningDiary = ({ ratings }) => {
                 {week[0].date.getDate() <= 7 && weekIndex < weeks.length - 2 ? monthFormat.format(week[0].date) : ''}
               </span>
               {week.map((entry, dayIndex) => (
-                <span
+                <button
+                  type="button"
                   key={dayIndex}
+                  tabIndex={weekIndex * 7 + dayIndex === focusedDay ? 0 : -1}
+                  aria-label={`${entry.date.toLocaleDateString('en', { month: 'long', day: 'numeric', year: 'numeric' })}: ${ratingsLabel(entry.count)}`}
                   data-week={weekIndex}
                   data-day={dayIndex}
-                  className={`aspect-square w-full cursor-pointer rounded-[3px] transition-shadow ${LEVELS[Math.min(entry.count, 4)]} ${
+                  className={`aspect-square w-full cursor-pointer rounded-[3px] transition-shadow focus-visible:outline focus-visible:outline-2 focus-visible:outline-paper ${LEVELS[Math.min(entry.count, 4)]} ${
                     entry === active?.entry ? 'ring-1 ring-inset ring-paper' : entry === today ? 'ring-1 ring-inset ring-paper/40' : ''
                   }`}
                 />

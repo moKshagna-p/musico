@@ -1,9 +1,5 @@
 import { expect, test } from 'bun:test'
 
-Bun.env.DISCOGS_MIN_REQUEST_INTERVAL_MS = '1'
-Bun.env.DISCOGS_MAX_RETRIES = '1'
-Bun.env.DISCOGS_REQUEST_TIMEOUT_MS = '10'
-
 const {
   buildSmartSearchResults,
   fetchRecentReleaseCandidatesFromDiscogs,

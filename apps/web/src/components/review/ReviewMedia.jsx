@@ -33,38 +33,47 @@ export const MediaGrid = ({ items, renderTile }) => {
   )
 }
 
-const MediaLightbox = ({ items, index, onIndexChange, onClose }) => {
-  const closeRef = useRef(null)
+const MediaLightbox = ({ items, index, onIndexChange, onClose, openerRef }) => {
+  const dialogRef = useRef(null)
   const item = items[index]
   const step = useCallback((delta) => onIndexChange((index + delta + items.length) % items.length), [index, items.length, onIndexChange])
 
   useEffect(() => {
-    closeRef.current?.focus()
-    const handleKeyDown = (event) => {
-      if (event.key === 'Escape') onClose()
-      if (items.length > 1 && event.key === 'ArrowRight') step(1)
-      if (items.length > 1 && event.key === 'ArrowLeft') step(-1)
-    }
+    const opener = openerRef.current
+    const dialog = dialogRef.current
+    dialog.showModal()
     const { overflow } = document.body.style
     document.body.style.overflow = 'hidden'
-    window.addEventListener('keydown', handleKeyDown)
     return () => {
       document.body.style.overflow = overflow
-      window.removeEventListener('keydown', handleKeyDown)
+      dialog.close()
+      opener?.focus({ preventScroll: true })
     }
-  }, [items.length, onClose, step])
+  }, [openerRef])
 
   return createPortal(
     // Opening and closing animate as a View Transition (the tile zooms in, the page crossfades), see ReviewMedia.
-    <div
-      role="dialog"
-      aria-modal="true"
+    <dialog
+      ref={dialogRef}
       aria-label="Image viewer"
+      onCancel={(event) => { event.preventDefault(); onClose() }}
+      onKeyDown={(event) => {
+        if (event.key === 'Tab') {
+          const buttons = Array.from(event.currentTarget.querySelectorAll('button'))
+          const edge = event.shiftKey ? buttons[0] : buttons.at(-1)
+          if (document.activeElement === edge) {
+            event.preventDefault()
+            ;(event.shiftKey ? buttons.at(-1) : buttons[0]).focus()
+          }
+        }
+        if (items.length > 1 && event.key === 'ArrowRight') { event.preventDefault(); step(1) }
+        if (items.length > 1 && event.key === 'ArrowLeft') { event.preventDefault(); step(-1) }
+      }}
       onClick={onClose}
-      className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-black/90 p-4 backdrop-blur-sm"
+      className="fixed inset-0 m-0 flex h-dvh max-h-none w-screen max-w-none flex-col items-center justify-center bg-black/90 p-4 backdrop-blur-sm"
     >
       <button
-        ref={closeRef}
+        autoFocus
         type="button"
         onClick={onClose}
         aria-label="Close"
@@ -106,7 +115,7 @@ const MediaLightbox = ({ items, index, onIndexChange, onClose }) => {
           </button>
         </>
       )}
-    </div>,
+    </dialog>,
     document.body,
   )
 }
@@ -114,10 +123,14 @@ const MediaLightbox = ({ items, index, onIndexChange, onClose }) => {
 const ReviewMedia = ({ media = [] }) => {
   const [openIndex, setOpenIndex] = useState(null)
   const rootRef = useRef(null)
+  const openerRef = useRef(null)
   const images = media.filter((item) => item.kind === 'image')
   const tile = (index) => rootRef.current?.querySelector(`[data-tile="${index}"]`)
   const lightboxImage = () => document.querySelector('[data-lightbox-image]')
-  const open = (index) => morph(() => setOpenIndex(index), { from: tile(index), to: lightboxImage, name: 'review-media' })
+  const open = (index) => {
+    openerRef.current = tile(index)?.closest('button')
+    morph(() => setOpenIndex(index), { from: tile(index), to: lightboxImage, name: 'review-media' })
+  }
   // Shrinks back into whichever tile the viewer ended on.
   const close = useCallback(
     () => morph(() => setOpenIndex(null), { from: lightboxImage(), to: () => tile(openIndex), name: 'review-media' }),
@@ -144,7 +157,7 @@ const ReviewMedia = ({ media = [] }) => {
         }
       />
       {openIndex !== null && images[openIndex] && (
-        <MediaLightbox items={images} index={openIndex} onIndexChange={setOpenIndex} onClose={close} />
+        <MediaLightbox items={images} index={openIndex} onIndexChange={setOpenIndex} onClose={close} openerRef={openerRef} />
       )}
     </div>
   )

@@ -339,6 +339,7 @@ export const reviewMedia = pgTable(
     userId: text('userId').notNull(),
     reviewId: text('reviewId').references(() => userReview.id, { onDelete: 'set null' }),
     kind: text('kind').$type<'image' | 'gif'>().notNull(),
+    state: text('state').$type<'uploading' | 'ready' | 'deleting'>().notNull().default('ready'),
     key: text('key'),
     url: text('url'),
     size: integer('size').notNull().default(0),
