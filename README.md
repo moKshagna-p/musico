@@ -1,86 +1,104 @@
+<div align="center">
+
+<img src="apps/web/public/musico-mark.svg" alt="Musico" width="72" />
+
 # Musico
 
-Musico is a high-performance open-source platform for music discovery and social interaction. Inspired by the community-centric model of Letterboxd, it provides a dedicated space for users to explore, rate, and review albums while maintaining personal collections.
+**Letterboxd, but for albums.**
 
-## Core Capabilities
+Rate the records you love, write about the ones that stayed with you,<br />
+and see what your friends are listening to.
 
-- **Discovery and Search**: Deep integration with the Discogs API provides comprehensive access to global music metadata.
-- **Social Interaction**: Users can rate releases, share written reviews, and follow others to stay updated on community activity.
-- **Collection Management**: Support for custom lists, such as "Listen Later" or personal favorites, to help users organize their musical journey.
-- **Engineered for Speed**: A multi-layered caching strategy using PostgreSQL and in-memory TTLs ensures minimal latency and reduced overhead on upstream APIs.
-- **Security and Privacy**: Built on Better Auth, providing robust session management and complete data isolation between accounts.
-- **Optimization**: Features like blur-up image loading, infinite scroll, and batched API responses prioritize a smooth user experience.
+[**Try it live**](https://musico-web.vercel.app) · [Report a bug](https://github.com/moKshagna-p/musico/issues) · [Contribute](#contributing)
 
-## System Architecture
+<br />
 
-Musico is built as a TypeScript monorepo managed by Turbo, ensuring a clean separation of concerns and efficient build cycles.
+<img src=".github/assets/album-page.png" alt="The Musico album page for Rodeo by Travis Scott, showing the community score, your rating, and links to streaming services" width="900" />
 
-- **Frontend**: A modern React application utilizing Vite, TailwindCSS, and TanStack Query for a responsive interface.
-- **API Service**: A backend built with Bun and Elysia that serves as a high-performance orchestrator and API proxy.
-- **Persistence**: PostgreSQL (via Neon) managed by Drizzle ORM for type-safe database operations.
+</div>
 
-## Technology Stack
+---
 
-| Layer | Technologies |
+## Why Musico?
+
+I've been a Letterboxd fan for years. Logging films, writing short reviews, scrolling through friends' diaries: it turns watching into something you share. I kept wishing music had the same thing, so I built it.
+
+Musico is free, open source, and made for people who still listen to albums from start to finish.
+
+## What you can do
+
+- **Rate albums** in half stars, from 0.5 to 5
+- **Write reviews** and add images or GIFs when words aren't enough
+- **Keep a Listen Later list**, your watchlist for records
+- **Make your own lists** and share them with a public link
+- **Follow friends** and see their ratings and reviews in your feed
+- **Look back at your listening diary** and rating history on your profile
+- **Discover new music** through trending releases, search, and artist pages
+
+All album data comes from [Discogs](https://www.discogs.com), so nearly any record you can think of is already there.
+
+## Built with
+
+| Layer | Stack |
 | :--- | :--- |
-| **Frontend** | React 18+, Vite, TailwindCSS, TanStack Query |
-| **Backend** | Bun, Elysia, Better Auth |
-| **Data** | PostgreSQL, Drizzle ORM |
-| **Tooling** | Turbo, mprocs, Playwright, Vitest |
+| Frontend | React, Vite, TailwindCSS, TanStack Query, Framer Motion |
+| Backend | Bun, Elysia, Better Auth |
+| Data | PostgreSQL (Neon), Drizzle ORM |
+| Hosting | Vercel (web), Cloudflare Workers (API) |
+| Tooling | Turbo, mprocs, Vitest, Playwright |
 
-## Getting Started
+The repo is a Turbo monorepo with two apps:
 
-### Prerequisites
+```
+apps/
+  web/   React frontend
+  api/   Elysia API that wraps Discogs, with Postgres and in-memory caching
+```
 
-- Node.js 22+
-- Bun 1.3.10+
-- A PostgreSQL instance (e.g., Neon)
+The API caches Discogs responses in Postgres and in memory, so pages load quickly and the upstream API isn't hit more than it needs to be.
 
-### Setup
+## Run it locally
 
-1. **Initialize**:
-   ```bash
-   git clone https://github.com/moKshagna-p/musico.git
-   cd musico
-   bun install
-   ```
+You'll need **Bun 1.3.10+**, **Node.js 22+**, and a **PostgreSQL** database (a free [Neon](https://neon.tech) one works well).
 
-2. **Configuration**:
-   Copy `.env.example` to `.env` and provide values for `DATABASE_URL`, `DISCOGS_TOKEN`, and `BETTER_AUTH_SECRET`.
+```bash
+git clone https://github.com/moKshagna-p/musico.git
+cd musico
+bun install
+cp .env.example .env   # fill in DATABASE_URL, DISCOGS_TOKEN, BETTER_AUTH_SECRET
+bun run db:migrate:api
+bun run dev
+```
 
-3. **Database**:
-   ```bash
-   bun run db:migrate:api
-   ```
+`bun run dev` starts the web app at http://localhost:5173 and the API at http://localhost:4000 in separate mprocs panes.
 
-4. **Development**:
-   ```bash
-   bun run dev
-   ```
-   mprocs starts the web and API services in separate panes. The application will be available at `http://localhost:5173` with the API service at `http://localhost:4000`.
+### Checks
 
-## Quality Standards
+```bash
+bun run lint        # lint every workspace
+bun run test        # API and web unit tests
+bun run test:e2e    # Playwright end-to-end tests
+```
 
-We maintain reliability through comprehensive testing and linting:
+## Contributing
 
-- **Linting**: `bun run lint`
-- **Unit Testing**: `bun run test` (Bun API tests and Node's built-in web tests)
-- **E2E Testing**: `npx playwright test`
+Contributions of any size are welcome, from a typo fix to a whole feature.
 
-## Release Workflow
+1. Fork the repo and create a branch
+2. Make your change, and add tests if it touches logic
+3. Run `bun run lint` and `bun run test`
+4. Open a pull request
 
-Normal pushes and pull requests run CI checks only. Production deployments run from the `Release` workflow when a `v*` tag is pushed or the workflow is started manually. Each release automatically publishes a professional, four-to-five-line summary of the commits since the previous release tag.
+If you're not sure where to start, open an issue and say hi.
 
-Release deployments require these GitHub Actions secrets:
+<details>
+<summary><strong>Releases and deployment (maintainers)</strong></summary>
 
-- `CLOUDFLARE_API_TOKEN`
-- `CLOUDFLARE_ACCOUNT_ID`
-- `VERCEL_TOKEN`
-- `VERCEL_ORG_ID`
-- `VERCEL_PROJECT_ID`
+<br />
 
-Store them as `production` environment secrets because the deploy jobs target the
-`production` GitHub Actions environment:
+Pushes and pull requests only run CI. Production deploys run from the `Release` workflow when a `v*` tag is pushed or when the workflow is started manually. Each release publishes a short summary of the commits since the previous tag.
+
+The deploy jobs target the `production` GitHub Actions environment and need these secrets:
 
 ```sh
 gh secret set CLOUDFLARE_API_TOKEN --env production
@@ -90,20 +108,29 @@ gh secret set VERCEL_ORG_ID --env production
 gh secret set VERCEL_PROJECT_ID --env production
 ```
 
-If any of these are missing, the release workflow fails before attempting the
-Cloudflare Worker or Vercel deploy.
+If any of them are missing, the workflow fails before it tries to deploy.
 
-## Production Security
+</details>
 
-- Provision the first administrator with the operator-only command in
-  [`apps/api/CLOUDFLARE.md`](apps/api/CLOUDFLARE.md). Runtime admin access is
-  granted only through the `admin_user` table.
-- Set a dedicated, high-entropy `CRON_SECRET`. Cron refresh endpoints accept
-  `POST` requests with `Authorization: Bearer <CRON_SECRET>` only.
-- Configure Cloudflare WAF/rate-limiting rules for `/api/auth/*`, `/api/search`,
-  and `/api/releases/*`; the Worker limiter is intentionally a bounded local
-  fallback, not global DDoS protection.
+<details>
+<summary><strong>Production security (maintainers)</strong></summary>
 
-## Contributing
+<br />
 
-Contributions are welcome. If you have improvements or bug fixes, please open an issue or submit a pull request for review.
+- Create the first admin with the operator-only command in [`apps/api/CLOUDFLARE.md`](apps/api/CLOUDFLARE.md). Admin access at runtime is granted only through the `admin_user` table.
+- Set a dedicated, high-entropy `CRON_SECRET`. Cron refresh endpoints accept only `POST` requests with `Authorization: Bearer <CRON_SECRET>`.
+- Add Cloudflare WAF and rate-limiting rules for `/api/auth/*`, `/api/search`, and `/api/releases/*`. The Worker's built-in limiter is a local fallback, not global DDoS protection.
+
+</details>
+
+## License
+
+[MIT](LICENSE). Use it, change it, build on it.
+
+---
+
+<div align="center">
+
+Made with love for people who listen to the whole album.
+
+</div>
