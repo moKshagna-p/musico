@@ -91,15 +91,26 @@ jobs:
     name: Migrate Database
     runs-on: ubuntu-latest
     needs: checks
-    timeout-minutes: 5
+    timeout-minutes: 45
     environment: production
-    # Releases are grouped per tag above, so two tags could migrate at once; this queues them instead.
-    concurrency:
-      group: production-migrations
-      cancel-in-progress: false
+    permissions:
+      actions: read
+      contents: read
     env:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
     steps:
+      # Releases are grouped per tag above, so two tags can run at once. A concurrency group would cancel all but one
+      # waiting run, so instead each release waits for every older one to finish, and they migrate and deploy in order.
+      - name: Wait for earlier releases
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          while gh run list --repo "$GITHUB_REPOSITORY" --workflow release.yml --limit 50 --json databaseId,status \
+            -q '.[] | select(.status != "completed" and .databaseId < ${{ github.run_id }}) | .databaseId' | grep -q .; do
+            echo 'An earlier release is still running; waiting for it to finish.'
+            sleep 20
+          done
+
       - name: Checkout
         uses: actions/checkout@v4
         with:
