@@ -15,6 +15,7 @@ export const artistRoutes = new Elysia({ prefix: '/api' })
       source: result?.source ?? null,
       kind: result?.kind ?? null,
       video: result?.video ?? null,
+      square: result?.square ?? null,
     }
   }, {
     query: t.Object({ name: t.String({ minLength: 1, maxLength: 200 }) }),

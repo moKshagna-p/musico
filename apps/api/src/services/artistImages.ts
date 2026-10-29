@@ -8,11 +8,12 @@ import { audioDbJson } from './theAudioDb'
 
 // `editorial` art is a wide, art-directed hero; `portrait` is a plain artist photo.
 // `video` is Apple's looping HLS motion hero, when the artist has one.
-export type ArtistImage = {
-  image: string
+// `square` is Apple's square cut of the same hero, art-directed for phones.
+type HeroArt = { image: string; video: string | null }
+export type ArtistImage = HeroArt & {
   source: 'apple' | 'fanart' | 'deezer'
   kind: 'editorial' | 'portrait'
-  video: string | null
+  square: HeroArt | null
 }
 
 type Fetcher = (input: string, init?: RequestInit) => Promise<Response>
@@ -77,24 +78,30 @@ const resolveAppleTemplate = (artwork: AppleArtwork | undefined, maxWidth = 2400
 
 const APPLE_MOTION_VIDEO = /^https:\/\/mvod\.itunes\.apple\.com\/itunes-assets\/.+\.m3u8$/i
 
+const readMotion = (value: unknown, maxWidth?: number) => {
+  const { previewFrame, video } = value as { previewFrame?: AppleArtwork; video?: unknown }
+  return {
+    image: resolveAppleTemplate(previewFrame, maxWidth),
+    video: typeof video === 'string' && APPLE_MOTION_VIDEO.test(video) ? video : null,
+  }
+}
+
+const firstResolved = (arts: Array<{ image: string | null; video: string | null }>) =>
+  arts.find((art): art is HeroArt => Boolean(art.image)) ?? null
+
 // Prefers art-directed heroes: motion heroes (still plus video), then editorial banners.
 export const pickEditorialArtwork = (pageData: unknown) => {
-  const motions = findAllByKey(pageData, 'motionArtistFullscreen16x9')
-    .map((value) => value as { previewFrame?: AppleArtwork; video?: unknown })
-    .map(({ previewFrame, video }) => ({
-      artwork: previewFrame,
-      video: typeof video === 'string' && APPLE_MOTION_VIDEO.test(video) ? video : null,
-    }))
+  const motions = findAllByKey(pageData, 'motionArtistFullscreen16x9').map((value) => readMotion(value))
   const banners = findAllByKey(pageData, 'wideArtwork')
     .map((value) => (value as { dictionary?: AppleArtwork }).dictionary)
     .filter((artwork) => typeof artwork?.url === 'string' && /\/thumb\/Features/i.test(artwork.url))
-    .map((artwork) => ({ artwork, video: null }))
+    .map((artwork) => ({ image: resolveAppleTemplate(artwork), video: null }))
 
-  for (const { artwork, video } of [...motions, ...banners]) {
-    const image = resolveAppleTemplate(artwork)
-    if (image) return { image, video }
-  }
-  return null
+  const wide = firstResolved([...motions, ...banners])
+  if (!wide) return null
+  // 1400px covers a phone's full width at 3x.
+  const square = firstResolved(findAllByKey(pageData, 'motionArtistSquare1x1').map((value) => readMotion(value, 1400)))
+  return { ...wide, square }
 }
 
 export const appleArtworkUrl = (ogImage: string, size = 1800) => {
@@ -169,7 +176,7 @@ const findOnApple = async (name: string, fetcher: Fetcher): Promise<AppleArt | n
 
   const ogImage = html.match(/<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i)?.[1]
   const image = ogImage ? appleArtworkUrl(ogImage) : null
-  return { wide, portrait: image ? { image, source: 'apple', kind: 'portrait', video: null } : null }
+  return { wide, portrait: image ? { image, source: 'apple', kind: 'portrait', video: null, square: null } : null }
 }
 
 const MBID = /^[0-9a-f-]{36}$/i
@@ -208,7 +215,7 @@ const findOnFanart = async (name: string, fetcher: Fetcher, apiKey?: string): Pr
   if (!apiKey) return null
   const mbid = await findArtistMbid(name, fetcher)
   const url = mbid ? mostLiked((await getFanartArtist(mbid, fetcher, apiKey))?.artistbackground) : null
-  return url ? { image: url, source: 'fanart', kind: 'editorial', video: null } : null
+  return url ? { image: url, source: 'fanart', kind: 'editorial', video: null, square: null } : null
 }
 
 const findOnDeezer = async (name: string, fetcher: Fetcher): Promise<ArtistImage | null> => {
@@ -219,7 +226,7 @@ const findOnDeezer = async (name: string, fetcher: Fetcher): Promise<ArtistImage
   const image = artist?.picture_xl
   // Deezer serves a blank silhouette at /images/artist//... for artists without a photo.
   if (!image?.startsWith('https://') || image.includes('/images/artist//')) return null
-  return { image, source: 'deezer', kind: 'portrait', video: null }
+  return { image, source: 'deezer', kind: 'portrait', video: null, square: null }
 }
 
 const attempt = async <T>(source: string, name: string, lookup: () => Promise<T | null>) => {

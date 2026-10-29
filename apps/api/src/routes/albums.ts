@@ -1,8 +1,9 @@
-import { Elysia } from 'elysia'
+import { Elysia, t } from 'elysia'
 import { getReleaseDetails } from '../services/discogs'
 import { attachMusicoCommunityStats } from '../core/utils'
 import { attachHdCovers } from '../services/albumArtwork'
 import { attachDiscLabels, lookUpDiscLabelsLater } from '../services/discLabels'
+import { findStreamingLinks } from '../services/streamingLinks'
 import { loadStoredFeaturedSection } from '../services/trending'
 import { readIdentifier } from './validation'
 
@@ -92,6 +93,28 @@ export const albumRoutes = new Elysia({ prefix: '/api' })
       set.status = 502
       return { error: 'Unable to load homepage data right now.' }
     }
+  })
+  .get('/streaming-links', async ({ query, set }) => {
+    set.headers ??= {}
+    try {
+      const links = await findStreamingLinks(query.artist, query.album)
+      // An album's pages rarely move; one with none listed yet is asked about again sooner.
+      set.headers['Cache-Control'] = Object.keys(links).length
+        ? 'public, max-age=86400, s-maxage=2592000'
+        : 'public, max-age=3600, s-maxage=86400'
+      return { links }
+    } catch (error) {
+      // The album page keeps its search links; nothing is cached so the next visit asks again.
+      console.warn('[streaming-links] lookup failed', query.artist, query.album, error instanceof Error ? error.message : String(error))
+      set.status = 503
+      set.headers['Cache-Control'] = 'no-store'
+      return { error: 'Streaming links are unavailable right now.' }
+    }
+  }, {
+    query: t.Object({
+      artist: t.String({ minLength: 1, maxLength: 200 }),
+      album: t.String({ minLength: 1, maxLength: 300 }),
+    }),
   })
    .get('/releases/:id', async ({ params, set }) => {
      const releaseId = readIdentifier(params?.id)

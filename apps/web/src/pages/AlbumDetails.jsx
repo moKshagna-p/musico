@@ -16,7 +16,7 @@ import { AlbumDetailsPageSkeleton, TrackRowsSkeleton } from '../components/ui/Pa
 import { useAuth } from '../hooks/useAuth.js'
 import { useLists } from '../hooks/useLists.js'
 import { useRatings } from '../hooks/useRatings.js'
-import { getReleaseDetails } from '../services/discogsService.js'
+import { getReleaseDetails, getStreamingLinks } from '../services/discogsService.js'
 import { saveMyReview } from '../services/socialService.js'
 import {
   formatDuration,
@@ -68,7 +68,16 @@ const AlbumDetails = () => {
   // Keep the card's cover so the art the browser already has isn't swapped and downloaded again.
   const album = useMemo(() => (data && seed?.cover ? { ...data, cover: seed.cover } : data), [data, seed])
 
-  const streamingLinks = useMemo(() => generateStreamingLinks(album), [album])
+  const artist = album?.artists?.[0]
+  const { data: directLinks } = useQuery({
+    queryKey: ['streaming-links', artist, album?.name],
+    queryFn: () => getStreamingLinks(artist, album.name),
+    enabled: Boolean(artist && album?.name),
+    staleTime: Infinity,
+    retry: false,
+  })
+  // Search links hold each button until the album's own page is known, and stay for platforms without one.
+  const streamingLinks = useMemo(() => ({ ...generateStreamingLinks(album), ...directLinks }), [album, directLinks])
   const albumGenres = useMemo(() => inferAlbumGenres(album), [album])
   const userRating = getUserRating(album?.id ?? '')
   const community = album ? getCommunityStats(album) : { average: 0, total: 0 }
@@ -242,7 +251,7 @@ const AlbumDetails = () => {
 
   return (
     <PageTransition bleed>
-      <Billboard artist={album.artists?.[0]} cover={album.cover} className="min-h-[86svh]">
+      <Billboard artist={album.artists?.[0]} cover={album.cover} className="tablet:min-h-[86svh]">
         <>
           <BackButton onClick={goBack} />
 

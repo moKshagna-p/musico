@@ -3,11 +3,14 @@ import { z } from 'zod'
 import { validatedRequest } from './apiClient.js'
 import { API_BASE_URL } from './authClient.js'
 
+const HeroArtSchema = z.object({ image: z.string().url(), video: z.string().url().nullable() })
+
 const ArtistImageSchema = z.object({
   image: z.string().url().nullable(),
   source: z.enum(['apple', 'fanart', 'deezer']).nullable(),
   kind: z.enum(['editorial', 'portrait']).nullable(),
   video: z.string().url().nullable().optional(),
+  square: HeroArtSchema.nullable().optional(),
 })
 
 // Discogs disambiguates duplicate names as "Artist (2)" and marks name variations with "*".
@@ -23,5 +26,5 @@ export const artistLogoImageUrl = (name) => `${API_BASE_URL}/api/artist-logo/ima
 
 export const getArtistImage = async (name) => {
   const data = await validatedRequest({ url: '/api/artist-image', params: { name: cleanArtistName(name) } }, ArtistImageSchema)
-  return data?.image ? { image: data.image, kind: data.kind ?? 'portrait', video: data.video ?? null } : null
+  return data?.image ? { image: data.image, kind: data.kind ?? 'portrait', video: data.video ?? null, square: data.square ?? null } : null
 }
