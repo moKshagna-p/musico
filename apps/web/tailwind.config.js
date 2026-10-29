@@ -12,6 +12,7 @@ export default {
       colors: {
         canvas: '#000000',
         panel: '#0d0d0c',
+        outline: '#232220',
         muted: '#8e8b85',
         paper: '#eeeae3',
       },
