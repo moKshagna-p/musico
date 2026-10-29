@@ -108,7 +108,7 @@ export const normalizeListName = (value: unknown) =>
     .replace(/\s+/g, ' ')
     .slice(0, 48)
 
-export const toSafeArtists = (value: unknown) => {
+const toSafeArtists = (value: unknown) => {
   if (!Array.isArray(value)) return []
   return value.filter(Boolean).map((entry) => String(entry)).slice(0, 3)
 }
@@ -119,7 +119,7 @@ export const getCachedReleaseArtists = (payload: unknown) => {
   return toSafeArtists(artists)
 }
 
-export const parseReleaseYear = (value: unknown) => {
+const parseReleaseYear = (value: unknown) => {
   const parsed = Number(value)
   return Number.isFinite(parsed) && parsed > 0 ? Math.round(parsed) : null
 }
@@ -142,7 +142,7 @@ export const parseProfileImage = (value: unknown) => {
   }
 }
 
-export const normalizeAlbumId = (value: unknown) => String(value ?? '').trim()
+const normalizeAlbumId = (value: unknown) => String(value ?? '').trim()
 export const normalizeEmail = (value: unknown) => String(value ?? '').trim().toLowerCase()
 
 // Drizzle wraps driver errors ("Failed query: ..."), so the Postgres message is on the cause.
@@ -188,7 +188,7 @@ export const getReleasePreviewMap = async (albumIds: unknown[]) => {
   )
 }
 
-export const getCachedReleasePreviewMap = async (albumIds: unknown[], allowExpiredMetadata = false) => {
+const getCachedReleasePreviewMap = async (albumIds: unknown[], allowExpiredMetadata = false) => {
   const uniqueAlbumIds = [...new Set(albumIds.map(normalizeAlbumId).filter(Boolean))].slice(0, MAX_RELEASE_PREVIEW_LOOKUPS)
   if (!uniqueAlbumIds.length) {
     return new Map<string, { name: string; cover: string; artists: string[]; genres: string[]; releaseYear: number | null }>()

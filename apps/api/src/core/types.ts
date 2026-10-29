@@ -27,6 +27,3 @@ export interface ReleaseSummary {
 export interface ReleaseDetails extends ReleaseSummary {
   tracks: Track[]
 }
-
-// Backward-compatible alias used by existing internals.
-export type Release = ReleaseDetails

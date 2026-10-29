@@ -11,7 +11,6 @@
     "worker:deploy": "wrangler deploy",
     "admin:grant": "bun --env-file=../../.env run scripts/grant-admin.ts --",
     "home:refresh": "bun --env-file=../../.env run scripts/refresh-home.ts",
-    "avatars:move": "bun --env-file=../../.env run scripts/move-inline-avatars.ts",
     "db:generate": "bun --env-file=../../.env drizzle-kit generate --config=drizzle.config.ts",
     "db:migrate": "drizzle-kit migrate --config=drizzle.config.ts",
     "db:migrate:local": "bun --env-file=../../.env drizzle-kit migrate --config=drizzle.config.ts",

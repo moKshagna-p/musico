@@ -13,7 +13,6 @@ export default {
         canvas: '#000000',
         panel: '#0d0d0c',
         outline: '#232220',
-        accent: '#d0d0d0',
         muted: '#8e8b85',
         paper: '#eeeae3',
       },
@@ -22,12 +21,8 @@ export default {
         sleeve: '0 30px 60px -20px rgba(0,0,0,0.9), 0 0 0 1px rgba(255,255,255,0.06)',
       },
       screens: {
-        desktop: '1920px',
         laptop: '1440px',
         tablet: '1024px',
-      },
-      animation: {
-        vinylSpin: 'vinylSpin 6s linear infinite',
       },
       keyframes: {
         vinylSpin: {

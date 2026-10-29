@@ -23,7 +23,7 @@ export const AlbumCardSkeleton = () => (
 )
 
 // Mirrors AlbumTile: inset sleeve, title, artist, meta.
-export const AlbumTileSkeleton = () => (
+const AlbumTileSkeleton = () => (
   <div aria-hidden="true">
     <div className="pr-[12%]">
       <SleeveSkeleton />
