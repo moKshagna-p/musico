@@ -1,7 +1,7 @@
 import { expect, test } from 'bun:test'
 
 // A separate process keeps the Neon adapter and authentication stubs out of other API tests.
-test.skipIf(!process.env.TEST_DATABASE_URL)('media reservations, review saves, and cleanup stay consistent under concurrency', async () => {
+test.skipIf(!process.env.TEST_DATABASE_URL)('media reservations, review saves, cleanup and the shared cache work against real PostgreSQL', async () => {
   const script = String.raw`
     import assert from 'node:assert/strict'
     import { readdir } from 'node:fs/promises'
@@ -176,6 +176,78 @@ test.skipIf(!process.env.TEST_DATABASE_URL)('media reservations, review saves, a
       assert.equal(gifReview.media[0].kind, 'gif')
       assert.equal(gifReview.media[0].alt, 'record')
       assert.equal((await pool.unsafe('select "reviewId" from review_media where id = \'keep\''))[0].reviewId, null)
+
+      // The shared cache keeps nulls as hits, overwrites keys, and treats and sweeps expired rows as misses.
+      const { sharedGet, sharedSet, sweepSharedCache, pauseService, isServicePaused } = await import('./src/core/sharedCache.ts')
+      await sharedSet('logo:none', null, 60_000)
+      assert.deepEqual(await sharedGet('logo:none'), { value: null })
+      await sharedSet('logo:none', 'https://example.com/logo.png', 60_000)
+      assert.deepEqual(await sharedGet('logo:none'), { value: 'https://example.com/logo.png' })
+      assert.equal(await sharedGet('missing'), null)
+      assert.equal(await isServicePaused('apple'), false)
+      await pauseService('apple', 60_000)
+      assert.equal(await isServicePaused('apple'), true)
+      await sharedSet('stale', 1, -1000)
+      assert.equal(await sharedGet('stale'), null)
+      await sweepSharedCache()
+      assert.deepEqual((await pool.unsafe('select key from shared_cache order by key')).map(row => row.key), ['logo:none', 'pause:apple'])
+
+      // Exercise a real service key so a memory hit cannot hide a failed Postgres write.
+      const { findStreamingLinks } = await import('./src/services/streamingLinks.ts')
+      const links = await findStreamingLinks('Cache Artist', 'Cache Album', async url => new Response(JSON.stringify(
+        url.includes('/release-group/?query=')
+          ? { 'release-groups': [{ id: 'cachedalbum', title: 'Cache Album', 'primary-type': 'Album', 'artist-credit': [{ name: 'Cache Artist' }] }] }
+          : { releases: [{ relations: [{ url: { resource: 'https://open.spotify.com/album/cachedalbum' } }] }] },
+      )))
+      assert.deepEqual(links, { spotify: 'https://open.spotify.com/album/cachedalbum' })
+      assert.deepEqual(await sharedGet('streaming:' + JSON.stringify(['cache artist', 'cache album'])), { value: links })
+      const { findStreamingLinks: coldStreamingLinks } = await import('./src/services/streamingLinks.ts?cold')
+      assert.deepEqual(await coldStreamingLinks('Cache Artist', 'Cache Album', async () => { throw new Error('cache should avoid upstream') }), links)
+
+      // Pauses set by another worker cover streaming, artist images and artist logos.
+      const { findArtistImage, findArtistLogo, searchAppleMusic } = await import('./src/services/artistImages.ts')
+      await pauseService('musicbrainz', 60_000)
+      const requests = []
+      const pausedFetcher = async url => {
+        requests.push(url)
+        return new Response(JSON.stringify({ artists: [], data: [{ name: 'Paused Image', picture_xl: 'https://cdn-images.dzcdn.net/images/artist/fallback/1000x1000.jpg' }] }))
+      }
+      const imageFailure = await findArtistImage('Paused Image', pausedFetcher, 'fanart-key').catch(error => error)
+      assert.equal(imageFailure.fallback?.source, 'deezer')
+      assert.equal(await sharedGet('artist-image:paused image'), null)
+      await assert.rejects(() => findArtistLogo('Paused Logo', pausedFetcher, { audioDb: 'test', fanart: 'fanart-key' }), /A logo source failed/)
+      assert.equal(requests.some(url => url.includes('music.apple.com') || url.includes('musicbrainz.org')), false)
+      await assert.rejects(() => findStreamingLinks('Paused Artist', 'Paused Album', pausedFetcher), /MusicBrainz is rate limited/)
+
+      // The route still returns the fallback, but it must not be saved by a browser or edge cache.
+      const { artistRoutes } = await import('./src/routes/artists.ts')
+      const originalFetch = globalThis.fetch
+      globalThis.fetch = pausedFetcher
+      try {
+        const response = await new Elysia().use(artistRoutes).handle(new Request('http://localhost/api/artist-image?name=Paused%20Image'))
+        assert.equal(response.status, 200)
+        assert.equal(response.headers.get('Cache-Control'), 'no-store')
+        assert.equal((await response.json()).source, 'deezer')
+      } finally {
+        globalThis.fetch = originalFetch
+      }
+
+      // Rate-limit responses from these callers publish pauses for other workers too.
+      await pool.unsafe("delete from shared_cache where key like 'pause:%'")
+      const recovered = await findArtistImage('Paused Image', async url => url.includes('/search?')
+        ? new Response('<script id="serialized-server-data" type="application/json">' + JSON.stringify({ items: [{ title: 'Paused Image', contentDescriptor: { kind: 'artist', url: 'https://music.apple.com/us/artist/paused-image/1' } }] }) + '</script>')
+        : new Response('<meta property="og:image" content="https://is1-ssl.mzstatic.com/image/thumb/AMCArtistImages211/v4/a/photo.png/1200x630cw.png">'))
+      assert.equal(recovered.source, 'apple')
+      let mbAttempts = 0
+      assert.deepEqual(await findStreamingLinks('Retry Artist', 'Retry Album', async () => new Response(
+        JSON.stringify({ 'release-groups': [] }), { status: ++mbAttempts === 1 ? 503 : 200 },
+      )), {})
+      assert.equal(mbAttempts, 2)
+      assert.equal(await isServicePaused('musicbrainz'), false)
+      await assert.rejects(() => searchAppleMusic('Limited Artist', async () => new Response('', { status: 429 })), /429/)
+      assert.equal(await isServicePaused('apple'), true)
+      await assert.rejects(() => findStreamingLinks('Limited Artist', 'Limited Album', async () => new Response('', { status: 429 })), /429/)
+      assert.equal(await isServicePaused('musicbrainz'), true)
 
       // Text-only saves still work before the original media migration is installed.
       await pool.unsafe('drop table review_media')

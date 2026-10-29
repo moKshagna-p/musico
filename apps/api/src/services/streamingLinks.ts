@@ -2,9 +2,11 @@
 // Spotify and Apple Music are listed for most albums; YouTube Music and Amazon Music less often. The web app keeps its
 // search links for anything missing here.
 
+import { sharedGet, sharedSet } from '../core/sharedCache'
 import { artistMatches, cleanDiscogsArtist } from './albumArtwork'
 import { normalizeName } from './artistImages'
-import { bareArtist, mbJson } from './discLabels'
+import { bareArtist } from './discLabels'
+import { mbJson } from './musicbrainz'
 
 type Fetcher = (input: string, init?: RequestInit) => Promise<Response>
 type MbReleaseGroup = { id?: string; title?: string; 'primary-type'?: string; 'artist-credit'?: Array<{ name?: string }> }
@@ -23,8 +25,14 @@ const PLATFORMS: Array<[keyof StreamingLinks, RegExp]> = [
 
 const CACHE_TTL_MS = 1000 * 60 * 60 * 24
 const CACHE_MAX_ENTRIES = 2000
-// ponytail: per-isolate memory cache plus the route's edge Cache-Control; move to Postgres if MusicBrainz load shows up.
+// Memory first, then the Postgres cache every isolate shares; the route's edge Cache-Control sits in front of both.
 const cache = new Map<string, { links: StreamingLinks; expiresAt: number }>()
+
+const remember = (key: string, links: StreamingLinks) => {
+  if (cache.size >= CACHE_MAX_ENTRIES) cache.delete(cache.keys().next().value as string)
+  cache.set(key, { links, expiresAt: Date.now() + CACHE_TTL_MS })
+  return links
+}
 
 // Only known edition labels can fall back; qualifiers such as "Live" or "Taylor's Version" identify different recordings.
 const editionTitle = (title: string) => normalizeName(title.replace(/\s*[([](?:deluxe|expanded)(?: edition| version)?[)\]]/gi, ''))
@@ -50,9 +58,11 @@ export const findStreamingLinks = async (artist: string, album: string, fetcher:
   const targetAlbum = normalizeName(album)
   if (!targetArtist || !targetAlbum) return {}
 
-  const key = `${targetArtist}\u0000${targetAlbum}`
+  const key = JSON.stringify([targetArtist, targetAlbum])
   const cached = cache.get(key)
   if (cached && cached.expiresAt > Date.now()) return cached.links
+  const stored = await sharedGet<StreamingLinks>(`streaming:${key}`)
+  if (stored) return remember(key, stored.value)
 
   // Normalized names hold only letters, numbers and spaces, so they are safe inside Lucene phrases.
   const baseAlbum = editionTitle(album)
@@ -76,7 +86,6 @@ export const findStreamingLinks = async (artist: string, album: string, fetcher:
     links = pickStreamingLinks(releases.flatMap((release) => (release.relations ?? []).map((relation) => String(relation.url?.resource ?? ''))))
   }
 
-  if (cache.size >= CACHE_MAX_ENTRIES) cache.delete(cache.keys().next().value as string)
-  cache.set(key, { links, expiresAt: Date.now() + CACHE_TTL_MS })
-  return links
+  await sharedSet(`streaming:${key}`, links, CACHE_TTL_MS)
+  return remember(key, links)
 }

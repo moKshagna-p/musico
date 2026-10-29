@@ -111,6 +111,17 @@ export const albumDiscLabel = pgTable('album_disc_label', {
   checkedAt: timestamp('checkedAt', { withTimezone: true, mode: 'date' }).notNull(),
 })
 
+// Lookups and rate-limit pauses every worker isolate can see; a row past expiresAt is a miss.
+export const sharedCache = pgTable(
+  'shared_cache',
+  {
+    key: text('key').primaryKey(),
+    value: jsonb('value').$type<{ v: unknown }>().notNull(),
+    expiresAt: timestamp('expiresAt', { withTimezone: true, mode: 'date' }).notNull(),
+  },
+  (table) => [index('shared_cache_expires_at_idx').on(table.expiresAt)],
+)
+
 export const storedTrendingAlbum = pgTable(
   'stored_trending_album',
   {

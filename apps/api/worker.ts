@@ -51,5 +51,12 @@ export default {
           console.error('[worker.scheduled] media sweep failed', error instanceof Error ? error.message : String(error), error)
         }),
     )
+    context.waitUntil(
+      import('./src/core/sharedCache')
+        .then(({ sweepSharedCache }) => sweepSharedCache())
+        .catch((error) => {
+          console.error('[worker.scheduled] shared cache sweep failed', error instanceof Error ? error.message : String(error), error)
+        }),
+    )
   },
 }

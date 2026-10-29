@@ -567,6 +567,14 @@ test.describe('Critical user flows', () => {
     await expect(page.getByText('A list by E2E User')).toBeVisible()
   })
 
+  test('a missing or private list explains itself and leads back to discover', async ({ page }) => {
+    await page.route('**/api/lists/list-gone', (route) => route.fulfill({ status: 404, json: { error: 'List not found.' } }))
+    await page.goto('/lists/list-gone')
+    await expect(page.getByRole('heading', { level: 1, name: 'List not found' })).toBeVisible()
+    await page.getByRole('button', { name: 'Discover Music' }).click()
+    await expect(page).toHaveURL('/discover')
+  })
+
   test('navbar pages render their data and album links open details', async ({ page }) => {
     const browserErrors: string[] = []
     page.on('console', (message) => {

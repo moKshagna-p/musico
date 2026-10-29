@@ -4,6 +4,8 @@
 // is the last resort. Artist logos come from TheAudioDB, then fanart.tv.
 
 import { env } from '../core/env'
+import { isServicePaused, pauseService, sharedGet, sharedSet } from '../core/sharedCache'
+import { mbJson } from './musicbrainz'
 import { audioDbJson } from './theAudioDb'
 
 // `editorial` art is a wide, art-directed hero; `portrait` is a plain artist photo.
@@ -16,15 +18,22 @@ export type ArtistImage = HeroArt & {
   square: HeroArt | null
 }
 
+export class ArtistImageUnavailableError extends Error {
+  constructor(readonly fallback: ArtistImage | null) {
+    super('Artist image sources are unavailable right now.')
+  }
+}
+
 type Fetcher = (input: string, init?: RequestInit) => Promise<Response>
 
 const CACHE_TTL_MS = 1000 * 60 * 60 * 24
 const CACHE_MAX_ENTRIES = 2000
 const REQUEST_TIMEOUT_MS = 4000
-const MUSICBRAINZ_UA = 'musico/1.0 ( https://musico-web.vercel.app )'
+const RATE_LIMIT_BACKOFF_MS = 1000 * 60 * 10
+let appleBackoffUntil = 0
 const BROWSER_UA = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36'
 
-// ponytail: per-isolate memory caches; edge Cache-Control on the routes does the heavy lifting. Move to Postgres if hit rate is poor.
+// Memory first, then the Postgres cache every isolate shares, then the sources.
 type Cache<T> = Map<string, { value: T; expiresAt: number }>
 const imageCache: Cache<ArtistImage | null> = new Map()
 const logoCache: Cache<string | null> = new Map()
@@ -32,7 +41,9 @@ const logoCache: Cache<string | null> = new Map()
 const remember = async <T>(cache: Cache<T>, key: string, load: () => Promise<T>) => {
   const cached = cache.get(key)
   if (cached && cached.expiresAt > Date.now()) return cached.value
-  const value = await load()
+  const stored = await sharedGet<T>(key)
+  const value = stored ? stored.value : await load()
+  if (!stored) await sharedSet(key, value, CACHE_TTL_MS)
   if (cache.size >= CACHE_MAX_ENTRIES) cache.delete(cache.keys().next().value as string)
   cache.set(key, { value, expiresAt: Date.now() + CACHE_TTL_MS })
   return value
@@ -142,12 +153,22 @@ const collectSearchItems = (node: unknown, out: AppleSearchItem[] = []) => {
   return out
 }
 
-// The iTunes Search API rate-limits Cloudflare's shared egress IPs (HTTP 429), so we read Apple Music's own search page.
-export const searchAppleMusic = async (term: string, fetcher: Fetcher, timeoutMs = REQUEST_TIMEOUT_MS) => {
-  const response = await fetcher(`https://music.apple.com/us/search?term=${encodeURIComponent(term)}`, {
+const fetchApple = async (url: string, fetcher: Fetcher, timeoutMs = REQUEST_TIMEOUT_MS) => {
+  if (Date.now() < appleBackoffUntil || await isServicePaused('apple')) throw new Error('Apple Music is rate limited')
+  const response = await fetcher(url, {
     headers: { 'User-Agent': BROWSER_UA },
     signal: AbortSignal.timeout(timeoutMs),
   })
+  if (response.status === 403 || response.status === 429) {
+    appleBackoffUntil = Date.now() + RATE_LIMIT_BACKOFF_MS
+    await pauseService('apple', RATE_LIMIT_BACKOFF_MS)
+  }
+  return response
+}
+
+// The iTunes Search API rate-limits Cloudflare's shared egress IPs (HTTP 429), so we read Apple Music's own search page.
+export const searchAppleMusic = async (term: string, fetcher: Fetcher, timeoutMs = REQUEST_TIMEOUT_MS) => {
+  const response = await fetchApple(`https://music.apple.com/us/search?term=${encodeURIComponent(term)}`, fetcher, timeoutMs)
   if (!response.ok) throw Object.assign(new Error(`Apple Music search failed (${response.status})`), { status: response.status })
   const serialized = readServerData(await response.text())
   if (!serialized) throw new Error('Apple Music search page has no server data')
@@ -159,8 +180,8 @@ const findOnApple = async (name: string, fetcher: Fetcher): Promise<AppleArt | n
   const pageUrl = pickByName(artists, name, (item) => item.title)?.url.split('?')[0]
   if (!pageUrl?.startsWith('https://music.apple.com/')) return null
 
-  const pageResponse = await fetchWithTimeout(fetcher, pageUrl, { headers: { 'User-Agent': BROWSER_UA } })
-  if (!pageResponse.ok) return null
+  const pageResponse = await fetchApple(pageUrl, fetcher)
+  if (!pageResponse.ok) throw new Error(`Apple Music artist page failed (${pageResponse.status})`)
   const html = await pageResponse.text()
 
   let wide: ArtistImage | null = null
@@ -183,11 +204,8 @@ const MBID = /^[0-9a-f-]{36}$/i
 
 const findArtistMbid = async (name: string, fetcher: Fetcher) => {
   const query = encodeURIComponent(`artist:"${name.replace(/"/g, '')}"`)
-  const search = await fetchWithTimeout(fetcher, `https://musicbrainz.org/ws/2/artist/?query=${query}&fmt=json&limit=5`, {
-    headers: { 'User-Agent': MUSICBRAINZ_UA, Accept: 'application/json' },
-  })
-  if (!search.ok) throw new Error(`MusicBrainz returned ${search.status}`)
-  const { artists = [] } = (await search.json()) as { artists?: Array<{ id?: string; name?: string }> }
+  const search = await mbJson(`https://musicbrainz.org/ws/2/artist/?query=${query}&fmt=json&limit=5`, fetcher, REQUEST_TIMEOUT_MS)
+  const { artists = [] } = (search ?? {}) as { artists?: Array<{ id?: string; name?: string }> }
   const mbid = pickByName(artists, name, (item) => item.name)?.id
   return mbid && MBID.test(mbid) ? mbid : null
 }
@@ -220,22 +238,13 @@ const findOnFanart = async (name: string, fetcher: Fetcher, apiKey?: string): Pr
 
 const findOnDeezer = async (name: string, fetcher: Fetcher): Promise<ArtistImage | null> => {
   const response = await fetchWithTimeout(fetcher, `https://api.deezer.com/search/artist?q=${encodeURIComponent(name)}&limit=5`)
-  if (!response.ok) return null
+  if (!response.ok) throw new Error(`Deezer returned ${response.status}`)
   const payload = (await response.json()) as { data?: Array<{ name?: string; picture_xl?: string }> }
   const artist = pickByName(payload.data ?? [], name, (item) => item.name)
   const image = artist?.picture_xl
   // Deezer serves a blank silhouette at /images/artist//... for artists without a photo.
   if (!image?.startsWith('https://') || image.includes('/images/artist//')) return null
   return { image, source: 'deezer', kind: 'portrait', video: null, square: null }
-}
-
-const attempt = async <T>(source: string, name: string, lookup: () => Promise<T | null>) => {
-  try {
-    return await lookup()
-  } catch (error) {
-    console.warn('[artist-image] source failed', { source, name, error: error instanceof Error ? error.message : String(error) })
-    return null
-  }
 }
 
 export const findArtistImage = async (
@@ -247,13 +256,26 @@ export const findArtistImage = async (
   const key = normalizeName(name)
   if (!key) return null
 
-  return remember(imageCache, key, async () => {
+  return remember(imageCache, `artist-image:${key}`, async () => {
+    let failed = false
+    const attempt = async <T>(source: string, lookup: () => Promise<T | null>) => {
+      try {
+        return await lookup()
+      } catch (error) {
+        failed = true
+        console.warn('[artist-image] source failed', { source, name, error: error instanceof Error ? error.message : String(error) })
+        return null
+      }
+    }
     // Wide art beats a square photo, whichever source it comes from.
-    const apple = await attempt('apple', name, () => findOnApple(name, fetcher))
-    return apple?.wide ??
-      (await attempt('fanart', name, () => findOnFanart(name, fetcher, fanartKey))) ??
+    const apple = await attempt('apple', () => findOnApple(name, fetcher))
+    const image = apple?.wide ??
+      (await attempt('fanart', () => findOnFanart(name, fetcher, fanartKey))) ??
       apple?.portrait ??
-      (await attempt('deezer', name, () => findOnDeezer(name, fetcher)))
+      (await attempt('deezer', () => findOnDeezer(name, fetcher)))
+    // A transient failure must not save a miss or lower-priority artwork for a day.
+    if (failed) throw new ArtistImageUnavailableError(image)
+    return image
   })
 }
 
@@ -269,7 +291,7 @@ export const findArtistLogo = async (
   const key = normalizeName(name)
   if (!key) return null
 
-  return remember(logoCache, key, async () => {
+  return remember(logoCache, `artist-logo:${key}`, async () => {
     let audioDbFailed = false
     const artist = await audioDbJson(`search.php?s=${encodeURIComponent(name)}`, keys.audioDb, fetcher)
       .then(({ artists }: { artists?: AudioDbArtist[] | null }) => pickByName(artists ?? [], name, (item) => item.strArtist) ?? null)

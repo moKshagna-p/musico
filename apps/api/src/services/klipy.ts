@@ -4,6 +4,7 @@
 import { LRUCache } from 'lru-cache'
 
 import { env } from '../core/env'
+import { sharedGet, sharedSet } from '../core/sharedCache'
 
 export type Gif = { id: string; title: string; url: string; preview: string; width: number; height: number }
 
@@ -16,8 +17,9 @@ const API_BASE = 'https://api.klipy.com/api/v1'
 const PER_PAGE = 24
 const REQUEST_TIMEOUT_MS = 5000
 
-// ponytail: per-isolate cache; trending and common searches repeat a lot. Move to Postgres if the key's hourly cap bites.
-const cache = new LRUCache<string, Gif[]>({ max: 500, ttl: 1000 * 60 * 60 })
+// Trending and common searches repeat a lot: memory first, then the Postgres cache every isolate shares.
+const CACHE_TTL_MS = 1000 * 60 * 60
+const cache = new LRUCache<string, Gif[]>({ max: 500, ttl: CACHE_TTL_MS })
 
 const readFile = (file: KlipyFile | undefined) => {
   const width = Number(file?.width)
@@ -50,6 +52,11 @@ export const searchGifs = async (query: string, page: number, fetcher: Fetcher =
   const cacheKey = `${query.toLowerCase()}|${page}`
   const cached = cache.get(cacheKey)
   if (cached) return cached
+  const stored = await sharedGet<Gif[]>(`gifs:${cacheKey}`)
+  if (stored) {
+    cache.set(cacheKey, stored.value)
+    return stored.value
+  }
 
   const params = new URLSearchParams({ page: String(page), per_page: String(PER_PAGE) })
   if (query) params.set('q', query)
@@ -60,5 +67,6 @@ export const searchGifs = async (query: string, page: number, fetcher: Fetcher =
   const body = (await response.json()) as { data?: { data?: KlipyItem[] } }
   const gifs = (body.data?.data ?? []).map(toGif).filter((gif): gif is Gif => gif !== null)
   cache.set(cacheKey, gifs)
+  await sharedSet(`gifs:${cacheKey}`, gifs, CACHE_TTL_MS)
   return gifs
 }

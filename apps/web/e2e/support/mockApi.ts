@@ -131,7 +131,7 @@ const sanitizeListName = (value: unknown) =>
     .replace(/\s+/g, ' ')
     .slice(0, 48)
 
-export const installApiMocks = async (page: Page) => {
+export const installApiMocks = async (page: Page, { admin = false } = {}) => {
   const user = {
     id: 'user-e2e',
     email: 'e2e@musico.dev',
@@ -147,8 +147,11 @@ export const installApiMocks = async (page: Page) => {
 
   let signedIn = false
   let username = 'e2e-user'
-  const adminIds = new Set<string>()
-  const bootstrapAdminEmail = 'mokshagnareddy45@gmail.com'
+  const adminIds = new Set<string>(admin ? [user.id] : [])
+  const adminReviews = [
+    { id: 'review-clean', albumName: 'Discovery', userName: 'Ava', content: 'Still the best Daft Punk record.', updatedAt: Date.now() - 3_600_000, isFlagged: false },
+    { id: 'review-flagged', albumName: 'Homework', userName: 'Promo Bot', content: 'Cheap followers, spam link in bio.', updatedAt: Date.now() - 60_000, isFlagged: true },
+  ]
 
   type ReviewMedia = { id: string; kind: 'image' | 'gif'; url: string; width: number; height: number; alt: string }
   const reviewsByAlbum = new Map<string, Array<{ id: string; content: string; user: { name: string; username: string }; createdAt: number; rating: number | null; media: ReviewMedia[] }>>()
@@ -171,7 +174,7 @@ export const installApiMocks = async (page: Page) => {
     },
   ]
 
-  const isAdmin = () => adminIds.has(user.id) || user.email.toLowerCase() === bootstrapAdminEmail
+  const isAdmin = () => adminIds.has(user.id)
   const ratingsPayload = () => Object.fromEntries(
     Array.from(ratings.entries()).map(([albumId, rating]) => [albumId, { rating, timestamp: Date.now() }]),
   )
@@ -261,6 +264,25 @@ export const installApiMocks = async (page: Page) => {
           isBootstrapAdmin: false,
         },
       })
+    }
+
+    if (pathname === '/api/admin/overview' && method === 'GET') {
+      if (!signedIn || !isAdmin()) return json(route, { error: 'Forbidden.' }, 403)
+      return json(route, { data: { metrics: { totalUsers: 1, totalRatings: ratings.size, totalReviews: adminReviews.length, adminCount: adminIds.size } } })
+    }
+
+    if (pathname === '/api/admin/reviews' && method === 'GET') {
+      if (!signedIn || !isAdmin()) return json(route, { error: 'Forbidden.' }, 403)
+      const status = url.searchParams.get('status')
+      return json(route, { data: adminReviews.filter((review) => status === 'flagged' ? review.isFlagged : status === 'clean' ? !review.isFlagged : true) })
+    }
+
+    if (pathname.startsWith('/api/admin/reviews/') && method === 'DELETE') {
+      if (!signedIn || !isAdmin()) return json(route, { error: 'Forbidden.' }, 403)
+      const index = adminReviews.findIndex((review) => review.id === decodeURIComponent(pathname.split('/').pop() ?? ''))
+      if (index < 0) return json(route, { error: 'Review not found.' }, 404)
+      adminReviews.splice(index, 1)
+      return json(route, { data: { deleted: true } })
     }
 
     if (pathname === '/api/search-events' && method === 'POST') {

@@ -1,13 +1,21 @@
 import { Elysia, t } from 'elysia'
 
-import { findArtistImage, findArtistLogo } from '../services/artistImages'
+import { ArtistImageUnavailableError, findArtistImage, findArtistLogo, type ArtistImage } from '../services/artistImages'
 
 export const artistRoutes = new Elysia({ prefix: '/api' })
   .get('/artist-image', async ({ query, set }) => {
-    const result = await findArtistImage(query.name)
     set.headers ??= {}
+    let result: ArtistImage | null
+    try {
+      result = await findArtistImage(query.name)
+    } catch (error) {
+      if (!(error instanceof ArtistImageUnavailableError)) throw error
+      console.warn('[artist-image] lookup incomplete', query.name, error.message)
+      result = error.fallback
+      set.headers['Cache-Control'] = 'no-store'
+    }
     // Misses are cached briefly so a newly added Apple photo shows up within the day.
-    set.headers['Cache-Control'] = result
+    set.headers['Cache-Control'] ??= result
       ? 'public, max-age=86400, s-maxage=604800'
       : 'public, max-age=3600, s-maxage=21600'
     return {
