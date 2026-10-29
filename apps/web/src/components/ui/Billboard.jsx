@@ -69,11 +69,13 @@ const Billboard = ({ artist, cover, children, className = 'min-h-[82svh]', gutte
   })
   // The blurred cover only holds the space until the photo arrives, then recedes so it doesn't muddy the hero.
   const hasLoadedArt = Boolean(artistArt) && loadedSrc === artistArt.image
-  // Wide editorial banners fill the hero; square press photos sit right and fade left so faces stay whole and clear of the text.
-  const artLayout =
+  // Phones are too narrow to crop into, so the whole photo runs across the top and fades into the page.
+  // From tablet up, wide editorial banners fill the hero; square press photos sit right and fade left so faces stay whole and clear of the text.
+  const artLayout = `absolute inset-x-0 top-0 w-full object-cover tablet:h-full ${
     artistArt?.kind === 'editorial'
-      ? 'inset-0 w-full object-[50%_35%]'
-      : 'inset-y-0 right-0 w-full object-[50%_25%] tablet:aspect-[5/4] tablet:w-auto tablet:max-w-[75%] tablet:[mask-image:linear-gradient(to_right,transparent,black_45%)]'
+      ? '[mask-image:linear-gradient(black_55%,transparent)] tablet:inset-0 tablet:object-[50%_35%] tablet:[mask-image:none]'
+      : '[mask-image:linear-gradient(black_55%,transparent)] tablet:inset-y-0 tablet:left-auto tablet:right-0 tablet:aspect-[5/4] tablet:w-auto tablet:max-w-[75%] tablet:object-[50%_25%] tablet:[mask-image:linear-gradient(to_right,transparent,black_45%)]'
+  }`
 
   return (
     <section className={`relative isolate flex items-end overflow-hidden ${className}`}>
@@ -88,14 +90,14 @@ const Billboard = ({ artist, cover, children, className = 'min-h-[82svh]', gutte
             alt=""
             decoding="async"
             onLoad={() => setLoadedSrc(artistArt.image)}
-            className={`absolute h-full object-cover ${artLayout} transition-opacity duration-700 ${loadedSrc === artistArt.image ? 'opacity-100' : 'opacity-0'}`}
+            className={`${artLayout} transition-opacity duration-700 ${loadedSrc === artistArt.image ? 'opacity-100' : 'opacity-0'}`}
           />
         ) : null}
         {artistArt?.video && !prefersStill() ? (
-          <HeroVideo key={artistArt.video} src={artistArt.video} className={`absolute h-full object-cover ${artLayout}`} />
+          <HeroVideo key={artistArt.video} src={artistArt.video} className={artLayout} />
         ) : null}
         <div
-          className={`absolute inset-x-0 top-0 bg-gradient-to-b from-black/70 to-transparent ${artistArt?.kind === 'portrait' ? 'h-1/2 from-black/90' : 'h-40'}`}
+          className={`absolute inset-x-0 top-0 bg-gradient-to-b from-black/70 to-transparent ${artistArt?.kind === 'portrait' ? 'h-40 tablet:h-1/2 tablet:from-black/90' : 'h-40'}`}
         />
         <div className="absolute inset-0 bg-gradient-to-r from-black/50 via-black/10 to-transparent" />
         <div className="absolute inset-x-0 bottom-0 h-3/5 bg-gradient-to-t from-black via-black/70 to-transparent" />

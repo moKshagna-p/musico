@@ -1,5 +1,6 @@
-// Real center-label photos for the vinyl disc. MusicBrainz finds the album's vinyl pressings and the
-// Cover Art Archive holds photos tagged "Medium" (the disc itself), which are mostly tight label shots.
+// Art for the disc's center. MusicBrainz finds the album's vinyl pressings and the Cover Art Archive holds photos
+// tagged "Medium" (the disc itself), which are mostly tight label shots. Albums without one fall back to fan-made
+// CD faces from TheAudioDB, then fanart.tv; their URLs contain "/cdart/", which the web app crops differently.
 // Like HD covers, every answer (including "no photo") is kept in Postgres so each album is looked up once.
 
 import { inArray, sql } from 'drizzle-orm'
@@ -9,6 +10,7 @@ import { env } from '../core/env'
 import { albumDiscLabel } from '../core/schema'
 import { artistMatches, cleanDiscogsArtist, normalizeTitle } from './albumArtwork'
 import { normalizeName } from './artistImages'
+import { audioDbJson } from './theAudioDb'
 
 type Fetcher = (input: string, init?: RequestInit) => Promise<Response>
 type LabelRow = { albumId: string; label: string | null; checkedAt: Date }
@@ -18,9 +20,12 @@ type MbRelease = {
   date?: string
   media?: Array<{ format?: string }>
   'artist-credit'?: Array<{ name?: string }>
-  'release-group'?: { title?: string; 'primary-type'?: string }
+  'release-group'?: { id?: string; title?: string; 'primary-type'?: string }
 }
 type CaaImage = { types?: string[]; image?: string; thumbnails?: Record<string, string> }
+type AudioDbAlbum = { strAlbum?: string; strArtist?: string; strAlbumCDart?: string | null; strMusicBrainzID?: string | null }
+type FanartImage = { url?: string; likes?: string }
+type ArtKeys = { audioDb: string; fanart?: string }
 
 export type DiscLabelStore = {
   read: (albumIds: string[]) => Promise<LabelRow[]>
@@ -31,6 +36,8 @@ export type DiscLabelStore = {
 const LOOKUP_TIMEOUT_MS = 15000
 const MAX_PRESSINGS = 4
 const RECHECK_MISS_MS = 1000 * 60 * 60 * 24 * 30
+// ponytail: misses recorded before the CD art sources existed are rechecked once; drop after 2026-12-01.
+const CD_ART_ADDED_AT = Date.parse('2026-10-29T00:00:00Z')
 const RATE_LIMIT_BACKOFF_MS = 1000 * 60 * 10
 // MusicBrainz allows one request per second per client.
 const MB_GAP_MS = 1100
@@ -57,14 +64,51 @@ const getJson = async (url: string, fetcher: Fetcher) => {
 // Discogs and MusicBrainz disagree on a leading "The" ("The Bill Evans Trio" vs "Bill Evans Trio").
 const bareArtist = (name: string) => name.replace(/^\s*the\s+/i, '')
 
+// Only URLs on the expected image hosts reach the page.
+const safeUrl = (url: string | null | undefined, host: RegExp) => {
+  const https = String(url ?? '').replace(/^http:/, 'https:')
+  return host.test(https) ? https : null
+}
+
 // Only a photo tagged solely "Medium" is the disc; "Front,Medium" is a cover shot with the record beside it.
 const pickLabel = (images: CaaImage[] = []) => {
   const disc = images.find((image) => image.types?.length === 1 && image.types[0] === 'Medium')
-  const url = (disc?.thumbnails?.['500'] ?? disc?.thumbnails?.large ?? disc?.image ?? '').replace(/^http:/, 'https:')
-  return /^https:\/\/(coverartarchive\.org|[a-z0-9.-]+\.archive\.org)\//i.test(url) ? url : null
+  return safeUrl(disc?.thumbnails?.['500'] ?? disc?.thumbnails?.large ?? disc?.image, /^https:\/\/(coverartarchive\.org|[a-z0-9.-]+\.archive\.org)\//i)
 }
 
-export const findDiscLabel = async (artist: string, album: string, fetcher: Fetcher = fetch) => {
+// Fan-made CD faces: transparent, square PNGs of the whole disc. TheAudioDB first, then fanart.tv by release group.
+const findCdArt = async (artist: string, album: string, releaseGroupId: string | undefined, keys: ArtKeys, fetcher: Fetcher) => {
+  let audioDbError: unknown = null
+  const search = await audioDbJson(`searchalbum.php?s=${encodeURIComponent(artist)}&a=${encodeURIComponent(album)}`, keys.audioDb, fetcher)
+    .catch((error) => { audioDbError = error; return null })
+  const albums: AudioDbAlbum[] = Array.isArray(search?.album) ? search.album : []
+  const match = albums.find((entry) =>
+    normalizeTitle(entry.strAlbum ?? '') === normalizeTitle(album) &&
+    artistMatches(bareArtist(entry.strArtist ?? ''), normalizeName(bareArtist(artist))))
+  const audioDbArt = safeUrl(match?.strAlbumCDart, /^https:\/\/(r2|www)\.theaudiodb\.com\/images\/media\/album\/cdart\//i)
+  if (audioDbArt) return audioDbArt
+
+  const groupId = releaseGroupId ?? match?.strMusicBrainzID ?? undefined
+  const fanart = keys.fanart && groupId && /^[0-9a-f-]{36}$/i.test(groupId)
+    ? await getJson(`https://webservice.fanart.tv/v3/music/albums/${groupId}?api_key=${encodeURIComponent(keys.fanart)}`, fetcher)
+    : null
+  const cdart: FanartImage[] = fanart?.albums?.[groupId ?? '']?.cdart ?? []
+  const fanartArt = [...cdart]
+    .sort((a, b) => Number(b.likes ?? 0) - Number(a.likes ?? 0))
+    .map((image) => safeUrl(image.url, /^https:\/\/assets\.fanart\.tv\/fanart\/music\/.+\/cdart\//i))
+    .find(Boolean) ?? null
+  // TheAudioDB might hold art once it answers again, so retry the album later rather than record a miss.
+  // Thrown without a status: TheAudioDB's rate limit is its own and must not pause MusicBrainz lookups.
+  if (!fanartArt && audioDbError) throw new Error(audioDbError instanceof Error ? audioDbError.message : String(audioDbError))
+  return fanartArt
+}
+
+export const findDiscLabel = async (
+  artist: string,
+  album: string,
+  fetcher: Fetcher = fetch,
+  keys: ArtKeys = { audioDb: env.THEAUDIODB_API_KEY, fanart: env.FANART_API_KEY },
+) => {
   const targetArtist = normalizeName(bareArtist(artist))
   const targetAlbum = normalizeTitle(album)
   if (!targetArtist || !targetAlbum) return null
@@ -82,12 +126,12 @@ export const findDiscLabel = async (artist: string, album: string, fetcher: Fetc
   })
   const releases: MbRelease[] = Array.isArray(search?.releases) ? search.releases : []
 
+  const matches = releases.filter((release) =>
+    normalizeTitle(release['release-group']?.title ?? '') === targetAlbum &&
+    artistMatches(bareArtist(release['artist-credit']?.[0]?.name ?? ''), targetArtist))
   // Albums before same-titled singles, then the oldest pressing: original labels are the iconic ones.
-  const pressings = releases
-    .filter((release) =>
-      normalizeTitle(release['release-group']?.title ?? '') === targetAlbum &&
-      artistMatches(bareArtist(release['artist-credit']?.[0]?.name ?? ''), targetArtist) &&
-      release.media?.some((medium) => /vinyl/i.test(medium.format ?? '')))
+  const pressings = matches
+    .filter((release) => release.media?.some((medium) => /vinyl/i.test(medium.format ?? '')))
     .sort((a, b) =>
       Number(b['release-group']?.['primary-type'] === 'Album') - Number(a['release-group']?.['primary-type'] === 'Album') ||
       (a.date || '9999').localeCompare(b.date || '9999'))
@@ -99,6 +143,9 @@ export const findDiscLabel = async (artist: string, album: string, fetcher: Fetc
     const label = entry.status === 'fulfilled' ? pickLabel(entry.value?.images) : null
     if (label) return label
   }
+  const albumGroup = matches.find((release) => release['release-group']?.['primary-type'] === 'Album') ?? matches[0]
+  const cdArt = await findCdArt(artist, album, albumGroup?.['release-group']?.id, keys, fetcher)
+  if (cdArt) return cdArt
   // A failed pressing might hold the photo, so throw rather than record a miss; the album is retried later.
   const failed = art.find((entry) => entry.status === 'rejected')
   if (failed) throw failed.reason
@@ -137,7 +184,8 @@ export const attachDiscLabels = async <T extends AlbumLike>(
   const now = Date.now()
   const needsLookup = (release: T) => {
     const row = known.get(release.id)
-    return Boolean(release.artists?.[0] && release.name) && (!row || (!row.label && now - row.checkedAt.getTime() > RECHECK_MISS_MS))
+    const checkedAt = row?.checkedAt.getTime() ?? 0
+    return Boolean(release.artists?.[0] && release.name) && (!row || (!row.label && (now - checkedAt > RECHECK_MISS_MS || checkedAt < CD_ART_ADDED_AT)))
   }
   const pending = now < mbBackoffUntil
     ? []

@@ -1,6 +1,7 @@
 import { expect, test } from 'bun:test'
 
 import { attachDiscLabels, findDiscLabel, type DiscLabelStore } from './discLabels'
+import { resetAudioDbRest } from './theAudioDb'
 
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } })
@@ -76,7 +77,7 @@ test('reads stored labels, records misses, and skips failed lookups', async () =
     write: async (rows) => { writes.push(...rows) },
   }
   const fetcher = async (url: string) => {
-    if (url.includes('missing')) return json({ releases: [] })
+    if (url.toLowerCase().includes('missing')) return json({ releases: [] })
     return json({}, 500)
   }
   const album = (id: string, name: string) => ({ id, name, artists: ['Artist'] })
@@ -85,4 +86,45 @@ test('reads stored labels, records misses, and skips failed lookups', async () =
 
   expect(result.map((release) => release.discLabel)).toEqual([LABEL('stored'), undefined, undefined])
   expect(writes.map(({ albumId, label }) => ({ albumId, label }))).toEqual([{ albumId: 'missing', label: null }])
+})
+
+test('falls back to TheAudioDB CD art, then fanart.tv by release group', async () => {
+  const GROUP = '48117b90-a16e-34ca-a514-19c702df1158'
+  const AUDIODB_ART = 'https://r2.theaudiodb.com/images/media/album/cdart/rumours.png'
+  const FANART_ART = (id: string) => `https://assets.fanart.tv/fanart/music/x/cdart/${id}.png`
+  const fetcher = (audioDbArt: string | null) => async (url: string) => {
+    if (url.includes('musicbrainz.org')) return json({ releases: [{ ...pressing('cd', { format: 'CD' }), 'release-group': { id: GROUP, title: 'Rumours', 'primary-type': 'Album' } }] })
+    if (url.includes('theaudiodb.com')) return json({ album: [{ strAlbum: 'Rumours', strArtist: 'Fleetwood Mac', strAlbumCDart: audioDbArt }] })
+    if (url.includes(`fanart.tv/v3/music/albums/${GROUP}`)) {
+      return json({ albums: { [GROUP]: { cdart: [{ url: FANART_ART('low'), likes: '1' }, { url: 'http://assets.fanart.tv/fanart/music/x/cdart/top.png', likes: '5' }] } } })
+    }
+    return json({}, 404)
+  }
+  const keys = { audioDb: '123', fanart: 'key' }
+
+  expect(await findDiscLabel('Fleetwood Mac', 'Rumours', fetcher(AUDIODB_ART), keys)).toBe(AUDIODB_ART)
+  expect(await findDiscLabel('Fleetwood Mac', 'Rumours', fetcher(''), keys)).toBe(FANART_ART('top'))
+  // No fanart.tv key, no fanart.tv lookup; art from other hosts is never passed on.
+  expect(await findDiscLabel('Fleetwood Mac', 'Rumours', fetcher(''), { audioDb: '123' })).toBeNull()
+  expect(await findDiscLabel('Fleetwood Mac', 'Rumours', fetcher('https://evil.example.com/cdart/x.png'), { audioDb: '123' })).toBeNull()
+})
+
+test('uses fanart.tv while TheAudioDB is rate limited, and retries later when neither has art', async () => {
+  resetAudioDbRest()
+  const GROUP = '48117b90-a16e-34ca-a514-19c702df1158'
+  const fetcher = (fanartArt: boolean) => async (url: string) => {
+    if (url.includes('musicbrainz.org')) return json({ releases: [{ ...pressing('cd', { format: 'CD' }), 'release-group': { id: GROUP, title: 'Rumours', 'primary-type': 'Album' } }] })
+    if (url.includes('theaudiodb.com')) return json({}, 429)
+    if (url.includes('fanart.tv')) return json({ albums: { [GROUP]: { cdart: fanartArt ? [{ url: 'https://assets.fanart.tv/fanart/music/x/cdart/top.png', likes: '1' }] : [] } } })
+    return json({}, 404)
+  }
+  const keys = { audioDb: '123', fanart: 'key' }
+
+  expect(await findDiscLabel('Fleetwood Mac', 'Rumours', fetcher(true), keys)).toBe('https://assets.fanart.tv/fanart/music/x/cdart/top.png')
+  const failure = await findDiscLabel('Fleetwood Mac', 'Rumours', fetcher(false), keys).catch((error) => error)
+  // The first 429 started TheAudioDB's minute of rest, so this lookup never reached it.
+  expect(failure.message).toBe('TheAudioDB is rate limited')
+  // No status, so attachDiscLabels doesn't pause MusicBrainz lookups for TheAudioDB's limit.
+  expect(failure.status).toBeUndefined()
+  resetAudioDbRest()
 })

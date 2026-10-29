@@ -1,9 +1,10 @@
 // Artist photos for album heroes. Apple Music has the best editorial shots and
 // motion heroes but no public image API, so we read the artist's public page.
 // fanart.tv (with an API key) fills in wide backgrounds, and Deezer's open API
-// is the last resort.
+// is the last resort. Artist logos come from TheAudioDB, then fanart.tv.
 
 import { env } from '../core/env'
+import { audioDbJson } from './theAudioDb'
 
 // `editorial` art is a wide, art-directed hero; `portrait` is a plain artist photo.
 // `video` is Apple's looping HLS motion hero, when the artist has one.
@@ -22,8 +23,19 @@ const REQUEST_TIMEOUT_MS = 4000
 const MUSICBRAINZ_UA = 'musico/1.0 ( https://musico-web.vercel.app )'
 const BROWSER_UA = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36'
 
-// ponytail: per-isolate memory cache; edge Cache-Control on the route does the heavy lifting. Move to Postgres if hit rate is poor.
-const cache = new Map<string, { value: ArtistImage | null; expiresAt: number }>()
+// ponytail: per-isolate memory caches; edge Cache-Control on the routes does the heavy lifting. Move to Postgres if hit rate is poor.
+type Cache<T> = Map<string, { value: T; expiresAt: number }>
+const imageCache: Cache<ArtistImage | null> = new Map()
+const logoCache: Cache<string | null> = new Map()
+
+const remember = async <T>(cache: Cache<T>, key: string, load: () => Promise<T>) => {
+  const cached = cache.get(key)
+  if (cached && cached.expiresAt > Date.now()) return cached.value
+  const value = await load()
+  if (cache.size >= CACHE_MAX_ENTRIES) cache.delete(cache.keys().next().value as string)
+  cache.set(key, { value, expiresAt: Date.now() + CACHE_TTL_MS })
+  return value
+}
 
 export const normalizeName = (value: string) =>
   // Drops Latin accents (é -> e) but keeps every script's letters and marks, so 宇多田ヒカル or ビ survive intact.
@@ -160,9 +172,9 @@ const findOnApple = async (name: string, fetcher: Fetcher): Promise<AppleArt | n
   return { wide, portrait: image ? { image, source: 'apple', kind: 'portrait', video: null } : null }
 }
 
-// fanart.tv keys artists by MusicBrainz id and has 1920x1080 backgrounds for many smaller artists.
-const findOnFanart = async (name: string, fetcher: Fetcher, apiKey?: string): Promise<ArtistImage | null> => {
-  if (!apiKey) return null
+const MBID = /^[0-9a-f-]{36}$/i
+
+const findArtistMbid = async (name: string, fetcher: Fetcher) => {
   const query = encodeURIComponent(`artist:"${name.replace(/"/g, '')}"`)
   const search = await fetchWithTimeout(fetcher, `https://musicbrainz.org/ws/2/artist/?query=${query}&fmt=json&limit=5`, {
     headers: { 'User-Agent': MUSICBRAINZ_UA, Accept: 'application/json' },
@@ -170,15 +182,29 @@ const findOnFanart = async (name: string, fetcher: Fetcher, apiKey?: string): Pr
   if (!search.ok) return null
   const { artists = [] } = (await search.json()) as { artists?: Array<{ id?: string; name?: string }> }
   const mbid = pickByName(artists, name, (item) => item.name)?.id
-  if (!mbid || !/^[0-9a-f-]{36}$/i.test(mbid)) return null
+  return mbid && MBID.test(mbid) ? mbid : null
+}
 
+type FanartImage = { url?: string; likes?: string }
+type FanartArtist = Partial<Record<'artistbackground' | 'hdmusiclogo' | 'musiclogo', FanartImage[]>>
+
+// fanart.tv keys artists by MusicBrainz id.
+const getFanartArtist = async (mbid: string, fetcher: Fetcher, apiKey: string) => {
   const response = await fetchWithTimeout(fetcher, `https://webservice.fanart.tv/v3/music/${mbid}?api_key=${encodeURIComponent(apiKey)}`)
-  if (!response.ok) return null
-  const { artistbackground = [] } = (await response.json()) as { artistbackground?: Array<{ url?: string; likes?: string }> }
-  const url = [...artistbackground]
+  return response.ok ? ((await response.json()) as FanartArtist) : null
+}
+
+const mostLiked = (images: FanartImage[] = []) =>
+  [...images]
     .sort((a, b) => Number(b.likes ?? 0) - Number(a.likes ?? 0))
-    .map((background) => String(background.url ?? '').replace(/^http:\/\//, 'https://'))
-    .find((candidate) => candidate.startsWith('https://assets.fanart.tv/'))
+    .map((image) => String(image.url ?? '').replace(/^http:\/\//, 'https://'))
+    .find((candidate) => candidate.startsWith('https://assets.fanart.tv/')) ?? null
+
+// fanart.tv has 1920x1080 backgrounds for many smaller artists.
+const findOnFanart = async (name: string, fetcher: Fetcher, apiKey?: string): Promise<ArtistImage | null> => {
+  if (!apiKey) return null
+  const mbid = await findArtistMbid(name, fetcher)
+  const url = mbid ? mostLiked((await getFanartArtist(mbid, fetcher, apiKey))?.artistbackground) : null
   return url ? { image: url, source: 'fanart', kind: 'editorial', video: null } : null
 }
 
@@ -211,18 +237,50 @@ export const findArtistImage = async (
   const key = normalizeName(name)
   if (!key) return null
 
-  const cached = cache.get(key)
-  if (cached && cached.expiresAt > Date.now()) return cached.value
+  return remember(imageCache, key, async () => {
+    // Wide art beats a square photo, whichever source it comes from.
+    const apple = await attempt('apple', name, () => findOnApple(name, fetcher))
+    return apple?.wide ??
+      (await attempt('fanart', name, () => findOnFanart(name, fetcher, fanartKey))) ??
+      apple?.portrait ??
+      (await attempt('deezer', name, () => findOnDeezer(name, fetcher)))
+  })
+}
 
-  // Wide art beats a square photo, whichever source it comes from.
-  const apple = await attempt('apple', name, () => findOnApple(name, fetcher))
-  const value =
-    apple?.wide ??
-    (await attempt('fanart', name, () => findOnFanart(name, fetcher, fanartKey))) ??
-    apple?.portrait ??
-    (await attempt('deezer', name, () => findOnDeezer(name, fetcher)))
+type AudioDbArtist = { strArtist?: string; strArtistLogo?: string | null; strArtistMBID?: string | null }
 
-  if (cache.size >= CACHE_MAX_ENTRIES) cache.delete(cache.keys().next().value as string)
-  cache.set(key, { value, expiresAt: Date.now() + CACHE_TTL_MS })
-  return value
+// A transparent PNG of the artist's wordmark (about 800x310). fanart.tv's HD logos are preferred over its old 400x155 ones.
+export const findArtistLogo = async (
+  rawName: string,
+  fetcher: Fetcher = fetch,
+  keys: { audioDb: string; fanart?: string } = { audioDb: env.THEAUDIODB_API_KEY, fanart: env.FANART_API_KEY },
+): Promise<string | null> => {
+  const name = rawName.trim()
+  const key = normalizeName(name)
+  if (!key) return null
+
+  return remember(logoCache, key, async () => {
+    let audioDbFailed = false
+    const artist = await audioDbJson(`search.php?s=${encodeURIComponent(name)}`, keys.audioDb, fetcher)
+      .then(({ artists }: { artists?: AudioDbArtist[] | null }) => pickByName(artists ?? [], name, (item) => item.strArtist) ?? null)
+      .catch((error) => {
+        audioDbFailed = true
+        console.warn('[artist-logo] theaudiodb failed', { name, error: error instanceof Error ? error.message : String(error) })
+        return null
+      })
+    const logo = String(artist?.strArtistLogo ?? '').replace(/^http:\/\//, 'https://')
+    if (/^https:\/\/(r2|www)\.theaudiodb\.com\/images\/media\/artist\/logo\//i.test(logo)) return logo
+
+    const fanartKey = keys.fanart
+    const fanartLogo = fanartKey
+      ? await attempt('fanart', name, async () => {
+        const mbid = artist?.strArtistMBID && MBID.test(artist.strArtistMBID) ? artist.strArtistMBID : await findArtistMbid(name, fetcher)
+        const fanart = mbid ? await getFanartArtist(mbid, fetcher, fanartKey) : null
+        return mostLiked(fanart?.hdmusiclogo) ?? mostLiked(fanart?.musiclogo)
+      })
+      : null
+    // Throwing skips the cache, so a logo TheAudioDB couldn't serve this minute is looked up again next time.
+    if (!fanartLogo && audioDbFailed) throw new Error('TheAudioDB unavailable and fanart.tv has no logo')
+    return fanartLogo
+  })
 }

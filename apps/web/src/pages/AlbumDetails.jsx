@@ -9,6 +9,7 @@ import ReviewInput from '../components/review/ReviewInput.jsx'
 import ReviewsList from '../components/review/ReviewsList.jsx'
 import StreamingLinks from '../components/album/StreamingLinks.jsx'
 import BackButton from '../components/ui/BackButton.jsx'
+import ArtistName from '../components/ui/ArtistName.jsx'
 import Billboard, { PAGE_GUTTER } from '../components/ui/Billboard.jsx'
 import VinylSleeve from '../components/ui/VinylSleeve.jsx'
 import { AlbumDetailsPageSkeleton, TrackRowsSkeleton } from '../components/ui/PageLoadingState.jsx'
@@ -256,7 +257,7 @@ const AlbumDetails = () => {
                 {formatReleaseDate(album.releaseDate, album.releaseYear)}, {genreLine}
               </p>
               <h1 className="mt-3 text-balance break-words font-display text-5xl leading-[0.92] text-paper tablet:text-7xl">{album.name}</h1>
-              <p className="mt-3 text-xl font-medium text-paper/85 tablet:text-2xl">{album.artists?.join(', ')}</p>
+              <ArtistName artists={album.artists} className="mt-3 text-xl font-medium text-paper/85 tablet:text-2xl" />
 
               <div className="mt-7 flex flex-wrap items-end gap-x-10 gap-y-5">
                 <div>
