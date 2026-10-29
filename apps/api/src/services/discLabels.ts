@@ -8,6 +8,7 @@ import { inArray, sql } from 'drizzle-orm'
 import { db } from '../core/db'
 import { env } from '../core/env'
 import { albumDiscLabel } from '../core/schema'
+import { isServicePaused, pauseService } from '../core/sharedCache'
 import { artistMatches, cleanDiscogsArtist, normalizeTitle } from './albumArtwork'
 import { normalizeName } from './artistImages'
 import { audioDbJson } from './theAudioDb'
@@ -36,13 +37,12 @@ export type DiscLabelStore = {
 const LOOKUP_TIMEOUT_MS = 15000
 const MAX_PRESSINGS = 4
 const RECHECK_MISS_MS = 1000 * 60 * 60 * 24 * 30
-// ponytail: misses recorded before the CD art sources existed are rechecked once; drop after 2026-12-01.
-const CD_ART_ADDED_AT = Date.parse('2026-10-29T00:00:00Z')
 const RATE_LIMIT_BACKOFF_MS = 1000 * 60 * 10
 // MusicBrainz allows one request per second per client.
 const MB_GAP_MS = 1100
 
-// ponytail: per-isolate throttle and backoff; isolates sharing an IP can still trip MusicBrainz's limit together.
+// ponytail: per-isolate one-per-second throttle; isolates sharing an IP can still trip MusicBrainz's limit together,
+// and the shared pause below then stops them all. A shared slot needs a lock round trip per request; add one if pauses recur.
 let nextMbSlot = 0
 let mbBackoffUntil = 0
 const waitForMbSlot = async () => {
@@ -190,10 +190,9 @@ export const attachDiscLabels = async <T extends AlbumLike>(
   const now = Date.now()
   const needsLookup = (release: T) => {
     const row = known.get(release.id)
-    const checkedAt = row?.checkedAt.getTime() ?? 0
-    return Boolean(release.artists?.[0] && release.name) && (!row || (!row.label && (now - checkedAt > RECHECK_MISS_MS || checkedAt < CD_ART_ADDED_AT)))
+    return Boolean(release.artists?.[0] && release.name) && (!row || (!row.label && now - row.checkedAt.getTime() > RECHECK_MISS_MS))
   }
-  const pending = now < mbBackoffUntil
+  const pending = now < mbBackoffUntil || await isServicePaused('musicbrainz')
     ? []
     : [...new Map(releases.filter(needsLookup).map((release) => [release.id, release])).values()].slice(0, maxLookups)
 
@@ -208,6 +207,7 @@ export const attachDiscLabels = async <T extends AlbumLike>(
       const status = (error as { status?: number }).status
       if (status === 429 || status === 503) {
         mbBackoffUntil = Date.now() + RATE_LIMIT_BACKOFF_MS
+        await pauseService('musicbrainz', RATE_LIMIT_BACKOFF_MS)
         break
       }
     }

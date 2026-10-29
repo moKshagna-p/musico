@@ -4,6 +4,7 @@
 // is the last resort. Artist logos come from TheAudioDB, then fanart.tv.
 
 import { env } from '../core/env'
+import { sharedGet, sharedSet } from '../core/sharedCache'
 import { audioDbJson } from './theAudioDb'
 
 // `editorial` art is a wide, art-directed hero; `portrait` is a plain artist photo.
@@ -24,7 +25,7 @@ const REQUEST_TIMEOUT_MS = 4000
 const MUSICBRAINZ_UA = 'musico/1.0 ( https://musico-web.vercel.app )'
 const BROWSER_UA = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36'
 
-// ponytail: per-isolate memory caches; edge Cache-Control on the routes does the heavy lifting. Move to Postgres if hit rate is poor.
+// Memory first, then the Postgres cache every isolate shares, then the sources.
 type Cache<T> = Map<string, { value: T; expiresAt: number }>
 const imageCache: Cache<ArtistImage | null> = new Map()
 const logoCache: Cache<string | null> = new Map()
@@ -32,7 +33,9 @@ const logoCache: Cache<string | null> = new Map()
 const remember = async <T>(cache: Cache<T>, key: string, load: () => Promise<T>) => {
   const cached = cache.get(key)
   if (cached && cached.expiresAt > Date.now()) return cached.value
-  const value = await load()
+  const stored = await sharedGet<T>(key)
+  const value = stored ? stored.value : await load()
+  if (!stored) await sharedSet(key, value, CACHE_TTL_MS)
   if (cache.size >= CACHE_MAX_ENTRIES) cache.delete(cache.keys().next().value as string)
   cache.set(key, { value, expiresAt: Date.now() + CACHE_TTL_MS })
   return value
@@ -247,7 +250,7 @@ export const findArtistImage = async (
   const key = normalizeName(name)
   if (!key) return null
 
-  return remember(imageCache, key, async () => {
+  return remember(imageCache, `artist-image:${key}`, async () => {
     // Wide art beats a square photo, whichever source it comes from.
     const apple = await attempt('apple', name, () => findOnApple(name, fetcher))
     return apple?.wide ??
@@ -269,7 +272,7 @@ export const findArtistLogo = async (
   const key = normalizeName(name)
   if (!key) return null
 
-  return remember(logoCache, key, async () => {
+  return remember(logoCache, `artist-logo:${key}`, async () => {
     let audioDbFailed = false
     const artist = await audioDbJson(`search.php?s=${encodeURIComponent(name)}`, keys.audioDb, fetcher)
       .then(({ artists }: { artists?: AudioDbArtist[] | null }) => pickByName(artists ?? [], name, (item) => item.strArtist) ?? null)

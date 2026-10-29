@@ -1,7 +1,7 @@
 import { expect, test } from 'bun:test'
 
 // A separate process keeps the Neon adapter and authentication stubs out of other API tests.
-test.skipIf(!process.env.TEST_DATABASE_URL)('media reservations, review saves, and cleanup stay consistent under concurrency', async () => {
+test.skipIf(!process.env.TEST_DATABASE_URL)('media reservations, review saves, cleanup and the shared cache work against real PostgreSQL', async () => {
   const script = String.raw`
     import assert from 'node:assert/strict'
     import { readdir } from 'node:fs/promises'
@@ -176,6 +176,21 @@ test.skipIf(!process.env.TEST_DATABASE_URL)('media reservations, review saves, a
       assert.equal(gifReview.media[0].kind, 'gif')
       assert.equal(gifReview.media[0].alt, 'record')
       assert.equal((await pool.unsafe('select "reviewId" from review_media where id = \'keep\''))[0].reviewId, null)
+
+      // The shared cache keeps nulls as hits, overwrites keys, and treats and sweeps expired rows as misses.
+      const { sharedGet, sharedSet, sweepSharedCache, pauseService, isServicePaused } = await import('./src/core/sharedCache.ts')
+      await sharedSet('logo:none', null, 60_000)
+      assert.deepEqual(await sharedGet('logo:none'), { value: null })
+      await sharedSet('logo:none', 'https://example.com/logo.png', 60_000)
+      assert.deepEqual(await sharedGet('logo:none'), { value: 'https://example.com/logo.png' })
+      assert.equal(await sharedGet('missing'), null)
+      assert.equal(await isServicePaused('apple'), false)
+      await pauseService('apple', 60_000)
+      assert.equal(await isServicePaused('apple'), true)
+      await sharedSet('stale', 1, -1000)
+      assert.equal(await sharedGet('stale'), null)
+      await sweepSharedCache()
+      assert.deepEqual((await pool.unsafe('select key from shared_cache order by key')).map(row => row.key), ['logo:none', 'pause:apple'])
 
       // Text-only saves still work before the original media migration is installed.
       await pool.unsafe('drop table review_media')
