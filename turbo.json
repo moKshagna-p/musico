@@ -10,7 +10,9 @@
       "outputs": ["dist/**"]
     },
     "lint": {},
-    "test": {},
+    "test": {
+      "env": ["TEST_DATABASE_URL"]
+    },
     "preview": {
       "cache": false,
       "persistent": true
