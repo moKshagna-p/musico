@@ -30,7 +30,7 @@ const json = (route: Route, body: unknown, status = 200) =>
 const PIXEL_PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64')
 const gifSvg = (color: string) =>
   `data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="320" height="240"><rect width="320" height="240" fill="${color}"/></svg>`)}`
-export const mockGifs = [
+const mockGifs = [
   { id: 'gif-1', title: 'dancing record', url: gifSvg('#c92a2a'), preview: gifSvg('#c92a2a'), width: 320, height: 240 },
   { id: 'gif-2', title: 'headphones on', url: gifSvg('#1971c2'), preview: gifSvg('#1971c2'), width: 320, height: 240 },
 ]

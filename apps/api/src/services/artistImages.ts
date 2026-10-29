@@ -53,7 +53,7 @@ const findAllByKey = (node: unknown, key: string, out: unknown[] = []) => {
 const MZSTATIC_TEMPLATE = /^https:\/\/[a-z0-9-]+\.mzstatic\.com\/image\/thumb\/.+\/\{w\}x\{h\}\{c\}\.\{f\}$/i
 
 // Resolves Apple's `{w}x{h}{c}.{f}` artwork template at up to 2400px wide, keeping the aspect ratio.
-export const resolveAppleTemplate = (artwork: AppleArtwork | undefined, maxWidth = 2400) => {
+const resolveAppleTemplate = (artwork: AppleArtwork | undefined, maxWidth = 2400) => {
   const url = typeof artwork?.url === 'string' ? artwork.url : ''
   const width = Number(artwork?.width)
   const height = Number(artwork?.height)
@@ -96,7 +96,7 @@ type AppleArt = { wide: ArtistImage | null; portrait: ArtistImage | null }
 const readServerData = (html: string) => html.match(/<script[^>]+id=["']serialized-server-data["'][^>]*>([\s\S]*?)<\/script>/i)?.[1]
 
 // One search result, e.g. { kind: 'album', title: 'Take Care', artist: 'Drake', ... }.
-export type AppleSearchItem = { kind: string; title: string; artist: string; url: string; artwork?: AppleArtwork }
+type AppleSearchItem = { kind: string; title: string; artist: string; url: string; artwork?: AppleArtwork }
 
 type Link = { title?: unknown }
 const linkTitles = (links: Link[]) => links.map((link) => String(link?.title ?? '')).join(', ')
