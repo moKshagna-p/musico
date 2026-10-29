@@ -5,7 +5,8 @@
 import { sharedGet, sharedSet } from '../core/sharedCache'
 import { artistMatches, cleanDiscogsArtist } from './albumArtwork'
 import { normalizeName } from './artistImages'
-import { bareArtist, mbJson } from './discLabels'
+import { bareArtist } from './discLabels'
+import { mbJson } from './musicbrainz'
 
 type Fetcher = (input: string, init?: RequestInit) => Promise<Response>
 type MbReleaseGroup = { id?: string; title?: string; 'primary-type'?: string; 'artist-credit'?: Array<{ name?: string }> }
@@ -57,7 +58,7 @@ export const findStreamingLinks = async (artist: string, album: string, fetcher:
   const targetAlbum = normalizeName(album)
   if (!targetArtist || !targetAlbum) return {}
 
-  const key = `${targetArtist}\u0000${targetAlbum}`
+  const key = JSON.stringify([targetArtist, targetAlbum])
   const cached = cache.get(key)
   if (cached && cached.expiresAt > Date.now()) return cached.links
   const stored = await sharedGet<StreamingLinks>(`streaming:${key}`)

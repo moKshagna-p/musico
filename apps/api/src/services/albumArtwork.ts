@@ -6,7 +6,7 @@ import { inArray, sql } from 'drizzle-orm'
 
 import { db } from '../core/db'
 import { albumArtwork } from '../core/schema'
-import { isServicePaused, pauseService } from '../core/sharedCache'
+import { isServicePaused } from '../core/sharedCache'
 import { normalizeName, searchAppleMusic } from './artistImages'
 
 type Fetcher = (input: string, init?: RequestInit) => Promise<Response>
@@ -25,10 +25,6 @@ const toCoverSize = (url: string) => url.replace(/\/\d+x\d+bb\.jpg$/, `/${COVER_
 // Apple renders uncached search pages in 2-3s; each album is looked up once and the answer stored.
 const LOOKUP_TIMEOUT_MS = 5000
 const RECHECK_MISS_MS = 1000 * 60 * 60 * 24 * 30
-const RATE_LIMIT_BACKOFF_MS = 1000 * 60 * 10
-
-// The local flag skips the database read while this isolate already knows; the shared pause tells the others.
-let appleBackoffUntil = 0
 
 // Discogs disambiguates artists as "Name (2)" and marks name variations with "*".
 export const cleanDiscogsArtist = (name = '') => name.replace(/\s*\(\d+\)$/, '').replace(/\*$/, '').trim()
@@ -89,7 +85,7 @@ export const attachHdCovers = async <T extends AlbumLike>(
     const row = known.get(release.id)
     return Boolean(release.artists?.[0] && release.name) && (!row || (!row.cover && now - row.checkedAt.getTime() > RECHECK_MISS_MS))
   }
-  const pending = now < appleBackoffUntil || await isServicePaused('apple')
+  const pending = await isServicePaused('apple')
     ? []
     : [...new Map(releases.filter(needsLookup).map((release) => [release.id, release])).values()].slice(0, maxLookups)
 
@@ -101,11 +97,6 @@ export const attachHdCovers = async <T extends AlbumLike>(
       } catch (error) {
         // Failed lookups are not recorded, so the album is retried on a later request.
         console.warn('[album-artwork] lookup failed', release.id, error instanceof Error ? error.message : String(error))
-        const status = (error as { status?: number }).status
-        if (status === 403 || status === 429) {
-          appleBackoffUntil = Date.now() + RATE_LIMIT_BACKOFF_MS
-          await pauseService('apple', RATE_LIMIT_BACKOFF_MS)
-        }
         return null
       }
     }),

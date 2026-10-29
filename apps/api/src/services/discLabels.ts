@@ -8,10 +8,11 @@ import { inArray, sql } from 'drizzle-orm'
 import { db } from '../core/db'
 import { env } from '../core/env'
 import { albumDiscLabel } from '../core/schema'
-import { isServicePaused, pauseService } from '../core/sharedCache'
+import { isServicePaused } from '../core/sharedCache'
 import { artistMatches, cleanDiscogsArtist, normalizeTitle } from './albumArtwork'
 import { normalizeName } from './artistImages'
 import { audioDbJson } from './theAudioDb'
+import { mbJson } from './musicbrainz'
 
 type Fetcher = (input: string, init?: RequestInit) => Promise<Response>
 type LabelRow = { albumId: string; label: string | null; checkedAt: Date }
@@ -37,19 +38,6 @@ export type DiscLabelStore = {
 const LOOKUP_TIMEOUT_MS = 15000
 const MAX_PRESSINGS = 4
 const RECHECK_MISS_MS = 1000 * 60 * 60 * 24 * 30
-const RATE_LIMIT_BACKOFF_MS = 1000 * 60 * 10
-// MusicBrainz allows one request per second per client.
-const MB_GAP_MS = 1100
-
-// ponytail: per-isolate one-per-second throttle; isolates sharing an IP can still trip MusicBrainz's limit together,
-// and the shared pause below then stops them all. A shared slot needs a lock round trip per request; add one if pauses recur.
-let nextMbSlot = 0
-let mbBackoffUntil = 0
-const waitForMbSlot = async () => {
-  const wait = nextMbSlot - Date.now()
-  nextMbSlot = Math.max(Date.now(), nextMbSlot) + MB_GAP_MS
-  if (wait > 0) await new Promise((resolve) => setTimeout(resolve, wait))
-}
 
 const getJson = async (url: string, fetcher: Fetcher) => {
   const response = await fetcher(url, {
@@ -59,19 +47,6 @@ const getJson = async (url: string, fetcher: Fetcher) => {
   if (response.status === 404) return null
   if (!response.ok) throw Object.assign(new Error(`${new URL(url).host} returned ${response.status}`), { status: response.status })
   return response.json()
-}
-
-// One MusicBrainz request in the shared one-per-second slot. It answers 503 whenever its servers are busy, so one retry
-// in the next slot is normal.
-export const mbJson = async (url: string, fetcher: Fetcher) => {
-  const request = async () => {
-    await waitForMbSlot()
-    return getJson(url, fetcher)
-  }
-  return request().catch((error) => {
-    if ((error as { status?: number }).status === 503) return request()
-    throw error
-  })
 }
 
 // Discogs and MusicBrainz disagree on a leading "The" ("The Bill Evans Trio" vs "Bill Evans Trio").
@@ -192,7 +167,7 @@ export const attachDiscLabels = async <T extends AlbumLike>(
     const row = known.get(release.id)
     return Boolean(release.artists?.[0] && release.name) && (!row || (!row.label && now - row.checkedAt.getTime() > RECHECK_MISS_MS))
   }
-  const pending = now < mbBackoffUntil || await isServicePaused('musicbrainz')
+  const pending = await isServicePaused('musicbrainz')
     ? []
     : [...new Map(releases.filter(needsLookup).map((release) => [release.id, release])).values()].slice(0, maxLookups)
 
@@ -206,8 +181,6 @@ export const attachDiscLabels = async <T extends AlbumLike>(
       console.warn('[disc-label] lookup failed', release.id, error instanceof Error ? error.message : String(error))
       const status = (error as { status?: number }).status
       if (status === 429 || status === 503) {
-        mbBackoffUntil = Date.now() + RATE_LIMIT_BACKOFF_MS
-        await pauseService('musicbrainz', RATE_LIMIT_BACKOFF_MS)
         break
       }
     }
