@@ -41,7 +41,7 @@ test('uses the exact-name Apple match, then falls back to Deezer', async () => {
     return new Response('not found', { status: 404 })
   }
 
-  expect(await findArtistImage('The Weeknd', fetcher)).toEqual({
+  expect(await findArtistImage('The Weeknd', fetcher, '')).toEqual({
     image: appleArtworkUrl(APPLE_OG)!,
     source: 'apple',
     kind: 'portrait',
@@ -49,10 +49,10 @@ test('uses the exact-name Apple match, then falls back to Deezer', async () => {
     square: null,
   })
   // Neither source has an exact-name match, so nothing is returned.
-  expect(await findArtistImage('Tribute', fetcher)).toBeNull()
+  expect(await findArtistImage('Tribute', fetcher, '')).toBeNull()
   expect(await findArtistImage('Tribute Band Name', async (url: string) => url.includes('deezer')
     ? json({ data: [{ name: 'Tribute Band Name', picture_xl: 'https://cdn-images.dzcdn.net/images/artist/abc/1000x1000.jpg' }] })
-    : appleSearch([]))).toEqual({ image: 'https://cdn-images.dzcdn.net/images/artist/abc/1000x1000.jpg', source: 'deezer', kind: 'portrait', video: null, square: null })
+    : appleSearch([]), '')).toEqual({ image: 'https://cdn-images.dzcdn.net/images/artist/abc/1000x1000.jpg', source: 'deezer', kind: 'portrait', video: null, square: null })
 })
 
 const TEMPLATE = (path: string) => `https://is1-ssl.mzstatic.com/image/thumb/${path}/{w}x{h}{c}.{f}`
@@ -125,7 +125,7 @@ test('uses a fanart.tv background before a square Apple photo when a key is set'
   expect(await findArtistImage('Small Band Two', async (url: string) => fetcher(url.replace('Small%20Band%20Two', 'Small%20Band')).then(async (response) => {
     if (!url.includes('/search?')) return response
     return appleSearch([['Small Band Two', 'https://music.apple.com/us/artist/s/3']])
-  }), undefined)).toEqual({ image: appleArtworkUrl(APPLE_OG)!, source: 'apple', kind: 'portrait', video: null, square: null })
+  }), '')).toEqual({ image: appleArtworkUrl(APPLE_OG)!, source: 'apple', kind: 'portrait', video: null, square: null })
 })
 
 test('finds artist logos on TheAudioDB, then fanart.tv HD logos', async () => {

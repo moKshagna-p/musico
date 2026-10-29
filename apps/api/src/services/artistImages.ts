@@ -18,6 +18,12 @@ export type ArtistImage = HeroArt & {
   square: HeroArt | null
 }
 
+export class ArtistImageUnavailableError extends Error {
+  constructor(readonly fallback: ArtistImage | null) {
+    super('Artist image sources are unavailable right now.')
+  }
+}
+
 type Fetcher = (input: string, init?: RequestInit) => Promise<Response>
 
 const CACHE_TTL_MS = 1000 * 60 * 60 * 24
@@ -175,7 +181,7 @@ const findOnApple = async (name: string, fetcher: Fetcher): Promise<AppleArt | n
   if (!pageUrl?.startsWith('https://music.apple.com/')) return null
 
   const pageResponse = await fetchApple(pageUrl, fetcher)
-  if (!pageResponse.ok) return null
+  if (!pageResponse.ok) throw new Error(`Apple Music artist page failed (${pageResponse.status})`)
   const html = await pageResponse.text()
 
   let wide: ArtistImage | null = null
@@ -232,22 +238,13 @@ const findOnFanart = async (name: string, fetcher: Fetcher, apiKey?: string): Pr
 
 const findOnDeezer = async (name: string, fetcher: Fetcher): Promise<ArtistImage | null> => {
   const response = await fetchWithTimeout(fetcher, `https://api.deezer.com/search/artist?q=${encodeURIComponent(name)}&limit=5`)
-  if (!response.ok) return null
+  if (!response.ok) throw new Error(`Deezer returned ${response.status}`)
   const payload = (await response.json()) as { data?: Array<{ name?: string; picture_xl?: string }> }
   const artist = pickByName(payload.data ?? [], name, (item) => item.name)
   const image = artist?.picture_xl
   // Deezer serves a blank silhouette at /images/artist//... for artists without a photo.
   if (!image?.startsWith('https://') || image.includes('/images/artist//')) return null
   return { image, source: 'deezer', kind: 'portrait', video: null, square: null }
-}
-
-const attempt = async <T>(source: string, name: string, lookup: () => Promise<T | null>) => {
-  try {
-    return await lookup()
-  } catch (error) {
-    console.warn('[artist-image] source failed', { source, name, error: error instanceof Error ? error.message : String(error) })
-    return null
-  }
 }
 
 export const findArtistImage = async (
@@ -260,12 +257,25 @@ export const findArtistImage = async (
   if (!key) return null
 
   return remember(imageCache, `artist-image:${key}`, async () => {
+    let failed = false
+    const attempt = async <T>(source: string, lookup: () => Promise<T | null>) => {
+      try {
+        return await lookup()
+      } catch (error) {
+        failed = true
+        console.warn('[artist-image] source failed', { source, name, error: error instanceof Error ? error.message : String(error) })
+        return null
+      }
+    }
     // Wide art beats a square photo, whichever source it comes from.
-    const apple = await attempt('apple', name, () => findOnApple(name, fetcher))
-    return apple?.wide ??
-      (await attempt('fanart', name, () => findOnFanart(name, fetcher, fanartKey))) ??
+    const apple = await attempt('apple', () => findOnApple(name, fetcher))
+    const image = apple?.wide ??
+      (await attempt('fanart', () => findOnFanart(name, fetcher, fanartKey))) ??
       apple?.portrait ??
-      (await attempt('deezer', name, () => findOnDeezer(name, fetcher)))
+      (await attempt('deezer', () => findOnDeezer(name, fetcher)))
+    // A transient failure must not save a miss or lower-priority artwork for a day.
+    if (failed) throw new ArtistImageUnavailableError(image)
+    return image
   })
 }
 

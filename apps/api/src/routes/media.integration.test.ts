@@ -210,15 +210,34 @@ test.skipIf(!process.env.TEST_DATABASE_URL)('media reservations, review saves, c
       const requests = []
       const pausedFetcher = async url => {
         requests.push(url)
-        return new Response(JSON.stringify({ artists: [], data: [] }))
+        return new Response(JSON.stringify({ artists: [], data: [{ name: 'Paused Image', picture_xl: 'https://cdn-images.dzcdn.net/images/artist/fallback/1000x1000.jpg' }] }))
       }
-      await findArtistImage('Paused Image', pausedFetcher, 'fanart-key')
+      const imageFailure = await findArtistImage('Paused Image', pausedFetcher, 'fanart-key').catch(error => error)
+      assert.equal(imageFailure.fallback?.source, 'deezer')
+      assert.equal(await sharedGet('artist-image:paused image'), null)
       await assert.rejects(() => findArtistLogo('Paused Logo', pausedFetcher, { audioDb: 'test', fanart: 'fanart-key' }), /A logo source failed/)
       assert.equal(requests.some(url => url.includes('music.apple.com') || url.includes('musicbrainz.org')), false)
       await assert.rejects(() => findStreamingLinks('Paused Artist', 'Paused Album', pausedFetcher), /MusicBrainz is rate limited/)
 
+      // The route still returns the fallback, but it must not be saved by a browser or edge cache.
+      const { artistRoutes } = await import('./src/routes/artists.ts')
+      const originalFetch = globalThis.fetch
+      globalThis.fetch = pausedFetcher
+      try {
+        const response = await new Elysia().use(artistRoutes).handle(new Request('http://localhost/api/artist-image?name=Paused%20Image'))
+        assert.equal(response.status, 200)
+        assert.equal(response.headers.get('Cache-Control'), 'no-store')
+        assert.equal((await response.json()).source, 'deezer')
+      } finally {
+        globalThis.fetch = originalFetch
+      }
+
       // Rate-limit responses from these callers publish pauses for other workers too.
       await pool.unsafe("delete from shared_cache where key like 'pause:%'")
+      const recovered = await findArtistImage('Paused Image', async url => url.includes('/search?')
+        ? new Response('<script id="serialized-server-data" type="application/json">' + JSON.stringify({ items: [{ title: 'Paused Image', contentDescriptor: { kind: 'artist', url: 'https://music.apple.com/us/artist/paused-image/1' } }] }) + '</script>')
+        : new Response('<meta property="og:image" content="https://is1-ssl.mzstatic.com/image/thumb/AMCArtistImages211/v4/a/photo.png/1200x630cw.png">'))
+      assert.equal(recovered.source, 'apple')
       let mbAttempts = 0
       assert.deepEqual(await findStreamingLinks('Retry Artist', 'Retry Album', async () => new Response(
         JSON.stringify({ 'release-groups': [] }), { status: ++mbAttempts === 1 ? 503 : 200 },
