@@ -2,7 +2,7 @@
 // Spotify and Apple Music are listed for most albums; YouTube Music and Amazon Music less often. The web app keeps its
 // search links for anything missing here.
 
-import { artistMatches, cleanDiscogsArtist, normalizeTitle } from './albumArtwork'
+import { artistMatches, cleanDiscogsArtist } from './albumArtwork'
 import { normalizeName } from './artistImages'
 import { bareArtist, mbJson } from './discLabels'
 
@@ -18,13 +18,16 @@ const PLATFORMS: Array<[keyof StreamingLinks, RegExp]> = [
   ['appleMusic', /^https:\/\/(music|itunes)\.apple\.com\/[a-z]{2}\/album\/([^/?#]+\/)?(id)?\d+$/],
   // YouTube's auto-generated album playlists (OLAK5uy_) open in YouTube Music as the album.
   ['youtubeMusic', /^https:\/\/(music|www)\.youtube\.com\/playlist\?list=OLAK5uy_[\w-]+$/],
-  ['amazonMusic', /^https:\/\/music\.amazon\.[a-z.]+\/albums\/[A-Z0-9]+$/],
+  ['amazonMusic', /^https:\/\/music\.amazon\.(com|co\.uk|de|fr|it|es|co\.jp|ca|com\.au|com\.br|com\.mx|in)\/albums\/[A-Z0-9]+$/],
 ]
 
 const CACHE_TTL_MS = 1000 * 60 * 60 * 24
 const CACHE_MAX_ENTRIES = 2000
 // ponytail: per-isolate memory cache plus the route's edge Cache-Control; move to Postgres if MusicBrainz load shows up.
 const cache = new Map<string, { links: StreamingLinks; expiresAt: number }>()
+
+// Only known edition labels can fall back; qualifiers such as "Live" or "Taylor's Version" identify different recordings.
+const editionTitle = (title: string) => normalizeName(title.replace(/\s*[([](?:deluxe|expanded)(?: edition| version)?[)\]]/gi, ''))
 
 // Apple links lose their country (/gb/, /nz/), so Apple sends each visitor to their own storefront.
 const tidy = (platform: keyof StreamingLinks, url: string) => {
@@ -44,7 +47,7 @@ export const pickStreamingLinks = (urls: string[]): StreamingLinks => {
 
 export const findStreamingLinks = async (artist: string, album: string, fetcher: Fetcher = fetch): Promise<StreamingLinks> => {
   const targetArtist = normalizeName(bareArtist(cleanDiscogsArtist(artist)))
-  const targetAlbum = normalizeTitle(album)
+  const targetAlbum = normalizeName(album)
   if (!targetArtist || !targetAlbum) return {}
 
   const key = `${targetArtist}\u0000${targetAlbum}`
@@ -52,14 +55,19 @@ export const findStreamingLinks = async (artist: string, album: string, fetcher:
   if (cached && cached.expiresAt > Date.now()) return cached.links
 
   // Normalized names hold only letters, numbers and spaces, so they are safe inside Lucene phrases.
-  const query = `releasegroup:"${targetAlbum}" AND artist:"${targetArtist}"`
+  const baseAlbum = editionTitle(album)
+  const query = `releasegroup:"${baseAlbum}" AND artist:"${targetArtist}"`
   const search = await mbJson(`https://musicbrainz.org/ws/2/release-group/?query=${encodeURIComponent(query)}&fmt=json&limit=25`, fetcher)
   const groups: MbReleaseGroup[] = Array.isArray(search?.['release-groups']) ? search['release-groups'] : []
   const matches = groups.filter((group) =>
-    normalizeTitle(group.title ?? '') === targetAlbum &&
+    editionTitle(group.title ?? '') === baseAlbum &&
     artistMatches(bareArtist(group['artist-credit']?.[0]?.name ?? ''), targetArtist))
   // The album before a same-titled single.
-  const group = matches.find((entry) => entry['primary-type'] === 'Album') ?? matches[0]
+  const albums = matches.filter((entry) => entry['primary-type'] === 'Album')
+  const candidates = albums.length ? albums : matches
+  const group = candidates.find((entry) => normalizeName(entry.title ?? '') === targetAlbum)
+    ?? candidates.find((entry) => normalizeName(entry.title ?? '') === baseAlbum)
+    ?? candidates[0]
 
   let links: StreamingLinks = {}
   if (group?.id) {

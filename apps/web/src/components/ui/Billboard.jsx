@@ -63,6 +63,13 @@ const PHONE = '(max-width: 1023px)'
 // Full-bleed hero: the blurred album art shows at once, and the artist's photo fades in over it when found.
 const Billboard = ({ artist, cover, children, className = 'tablet:min-h-[82svh]', gutter = PAGE_GUTTER }) => {
   const [loadedSrc, setLoadedSrc] = useState(null)
+  const [isPhone, setIsPhone] = useState(() => window.matchMedia(PHONE).matches)
+  useEffect(() => {
+    const media = window.matchMedia(PHONE)
+    const handleChange = (event) => setIsPhone(event.matches)
+    media.addEventListener('change', handleChange)
+    return () => media.removeEventListener('change', handleChange)
+  }, [])
   const { data: artistArt } = useQuery({
     queryKey: ['artist-image', artist],
     queryFn: () => getArtistImage(artist),
@@ -76,7 +83,7 @@ const Billboard = ({ artist, cover, children, className = 'tablet:min-h-[82svh]'
   // Apple's square cut is art-directed for this; other wide art is cropped from the center, and square photos fit as they are.
   // From tablet up, wide editorial banners fill the hero; square press photos sit right and fade left so faces stay whole and clear of the text.
   const square = artistArt?.square
-  const video = square && window.matchMedia(PHONE).matches ? square.video : artistArt?.video
+  const video = square && isPhone ? square.video : artistArt?.video
   const artLayout = `absolute inset-x-0 top-0 h-[min(100vw,72svh)] w-full object-cover [mask-image:linear-gradient(black_60%,transparent)] tablet:h-full ${
     artistArt?.kind === 'editorial'
       ? 'tablet:inset-0 tablet:object-[50%_35%] tablet:[mask-image:none]'

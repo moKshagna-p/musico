@@ -23,6 +23,48 @@ test('keeps only album pages, one per platform, with Apple links free of a store
   })
 })
 
+test('rejects Amazon look-alike domains while keeping supported country hosts', () => {
+  for (const host of ['music.amazon.attacker.com', 'music.amazon.com.attacker.com', 'music.amazon.evil', 'music.amazon.co.uk.attacker.com']) {
+    expect(pickStreamingLinks([`https://${host}/albums/ABC`])).toEqual({})
+  }
+  for (const host of ['music.amazon.com', 'music.amazon.co.uk', 'music.amazon.co.jp', 'music.amazon.in']) {
+    expect(pickStreamingLinks([`https://${host}/albums/ABC`])).toEqual({ amazonMusic: `https://${host}/albums/ABC` })
+  }
+})
+
+test('keeps rerecordings separate in matching, searches and the cache', async () => {
+  const requested: string[] = []
+  const fetcher = async (url: string) => {
+    requested.push(url)
+    if (url.includes('/release-group/?query=')) return json({ 'release-groups': [
+      { id: 'original', title: '1989', 'primary-type': 'Album', 'artist-credit': [{ name: 'Taylor Swift' }] },
+      { id: 'rerecording', title: "1989 (Taylor's Version)", 'primary-type': 'Album', 'artist-credit': [{ name: 'Taylor Swift' }] },
+    ] })
+    const id = new URL(url).searchParams.get('release-group')
+    return json({ releases: [{ relations: [{ url: { resource: `https://open.spotify.com/album/${id}` } }] }] })
+  }
+
+  expect(await findStreamingLinks('Taylor Swift', "1989 (Taylor's Version)", fetcher)).toEqual({ spotify: 'https://open.spotify.com/album/rerecording' })
+  expect(await findStreamingLinks('Taylor Swift', '1989', fetcher)).toEqual({ spotify: 'https://open.spotify.com/album/original' })
+  expect(await findStreamingLinks('Taylor Swift', "1989 (Taylor's Version)", fetcher)).toEqual({ spotify: 'https://open.spotify.com/album/rerecording' })
+  expect(requested).toHaveLength(4)
+  expect(new URL(requested[0]).searchParams.get('query')).toContain('1989 taylor s version')
+})
+
+test('prefers full album titles before edition fallbacks and keeps meaningful qualifiers', async () => {
+  const fetcher = async (url: string) => {
+    if (url.includes('/release-group/?query=')) return json({ 'release-groups': [
+      { id: 'expanded', title: 'Test Album (Expanded)', 'primary-type': 'Album', 'artist-credit': [{ name: 'Test Artist' }] },
+      { id: 'exact', title: 'Test Album', 'primary-type': 'Album', 'artist-credit': [{ name: 'Test Artist' }] },
+    ] })
+    const id = new URL(url).searchParams.get('release-group')
+    return json({ releases: [{ relations: [{ url: { resource: `https://open.spotify.com/album/${id}` } }] }] })
+  }
+  expect(await findStreamingLinks('Test Artist', 'Test Album', fetcher)).toEqual({ spotify: 'https://open.spotify.com/album/exact' })
+  expect(await findStreamingLinks('Test Artist', 'Test Album (Live)', fetcher)).toEqual({})
+  expect(await findStreamingLinks('Test Artist', 'Test Album (Deluxe Edition)', fetcher)).toEqual({ spotify: 'https://open.spotify.com/album/exact' })
+}, 10_000)
+
 test('reads links from the album release group, not a same-titled single or tribute', async () => {
   const requested: string[] = []
   const fetcher = async (url: string) => {
