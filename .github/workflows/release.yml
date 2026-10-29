@@ -93,6 +93,10 @@ jobs:
     needs: checks
     timeout-minutes: 5
     environment: production
+    # Releases are grouped per tag above, so two tags could migrate at once; this queues them instead.
+    concurrency:
+      group: production-migrations
+      cancel-in-progress: false
     env:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
     steps:
