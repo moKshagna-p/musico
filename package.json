@@ -12,6 +12,7 @@
     "postcss": "8.5.17"
   },
   "scripts": {
+    "prepare": "bun .husky/install.mjs",
     "check:bun": "node ./scripts/check-bun.mjs",
     "dev": "npm run check:bun && mprocs",
     "dev:turbo": "npm run check:bun && turbo run dev --parallel",
@@ -31,6 +32,7 @@
   },
   "devDependencies": {
     "@playwright/test": "^1.61.1",
+    "husky": "^9.1.7",
     "mprocs": "0.7.3",
     "turbo": "^2.10.4"
   }
