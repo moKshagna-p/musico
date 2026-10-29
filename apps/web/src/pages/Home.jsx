@@ -37,7 +37,7 @@ const Home = () => {
         artist={topAlbum?.artists?.[0]}
         cover={topAlbum?.cover}
         gutter={WIDE_GUTTER}
-        className={topAlbum || loading ? undefined : 'min-h-[50svh]'}
+        className={topAlbum || loading ? undefined : 'tablet:min-h-[50svh]'}
       >
         {topAlbum ? (
           <div className="flex flex-col gap-8 md:flex-row md:items-end md:gap-10">

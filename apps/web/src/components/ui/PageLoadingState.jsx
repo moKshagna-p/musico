@@ -184,7 +184,7 @@ export const TrackRowsSkeleton = () =>
 // Rendered inside a bleed PageTransition, like the album page itself.
 export const AlbumDetailsPageSkeleton = () => (
   <div aria-busy="true" aria-label="Loading album details">
-    <Billboard className="min-h-[86svh]">
+    <Billboard className="tablet:min-h-[86svh]">
       <div className="flex flex-col gap-8 md:flex-row md:items-end md:gap-10">
         <div className="w-44 shrink-0 pr-14 tablet:w-64 tablet:pr-20">
           <SleeveSkeleton out />

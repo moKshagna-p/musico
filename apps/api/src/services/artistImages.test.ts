@@ -46,12 +46,13 @@ test('uses the exact-name Apple match, then falls back to Deezer', async () => {
     source: 'apple',
     kind: 'portrait',
     video: null,
+    square: null,
   })
   // Neither source has an exact-name match, so nothing is returned.
   expect(await findArtistImage('Tribute', fetcher)).toBeNull()
   expect(await findArtistImage('Tribute Band Name', async (url: string) => url.includes('deezer')
     ? json({ data: [{ name: 'Tribute Band Name', picture_xl: 'https://cdn-images.dzcdn.net/images/artist/abc/1000x1000.jpg' }] })
-    : appleSearch([]))).toEqual({ image: 'https://cdn-images.dzcdn.net/images/artist/abc/1000x1000.jpg', source: 'deezer', kind: 'portrait', video: null })
+    : appleSearch([]))).toEqual({ image: 'https://cdn-images.dzcdn.net/images/artist/abc/1000x1000.jpg', source: 'deezer', kind: 'portrait', video: null, square: null })
 })
 
 const TEMPLATE = (path: string) => `https://is1-ssl.mzstatic.com/image/thumb/${path}/{w}x{h}{c}.{f}`
@@ -64,10 +65,17 @@ test('prefers motion heroes with their video, then editorial banners, keeping th
   const motion = { previewFrame: { url: TEMPLATE('Video211/v4/c/still.png'), width: 3840, height: 2160 }, video: VIDEO }
   const page = (items: object) => ({ data: [{ data: { sections: [{ items: [items] }] } }] })
 
-  expect(pickEditorialArtwork(page({ wideArtwork: banner, wideVideoArtwork: { dictionary: { motionArtistFullscreen16x9: motion } } })))
-    .toEqual({ image: 'https://is1-ssl.mzstatic.com/image/thumb/Video211/v4/c/still.png/2400x1350bb.webp', video: VIDEO })
+  const square = { previewFrame: { url: TEMPLATE('Video211/v4/d/square.png'), width: 3840, height: 3840 }, video: VIDEO }
+
+  expect(pickEditorialArtwork(page({ wideArtwork: banner, wideVideoArtwork: { dictionary: { motionArtistFullscreen16x9: motion, motionArtistSquare1x1: square } } })))
+    .toEqual({
+      image: 'https://is1-ssl.mzstatic.com/image/thumb/Video211/v4/c/still.png/2400x1350bb.webp',
+      video: VIDEO,
+      // Phones get the square cut, sized for a 3x screen.
+      square: { image: 'https://is1-ssl.mzstatic.com/image/thumb/Video211/v4/d/square.png/1400x1400bb.webp', video: VIDEO },
+    })
   expect(pickEditorialArtwork(page({ wideArtwork: banner })))
-    .toEqual({ image: 'https://is1-ssl.mzstatic.com/image/thumb/Features125/v4/b/banner.png/2400x1200bb.webp', video: null })
+    .toEqual({ image: 'https://is1-ssl.mzstatic.com/image/thumb/Features125/v4/b/banner.png/2400x1200bb.webp', video: null, square: null })
   // Videos must come from Apple's stream host.
   expect(pickEditorialArtwork(page({ wideVideoArtwork: { dictionary: { motionArtistFullscreen16x9: { ...motion, video: 'https://evil.example.com/x.m3u8' } } } }))?.video)
     .toBeNull()
@@ -87,6 +95,7 @@ test('reads editorial art from the Apple page before falling back to og:image', 
     source: 'apple',
     kind: 'editorial',
     video: null,
+    square: null,
   })
 })
 
@@ -110,12 +119,13 @@ test('uses a fanart.tv background before a square Apple photo when a key is set'
     source: 'fanart',
     kind: 'editorial',
     video: null,
+    square: null,
   })
   // Without a key, the square Apple photo is used.
   expect(await findArtistImage('Small Band Two', async (url: string) => fetcher(url.replace('Small%20Band%20Two', 'Small%20Band')).then(async (response) => {
     if (!url.includes('/search?')) return response
     return appleSearch([['Small Band Two', 'https://music.apple.com/us/artist/s/3']])
-  }), undefined)).toEqual({ image: appleArtworkUrl(APPLE_OG)!, source: 'apple', kind: 'portrait', video: null })
+  }), undefined)).toEqual({ image: appleArtworkUrl(APPLE_OG)!, source: 'apple', kind: 'portrait', video: null, square: null })
 })
 
 test('finds artist logos on TheAudioDB, then fanart.tv HD logos', async () => {

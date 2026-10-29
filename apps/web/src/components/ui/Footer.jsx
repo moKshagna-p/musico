@@ -29,22 +29,6 @@ const socials = [
 
 const Footer = () => (
   <footer className="relative mt-24 overflow-hidden border-t border-white/[0.07] pb-[env(safe-area-inset-bottom)]">
-    {/* An oxblood pressing: on phones it peeks in beside the social links, above the wordmark (which fills the width
-        there, so the record would cover it); on wider screens it rises out of the bottom edge behind the wordmark.
-        26vw is about the wordmark's visible height (26vw type, 1.15 line, sunk 0.14em). */}
-    <Motion.div
-      aria-hidden="true"
-      style={{ '--vinyl': '#5c1420' }}
-      initial={{ y: '45%', x: '20%', rotate: 120, opacity: 0 }}
-      whileInView={{ y: 0, x: 0, rotate: 0, opacity: 1 }}
-      viewport={{ once: true }}
-      transition={{ duration: 1.4, ease: [0.16, 1, 0.3, 1] }}
-      className="vinyl pointer-events-none absolute -right-14 bottom-[calc(26vw+2.5rem)] h-36 w-36 tablet:-bottom-60 tablet:right-[5%] tablet:h-[26rem] tablet:w-[26rem]"
-    >
-      <span className="absolute inset-[38%] rounded-full bg-paper/90" />
-      <span className="absolute inset-[48.5%] rounded-full bg-canvas" />
-    </Motion.div>
-
     <div className="relative mx-auto max-w-6xl px-4 pt-14 tablet:px-6 tablet:pt-20">
       <div className="grid gap-12 tablet:grid-cols-[1.6fr_1fr_1fr]">
         <div>
@@ -99,14 +83,30 @@ const Footer = () => (
         </div>
       </div>
 
-      {/* Clipped text only paints inside its line box, so the line is tall enough for the i's dot; the negative
-          margin then sinks the empty space under the letters below the edge so they sit on it. */}
-      <p
-        aria-hidden="true"
-        className="pointer-events-none -mb-[0.14em] mt-6 select-none bg-gradient-to-b from-white/[0.16] to-white/[0.04] bg-clip-text font-display text-[26vw] leading-[1.15] text-transparent tablet:mt-8 tablet:text-[15rem]"
-      >
-        musico
-      </p>
+      {/* The wrapper hugs the wordmark and carries its font size, so the record is placed in em from the last "o"
+          at every screen width. Clipped text only paints inside its line box, so the line is tall enough for the
+          i's dot; the negative margin then sinks the empty space under the letters below the edge so they sit on it. */}
+      <div className="relative mt-6 w-fit font-display text-[20vw] tablet:mt-8 tablet:text-[15rem]">
+        {/* An oxblood pressing rising out of the footer's bottom edge, which sits 0.14em above the wrapper's. */}
+        <Motion.div
+          aria-hidden="true"
+          style={{ '--vinyl': '#5c1420' }}
+          initial={{ y: '45%', x: '20%', rotate: 120, opacity: 0 }}
+          whileInView={{ y: 0, x: 0, rotate: 0, opacity: 1 }}
+          viewport={{ once: true }}
+          transition={{ duration: 1.4, ease: [0.16, 1, 0.3, 1] }}
+          className="vinyl pointer-events-none absolute -bottom-[1.39em] left-[calc(100%+0.05em)] h-[2.25em] w-[2.25em] tablet:-bottom-[1.14em] tablet:h-[1.75em] tablet:w-[1.75em]"
+        >
+          <span className="absolute inset-[38%] rounded-full bg-paper/90" />
+          <span className="absolute inset-[48.5%] rounded-full bg-canvas" />
+        </Motion.div>
+        <p
+          aria-hidden="true"
+          className="pointer-events-none relative -mb-[0.14em] select-none bg-gradient-to-b from-white/[0.16] to-white/[0.04] bg-clip-text leading-[1.15] text-transparent"
+        >
+          musico
+        </p>
+      </div>
     </div>
   </footer>
 )

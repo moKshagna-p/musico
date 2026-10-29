@@ -269,3 +269,11 @@ export const getReleaseDetails = async (releaseId) => {
   // Not persisted: the response carries live community scores.
   return validatedRequest({ url: `/api/releases/${releaseId}` }, AlbumSchema)
 }
+
+const StreamingLinksSchema = z.object({ links: z.record(z.string(), z.string().url()) })
+
+// Direct album pages on Spotify, Apple Music, YouTube Music and Amazon Music, for the platforms MusicBrainz lists.
+export const getStreamingLinks = async (artist, album) => {
+  const data = await validatedRequest({ url: '/api/streaming-links', params: { artist, album } }, StreamingLinksSchema)
+  return data?.links ?? {}
+}

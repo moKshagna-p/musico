@@ -57,9 +57,19 @@ const HeroVideo = ({ src, className }) => {
   )
 }
 
+// Below the `tablet` breakpoint.
+const PHONE = '(max-width: 1023px)'
+
 // Full-bleed hero: the blurred album art shows at once, and the artist's photo fades in over it when found.
-const Billboard = ({ artist, cover, children, className = 'min-h-[82svh]', gutter = PAGE_GUTTER }) => {
+const Billboard = ({ artist, cover, children, className = 'tablet:min-h-[82svh]', gutter = PAGE_GUTTER }) => {
   const [loadedSrc, setLoadedSrc] = useState(null)
+  const [isPhone, setIsPhone] = useState(() => window.matchMedia(PHONE).matches)
+  useEffect(() => {
+    const media = window.matchMedia(PHONE)
+    const handleChange = (event) => setIsPhone(event.matches)
+    media.addEventListener('change', handleChange)
+    return () => media.removeEventListener('change', handleChange)
+  }, [])
   const { data: artistArt } = useQuery({
     queryKey: ['artist-image', artist],
     queryFn: () => getArtistImage(artist),
@@ -69,12 +79,15 @@ const Billboard = ({ artist, cover, children, className = 'min-h-[82svh]', gutte
   })
   // The blurred cover only holds the space until the photo arrives, then recedes so it doesn't muddy the hero.
   const hasLoadedArt = Boolean(artistArt) && loadedSrc === artistArt.image
-  // Phones are too narrow to crop into, so the whole photo runs across the top and fades into the page.
+  // Phones get a square of art across the top that fades into the page, with the text starting on the fade.
+  // Apple's square cut is art-directed for this; other wide art is cropped from the center, and square photos fit as they are.
   // From tablet up, wide editorial banners fill the hero; square press photos sit right and fade left so faces stay whole and clear of the text.
-  const artLayout = `absolute inset-x-0 top-0 w-full object-cover tablet:h-full ${
+  const square = artistArt?.square
+  const video = square && isPhone ? square.video : artistArt?.video
+  const artLayout = `absolute inset-x-0 top-0 h-[min(100vw,72svh)] w-full object-cover [mask-image:linear-gradient(black_60%,transparent)] tablet:h-full ${
     artistArt?.kind === 'editorial'
-      ? '[mask-image:linear-gradient(black_55%,transparent)] tablet:inset-0 tablet:object-[50%_35%] tablet:[mask-image:none]'
-      : '[mask-image:linear-gradient(black_55%,transparent)] tablet:inset-y-0 tablet:left-auto tablet:right-0 tablet:aspect-[5/4] tablet:w-auto tablet:max-w-[75%] tablet:object-[50%_25%] tablet:[mask-image:linear-gradient(to_right,transparent,black_45%)]'
+      ? 'tablet:inset-0 tablet:object-[50%_35%] tablet:[mask-image:none]'
+      : 'object-[50%_25%] tablet:inset-y-0 tablet:left-auto tablet:right-0 tablet:aspect-[5/4] tablet:w-auto tablet:max-w-[75%] tablet:[mask-image:linear-gradient(to_right,transparent,black_45%)]'
   }`
 
   return (
@@ -84,26 +97,30 @@ const Billboard = ({ artist, cover, children, className = 'min-h-[82svh]', gutte
           <img src={cover} alt="" decoding="async" className={`h-full w-full scale-125 object-cover blur-3xl saturate-150 transition-opacity duration-700 ${hasLoadedArt ? 'opacity-20' : 'opacity-50'}`} />
         ) : null}
         {artistArt ? (
-          <img
-            key={artistArt.image}
-            src={artistArt.image}
-            alt=""
-            decoding="async"
-            onLoad={() => setLoadedSrc(artistArt.image)}
-            className={`${artLayout} transition-opacity duration-700 ${loadedSrc === artistArt.image ? 'opacity-100' : 'opacity-0'}`}
-          />
+          <picture key={artistArt.image}>
+            {square ? <source media={PHONE} srcSet={square.image} /> : null}
+            <img
+              src={artistArt.image}
+              alt=""
+              decoding="async"
+              onLoad={() => setLoadedSrc(artistArt.image)}
+              className={`${artLayout} transition-opacity duration-700 ${loadedSrc === artistArt.image ? 'opacity-100' : 'opacity-0'}`}
+            />
+          </picture>
         ) : null}
-        {artistArt?.video && !prefersStill() ? (
-          <HeroVideo key={artistArt.video} src={artistArt.video} className={artLayout} />
+        {video && !prefersStill() ? (
+          <HeroVideo key={video} src={video} className={artLayout} />
         ) : null}
         <div
           className={`absolute inset-x-0 top-0 bg-gradient-to-b from-black/70 to-transparent ${artistArt?.kind === 'portrait' ? 'h-40 tablet:h-1/2 tablet:from-black/90' : 'h-40'}`}
         />
-        <div className="absolute inset-0 bg-gradient-to-r from-black/50 via-black/10 to-transparent" />
+        {/* Phone text sits below the art, so only wider screens need the left shade behind it. */}
+        <div className="absolute inset-0 hidden bg-gradient-to-r from-black/50 via-black/10 to-transparent tablet:block" />
         <div className="absolute inset-x-0 bottom-0 h-3/5 bg-gradient-to-t from-black via-black/70 to-transparent" />
       </div>
 
-      <div className={`${gutter} pb-10 pt-32 tablet:pb-16`}>
+      {/* On phones the art's height sets the hero: text begins 6rem into its fade, so there's no empty band to fill. */}
+      <div className={`${gutter} pb-10 pt-[calc(min(100vw,72svh)-6rem)] tablet:pb-16 tablet:pt-32`}>
         {children}
       </div>
     </section>

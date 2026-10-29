@@ -61,8 +61,21 @@ const getJson = async (url: string, fetcher: Fetcher) => {
   return response.json()
 }
 
+// One MusicBrainz request in the shared one-per-second slot. It answers 503 whenever its servers are busy, so one retry
+// in the next slot is normal.
+export const mbJson = async (url: string, fetcher: Fetcher) => {
+  const request = async () => {
+    await waitForMbSlot()
+    return getJson(url, fetcher)
+  }
+  return request().catch((error) => {
+    if ((error as { status?: number }).status === 503) return request()
+    throw error
+  })
+}
+
 // Discogs and MusicBrainz disagree on a leading "The" ("The Bill Evans Trio" vs "Bill Evans Trio").
-const bareArtist = (name: string) => name.replace(/^\s*the\s+/i, '')
+export const bareArtist = (name: string) => name.replace(/^\s*the\s+/i, '')
 
 // Only URLs on the expected image hosts reach the page.
 const safeUrl = (url: string | null | undefined, host: RegExp) => {
@@ -118,15 +131,7 @@ export const findDiscLabel = async (
 
   // Normalized names hold only letters, numbers and spaces, so they are safe inside Lucene phrases.
   const query = `releasegroup:"${targetAlbum}" AND artist:"${targetArtist}"`
-  const searchMb = async () => {
-    await waitForMbSlot()
-    return getJson(`https://musicbrainz.org/ws/2/release/?query=${encodeURIComponent(query)}&fmt=json&limit=100`, fetcher)
-  }
-  // MusicBrainz answers 503 whenever its servers are busy, so one retry in the next slot is normal.
-  const search = await searchMb().catch((error) => {
-    if ((error as { status?: number }).status === 503) return searchMb()
-    throw error
-  })
+  const search = await mbJson(`https://musicbrainz.org/ws/2/release/?query=${encodeURIComponent(query)}&fmt=json&limit=100`, fetcher)
   const releases: MbRelease[] = Array.isArray(search?.releases) ? search.releases : []
 
   const matches = releases.filter((release) =>

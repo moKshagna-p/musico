@@ -57,6 +57,7 @@ for (const failedMode of [null, 'featured', 'recent-popular']) {
       }))
       mock.module('./src/services/albumArtwork.ts', () => ({ attachHdCovers: async (albums) => albums }))
       mock.module('./src/services/discLabels.ts', () => ({ attachDiscLabels: async (albums) => albums, lookUpDiscLabelsLater: () => {} }))
+      mock.module('./src/services/streamingLinks.ts', () => ({ findStreamingLinks: async () => ({}) }))
       const { albumRoutes } = await import('./src/routes/albums.ts')
       const response = await new Elysia().use(albumRoutes).handle(new Request('http://localhost/api/home'))
       console.log(JSON.stringify({ body: await response.json(), batches, cache: response.headers.get('cache-control'), status: response.status }))
