@@ -268,7 +268,21 @@ export const installApiMocks = async (page: Page, { admin = false } = {}) => {
 
     if (pathname === '/api/admin/overview' && method === 'GET') {
       if (!signedIn || !isAdmin()) return json(route, { error: 'Forbidden.' }, 403)
-      return json(route, { data: { metrics: { totalUsers: 1, totalRatings: ratings.size, totalReviews: adminReviews.length, adminCount: adminIds.size } } })
+      return json(route, { data: {
+        metrics: {
+          totalUsers: 128, newUsers7d: 4, totalRatings: 1204, ratings7d: 31, totalReviews: adminReviews.length, reviews7d: 1,
+          totalLists: 41, searches7d: 52, averageRating: 3.8, adminCount: adminIds.size,
+        },
+        topQueries: [
+          { query: 'Daft Punk', normalizedQuery: 'daft punk', searchCount: 24, lastSearchedAt: Date.now() },
+          { query: 'Radiohead', normalizedQuery: 'radiohead', searchCount: 15, lastSearchedAt: Date.now() },
+          { query: 'Kind of Blue', normalizedQuery: 'kind of blue', searchCount: 6, lastSearchedAt: Date.now() },
+        ],
+        recentActivity: [
+          { id: 'activity-1', userId: 'ava', userName: 'Ava', type: 'rated', albumName: 'Discovery', createdAt: Date.now() - 3_600_000 },
+          { id: 'activity-2', userId: 'sam', userName: 'Sam', type: 'followed', albumName: null, createdAt: Date.now() - 7_200_000 },
+        ],
+      } })
     }
 
     if (pathname === '/api/admin/reviews' && method === 'GET') {
