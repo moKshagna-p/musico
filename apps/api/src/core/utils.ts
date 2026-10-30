@@ -1,4 +1,5 @@
 import { and, sql, eq, inArray, isNull } from 'drizzle-orm'
+import { LRUCache } from 'lru-cache'
 import { db } from './db'
 import { auth } from '../auth'
 import { env } from './env'
@@ -56,8 +57,9 @@ export const getClientIp = (request: Request) => {
   return 'unknown'
 }
 
-const rateLimiter = new Map<string, { count: number; resetAt: number }>()
-let lastRateLimitCleanupAt = 0
+// Full tables evict the least recently seen IP rather than refusing new ones, so a flood of spoofed
+// x-vercel-forwarded-for values can't lock every new visitor out. Evicted IPs just restart their window.
+const rateLimiter = new LRUCache<string, { count: number; resetAt: number }>({ max: RATE_LIMIT_MAX_TRACKED_IPS })
 
 const isIpAddress = (value: string) => {
   const ipv4Parts = value.split('.')
@@ -72,34 +74,18 @@ const isIpAddress = (value: string) => {
   }
 }
 
-const cleanupExpiredRateLimits = (now: number) => {
-  if (rateLimiter.size < RATE_LIMIT_MAX_TRACKED_IPS && now - lastRateLimitCleanupAt < 60_000) return
-  for (const [trackedIp, tracked] of rateLimiter) {
-    if (tracked.resetAt <= now) rateLimiter.delete(trackedIp)
-  }
-  lastRateLimitCleanupAt = now
-}
-
 export const consumeRateLimit = (ip: string) => {
   const now = Date.now()
-  const entry = rateLimiter.get(ip)
-
-  if (entry && now <= entry.resetAt) {
-    if (entry.count >= RATE_LIMIT_MAX) {
-      return { allowed: false, remaining: 0, retryAfter: Math.ceil((entry.resetAt - now) / 1000) }
-    }
-    entry.count += 1
-    return { allowed: true, remaining: RATE_LIMIT_MAX - entry.count, retryAfter: Math.ceil((entry.resetAt - now) / 1000) }
+  let entry = rateLimiter.get(ip)
+  if (!entry || now > entry.resetAt) {
+    entry = { count: 0, resetAt: now + RATE_LIMIT_WINDOW }
+    rateLimiter.set(ip, entry)
   }
 
-  if (entry) rateLimiter.delete(ip)
-  cleanupExpiredRateLimits(now)
-  if (rateLimiter.size >= RATE_LIMIT_MAX_TRACKED_IPS) {
-    return { allowed: false, remaining: 0, retryAfter: 60 }
-  }
-
-  rateLimiter.set(ip, { count: 1, resetAt: now + RATE_LIMIT_WINDOW })
-  return { allowed: true, remaining: RATE_LIMIT_MAX - 1, retryAfter: RATE_LIMIT_WINDOW / 1000 }
+  const retryAfter = Math.ceil((entry.resetAt - now) / 1000)
+  if (entry.count >= RATE_LIMIT_MAX) return { allowed: false, remaining: 0, retryAfter }
+  entry.count += 1
+  return { allowed: true, remaining: RATE_LIMIT_MAX - entry.count, retryAfter }
 }
 
 export const normalizeListName = (value: unknown) =>

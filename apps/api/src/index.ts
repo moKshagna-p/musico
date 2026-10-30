@@ -17,6 +17,29 @@ import { apiRoutes } from './routes'
 
 const allowedOrigin = env.ALLOWED_ORIGINS
 
+const CLIENT_ERROR_CODES = new Set<unknown>(['VALIDATION', 'PARSE', 'NOT_FOUND', 'INVALID_COOKIE_SIGNATURE', 'INVALID_FILE_TYPE'])
+
+const health = () => ({
+  status: 'ok',
+  uptimeSeconds: Math.floor(process.uptime()),
+})
+
+const ready = async ({ set }: { set: { status?: number | string } }) => {
+  try {
+    await db.execute(sql`select 1`)
+    return { status: 'ready' }
+  } catch (error) {
+    log('error', 'readiness.failed', {
+      message: error instanceof Error ? error.message : 'Database unavailable.',
+    })
+    set.status = 503
+    return {
+      status: 'not_ready',
+      error: 'Database unavailable.',
+    }
+  }
+}
+
 export const createApp = (options?: ConstructorParameters<typeof Elysia>[0]) => new Elysia(options)
   .derive(({ request, set }) => {
     const requestId = crypto.randomUUID()
@@ -45,6 +68,10 @@ export const createApp = (options?: ConstructorParameters<typeof Elysia>[0]) => 
     })
   })
   .onError(({ code, error, request, requestId, requestPath, set }) => {
+    // Elysia would otherwise send the thrown message as the body, exposing database and upstream error details.
+    // Its `code` comes from the error itself (Postgres SQLSTATEs, ECONNREFUSED), so only its own client errors pass.
+    const unexpected = typeof code !== 'number' && !CLIENT_ERROR_CODES.has(code)
+    if (unexpected && !(Number(set.status) >= 400)) set.status = 500
     log('error', 'request.failed', {
       requestId,
       code,
@@ -53,6 +80,7 @@ export const createApp = (options?: ConstructorParameters<typeof Elysia>[0]) => 
       path: requestPath,
       status: Number(set.status ?? 500),
     })
+    if (unexpected) return { error: 'Something went wrong. Please try again.', requestId }
   })
   .use(
     cors({
@@ -80,44 +108,10 @@ export const createApp = (options?: ConstructorParameters<typeof Elysia>[0]) => 
     status: 'ok',
     message: 'Musico API proxy is running.',
   }))
-  .get('/health', () => ({
-    status: 'ok',
-    uptimeSeconds: Math.floor(process.uptime()),
-  }))
-  .get('/api/health', () => ({
-    status: 'ok',
-    uptimeSeconds: Math.floor(process.uptime()),
-  }))
-  .get('/ready', async ({ set }) => {
-    try {
-      await db.execute(sql`select 1`)
-      return { status: 'ready' }
-    } catch (error) {
-      log('error', 'readiness.failed', {
-        message: error instanceof Error ? error.message : 'Database unavailable.',
-      })
-      set.status = 503
-      return {
-        status: 'not_ready',
-        error: 'Database unavailable.',
-      }
-    }
-  })
-  .get('/api/ready', async ({ set }) => {
-    try {
-      await db.execute(sql`select 1`)
-      return { status: 'ready' }
-    } catch (error) {
-      log('error', 'readiness.failed', {
-        message: error instanceof Error ? error.message : 'Database unavailable.',
-      })
-      set.status = 503
-      return {
-        status: 'not_ready',
-        error: 'Database unavailable.',
-      }
-    }
-  })
+  .get('/health', health)
+  .get('/api/health', health)
+  .get('/ready', ready)
+  .get('/api/ready', ready)
   .use(apiRoutes)
 
 export { env } from './core/env'

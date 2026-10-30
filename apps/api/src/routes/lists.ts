@@ -110,8 +110,6 @@ export const listRoutes = new Elysia({ prefix: '/api' })
       updatedAt: now,
     }
 
-    await db.insert(userList).values(created)
-
     let initialAlbumEntry: {
       id: string
       name: string
@@ -129,16 +127,20 @@ export const listRoutes = new Elysia({ prefix: '/api' })
         releaseYear: initialAlbum?.releaseYear,
       })
 
-      await db.insert(userListAlbum).values({
-        id: crypto.randomUUID(),
-        listId: created.id,
-        albumId: initialAlbumId,
-        name: albumMeta.name,
-        cover: albumMeta.cover,
-        artists: albumMeta.artists,
-        releaseYear: albumMeta.releaseYear,
-        addedAt: now,
-      })
+      // One batch, so a failed album insert can't leave an empty list behind.
+      await db.batch([
+        db.insert(userList).values(created),
+        db.insert(userListAlbum).values({
+          id: crypto.randomUUID(),
+          listId: created.id,
+          albumId: initialAlbumId,
+          name: albumMeta.name,
+          cover: albumMeta.cover,
+          artists: albumMeta.artists,
+          releaseYear: albumMeta.releaseYear,
+          addedAt: now,
+        }),
+      ])
 
       await recordActivity({
         userId: authUser.id,
@@ -157,6 +159,8 @@ export const listRoutes = new Elysia({ prefix: '/api' })
         releaseYear: albumMeta.releaseYear,
         addedAt: now.getTime(),
       }
+    } else {
+      await db.insert(userList).values(created)
     }
 
     set.headers ??= {}
@@ -206,8 +210,10 @@ export const listRoutes = new Elysia({ prefix: '/api' })
     const now = new Date()
 
     if (existing[0]) {
-      await db.delete(userListAlbum).where(eq(userListAlbum.id, existing[0].id))
-      await db.update(userList).set({ updatedAt: now }).where(eq(userList.id, listId))
+      await db.batch([
+        db.delete(userListAlbum).where(eq(userListAlbum.id, existing[0].id)),
+        db.update(userList).set({ updatedAt: now }).where(eq(userList.id, listId)),
+      ])
 
       set.headers ??= {}
       set.headers['Cache-Control'] = 'no-store'
@@ -236,27 +242,32 @@ export const listRoutes = new Elysia({ prefix: '/api' })
       releaseYear: album?.releaseYear,
     })
 
-    await db.insert(userListAlbum).values({
-      id: crypto.randomUUID(),
-      listId,
-      albumId,
-      name: albumMeta.name,
-      cover: albumMeta.cover,
-      artists: albumMeta.artists,
-      releaseYear: albumMeta.releaseYear,
-      addedAt: now,
-    })
-    await db.update(userList).set({ updatedAt: now }).where(eq(userList.id, listId))
+    // A double-tapped add lands on the unique (listId, albumId) index; the second insert is a no-op, not a 500,
+    // and only the request that inserted the row posts to the feed.
+    const [inserted] = await db.batch([
+      db.insert(userListAlbum).values({
+        id: crypto.randomUUID(),
+        listId,
+        albumId,
+        name: albumMeta.name,
+        cover: albumMeta.cover,
+        artists: albumMeta.artists,
+        releaseYear: albumMeta.releaseYear,
+        addedAt: now,
+      }).onConflictDoNothing().returning({ id: userListAlbum.id }),
+      db.update(userList).set({ updatedAt: now }).where(eq(userList.id, listId)),
+    ])
 
-    // Record activity for the feed
-    await recordActivity({
-      userId: authUser.id,
-      type: 'listed',
-      albumId,
-      albumName: albumMeta.name,
-      albumCover: albumMeta.cover,
-      metadata: { listName: targetList.name, listId },
-    })
+    if (inserted.length) {
+      await recordActivity({
+        userId: authUser.id,
+        type: 'listed',
+        albumId,
+        albumName: albumMeta.name,
+        albumCover: albumMeta.cover,
+        metadata: { listName: targetList.name, listId },
+      })
+    }
 
     set.headers ??= {}
     set.headers['Cache-Control'] = 'no-store'

@@ -25,66 +25,56 @@ permissions:
 
 # Cancel older release runs for the same ref
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: ${{ github.workflow }}-${{ inputs.tag_name || github.ref_name }}
   cancel-in-progress: true
 
 jobs:
+  # main only takes merges that passed CI, and CI runs again on the merged commit, so the release reuses that
+  # result instead of repeating the same lint, build and test run. Later jobs deploy this exact commit, so a merge
+  # landing while the release waits can't ship untested.
   checks:
-    name: Release Checks
+    name: Require Green CI
     runs-on: ubuntu-latest
-    timeout-minutes: 15
-    env:
-      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+    timeout-minutes: 30
+    permissions:
+      actions: read
+      contents: read
+    outputs:
+      sha: ${{ steps.ci.outputs.sha }}
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          ref: ${{ inputs.target_ref || github.sha }}
-          fetch-depth: 0
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22
-
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: 1.3.10
-
-      - name: Install dependencies
-        run: bun install --frozen-lockfile
-
-      - name: Verify workspace integrity
-        run: bun run check:bun
-
-      - name: Lint
-        run: bun run lint
-
-      - name: Build project
-        run: bun run build
-
-      - name: Run unit tests
-        run: bun run test
-
-      - name: Test release notes
-        run: bun run test:release-notes
-
-      - name: Install Playwright browsers
-        run: bunx playwright install --with-deps chromium
-
-      - name: Run E2E smoke tests
-        run: bun run test:e2e
-
-      - name: Upload Playwright artifacts
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: release-playwright-artifacts
-          path: |
-            playwright-report
-            test-results
-          if-no-files-found: ignore
+      - name: Wait for CI on the release commit
+        id: ci
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TARGET_REF: ${{ inputs.target_ref || github.sha }}
+        run: |
+          set -euo pipefail
+          sha=$(gh api "repos/$GITHUB_REPOSITORY/commits/$TARGET_REF" -q .sha)
+          echo "Release commit: $sha"
+          on_main=$(gh api "repos/$GITHUB_REPOSITORY/compare/$sha...main" -q .status)
+          if [ "$on_main" != identical ] && [ "$on_main" != ahead ]; then
+            echo "$sha is not on main. Merge it first; only merged commits can be released." >&2
+            exit 1
+          fi
+          # Only push runs on main count: a PR run tested the merge ref, and docs-only PRs skip every step.
+          # A tag pushed right after a merge can arrive before that run has been created.
+          deadline=$((SECONDS + 300))
+          while :; do
+            if ! run=$(gh run list -R "$GITHUB_REPOSITORY" --workflow ci.yml --commit "$sha" --event push --branch main \
+              --json databaseId,status,conclusion -q 'sort_by(.databaseId) | last // empty | "\(.status) \(.conclusion)"'); then
+              echo 'Could not read CI status; retrying.' >&2; sleep 15; continue
+            fi
+            case "$run" in
+              "completed success") echo 'CI passed.'; echo "sha=$sha" >> "$GITHUB_OUTPUT"; exit 0 ;;
+              completed*) echo "CI finished as '${run#completed }' for $sha. Rerun that CI run, then rerun this release." >&2; exit 1 ;;
+              "")
+                if [ "$SECONDS" -ge "$deadline" ]; then
+                  echo "No CI run appeared for $sha within 5 minutes. Run CI on main, then rerun this release." >&2; exit 1
+                fi
+                echo 'CI has not started yet; waiting.'; sleep 15 ;;
+              *) echo "CI is $run; waiting."; sleep 15 ;;
+            esac
+          done
 
   # Releases are grouped per tag above, so two tags can run at once. A concurrency group would cancel all but one
   # waiting run, so instead each release waits here for every older one to finish, and they migrate and deploy in
@@ -96,6 +86,7 @@ jobs:
     timeout-minutes: 360
     permissions:
       actions: read
+      contents: read
     steps:
       - name: Wait for older release runs to finish
         env:
@@ -114,6 +105,21 @@ jobs:
             sleep 20
           done
 
+      # Checked only once earlier releases have finished, so one that published while this run waited counts. This
+      # also stops a rerun of an old release, which keeps its old run id and so never waits behind newer ones.
+      - name: Refuse commits older than the latest release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SHA: ${{ needs.checks.outputs.sha }}
+        run: |
+          set -euo pipefail
+          latest=$(gh api "repos/$GITHUB_REPOSITORY/releases/latest" -q .tag_name 2>/dev/null || true)
+          if [ -n "$latest" ] && [ "$(gh api "repos/$GITHUB_REPOSITORY/compare/$SHA...$latest" -q .status)" = ahead ]; then
+            echo "$SHA is older than the latest release $latest. Roll back by reverting on main and releasing that." >&2
+            exit 1
+          fi
+          echo "$SHA is not older than ${latest:-any release}."
+
   # Migrations are additive, so the schema lands before either deploy and the running code never meets a missing column.
   migrate:
     name: Migrate Database
@@ -127,7 +133,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          ref: ${{ inputs.target_ref || github.sha }}
+          ref: ${{ needs.checks.outputs.sha }}
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
@@ -165,7 +171,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          ref: ${{ inputs.target_ref || github.sha }}
+          ref: ${{ needs.checks.outputs.sha }}
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -233,7 +239,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          ref: ${{ inputs.target_ref || github.sha }}
+          ref: ${{ needs.checks.outputs.sha }}
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -293,12 +299,13 @@ jobs:
     name: Create GitHub Release
     runs-on: ubuntu-latest
     needs:
+      - checks
       - deploy-api
       - deploy-web
     env:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
       RELEASE_TAG: ${{ inputs.tag_name || github.ref_name }}
-      TARGET_REF: ${{ inputs.target_ref || github.sha }}
+      TARGET_REF: ${{ needs.checks.outputs.sha }}
       BASE_REF: ${{ inputs.base_ref }}
       CUSTOM_RELEASE_BODY: ${{ inputs.release_body }}
     steps:

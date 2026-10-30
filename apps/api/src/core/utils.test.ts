@@ -107,3 +107,22 @@ test('re-rating replaces the earlier feed entry in one batch instead of stacking
   expect(where.params).toEqual(['u1', 'rated', 'a1'])
   expect(rating).toBe(4)
 })
+
+test('a full rate-limit table evicts old IPs instead of refusing every new visitor', async () => {
+  const script = `
+    const { consumeRateLimit } = await import('./src/core/utils.ts')
+    const { RATE_LIMIT_MAX, RATE_LIMIT_MAX_TRACKED_IPS } = await import('./src/core/constants.ts')
+    for (let i = 0; i <= RATE_LIMIT_MAX; i++) consumeRateLimit('203.0.113.1')
+    const allowedAfterMax = consumeRateLimit('203.0.113.1').allowed
+    for (let i = 0; i < RATE_LIMIT_MAX_TRACKED_IPS + 1; i++) consumeRateLimit('spoofed-' + i)
+    console.log(JSON.stringify({ allowedAfterMax, newVisitor: consumeRateLimit('198.51.100.9'), max: RATE_LIMIT_MAX }))
+  `
+  const child = Bun.spawn([process.execPath, '--eval', script], {
+    cwd: new URL('../..', import.meta.url).pathname, stdout: 'pipe', stderr: 'pipe',
+  })
+  const [exitCode, stdout, stderr] = await Promise.all([child.exited, new Response(child.stdout).text(), new Response(child.stderr).text()])
+  expect(exitCode, stderr).toBe(0)
+  const { allowedAfterMax, newVisitor, max } = JSON.parse(stdout)
+  expect(allowedAfterMax).toBe(false)
+  expect(newVisitor).toEqual({ allowed: true, remaining: max - 1, retryAfter: 60 })
+})
