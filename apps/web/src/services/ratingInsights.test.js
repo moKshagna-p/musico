@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { listeningDiary, ratingSpread } from './ratingInsights.js'
+import { listeningDiary, pickTopArtist, ratingSpread } from './ratingInsights.js'
 
 test('ratings land in their half-star bucket and out-of-range values are ignored', () => {
   const counts = ratingSpread([{ rating: 0.5 }, { rating: 4 }, { rating: '4' }, { rating: 5 }, { rating: 0 }, { rating: 7 }])
@@ -24,4 +24,21 @@ test('the diary covers 53 Sunday-first weeks ending today and counts streaks', (
   assert.equal(diary.total, 4)
   assert.equal(diary.activeDays, 3)
   assert.equal(diary.longestStreak, 2)
+})
+
+test('the top artist is weighted by stars, skips misses, merges Discogs variants and breaks ties by recency', () => {
+  const rated = (rating, timestamp, ...artists) => ({ rating, timestamp, artists })
+  // Two loved albums beat three 3-star ones; 1-star ratings never count however many there are.
+  assert.equal(pickTopArtist([
+    rated(5, 10, 'Mac DeMarco'), rated(5, 9, 'Mac DeMarco*'),
+    rated(3, 8, 'Radiohead'), rated(3, 7, 'Radiohead (2)'), rated(3, 6, 'radiohead'),
+    rated(1, 5, 'Nickelback'), rated(1, 4, 'Nickelback'), rated(1, 3, 'Nickelback'), rated(1, 2, 'Nickelback'), rated(1, 1, 'Nickelback'),
+  ]), 'Mac DeMarco')
+  // Equal scores go to the artist rated most recently, whatever order the ratings arrive in.
+  assert.equal(pickTopArtist([rated(4, 100, 'Older'), rated(4, 200, 'Newer')]), 'Newer')
+  assert.equal(pickTopArtist([rated(4, 200, 'Newer'), rated(4, 100, 'Older')]), 'Newer')
+  // Every credited artist on a collaboration gets the stars.
+  assert.equal(pickTopArtist([rated(5, 2, 'Solo'), rated(4, 3, 'Duo A', 'Feature'), rated(4, 1, 'Feature')]), 'Feature')
+  assert.equal(pickTopArtist([rated(2, 1, 'Meh')]), null)
+  assert.equal(pickTopArtist([]), null)
 })

@@ -1,3 +1,5 @@
+import { cleanArtistName } from './artistService.js'
+
 // Ratings are half-star steps from 0.5 to 5, so bucket i holds ratings of (i + 1) / 2.
 export const ratingSpread = (ratings) => {
   const counts = Array(10).fill(0)
@@ -40,4 +42,29 @@ export const listeningDiary = (ratings, now = new Date()) => {
   }
 
   return { weeks, total, activeDays, longestStreak }
+}
+
+// Ratings below this say the album missed, so they never make someone your top artist.
+const TOP_ARTIST_MIN_RATING = 3
+
+// The artist your recent ratings liked most: each 3-star-or-better album adds its stars to every credited artist
+// (Discogs variants like "Name (2)" or "Name*" merged), and a tie goes to whoever you rated most recently.
+export const pickTopArtist = (ratings) => {
+  const scores = new Map()
+  for (const { rating, timestamp, artists = [] } of ratings) {
+    const stars = Number(rating)
+    if (!(stars >= TOP_ARTIST_MIN_RATING)) continue
+    for (const name of new Set(artists.map(cleanArtistName).filter(Boolean))) {
+      const key = name.toLowerCase()
+      const entry = scores.get(key) ?? { name, score: 0, lastRatedAt: 0 }
+      entry.score += stars
+      entry.lastRatedAt = Math.max(entry.lastRatedAt, Number(timestamp) || 0)
+      scores.set(key, entry)
+    }
+  }
+  let top = null
+  for (const entry of scores.values()) {
+    if (!top || entry.score > top.score || (entry.score === top.score && entry.lastRatedAt > top.lastRatedAt)) top = entry
+  }
+  return top?.name ?? null
 }
