@@ -17,6 +17,8 @@ import { apiRoutes } from './routes'
 
 const allowedOrigin = env.ALLOWED_ORIGINS
 
+const CLIENT_ERROR_CODES = new Set<unknown>(['VALIDATION', 'PARSE', 'NOT_FOUND', 'INVALID_COOKIE_SIGNATURE', 'INVALID_FILE_TYPE'])
+
 const health = () => ({
   status: 'ok',
   uptimeSeconds: Math.floor(process.uptime()),
@@ -67,8 +69,9 @@ export const createApp = (options?: ConstructorParameters<typeof Elysia>[0]) => 
   })
   .onError(({ code, error, request, requestId, requestPath, set }) => {
     // Elysia would otherwise send the thrown message as the body, exposing database and upstream error details.
-    const unexpected = code === 'UNKNOWN' || code === 'INTERNAL_SERVER_ERROR'
-    if (unexpected) set.status = 500
+    // Its `code` comes from the error itself (Postgres SQLSTATEs, ECONNREFUSED), so only its own client errors pass.
+    const unexpected = typeof code !== 'number' && !CLIENT_ERROR_CODES.has(code)
+    if (unexpected && !(Number(set.status) >= 400)) set.status = 500
     log('error', 'request.failed', {
       requestId,
       code,

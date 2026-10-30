@@ -37,10 +37,12 @@ test.skipIf(!process.env.TEST_DATABASE_URL)('media reservations, review saves, c
       })
       const db = drizzle(client)
       mock.module('./src/core/db.ts', () => ({ db }))
+      let metadataGate = null
+      const activities = []
       mock.module('./src/core/utils.ts', () => ({
         ensureAuthenticated: async () => ({ id: 'owner' }),
-        getCanonicalAlbumMetadata: async () => ({ name: 'Album', cover: '', artists: [], releaseYear: null }),
-        recordActivity: async () => {},
+        getCanonicalAlbumMetadata: async () => { await metadataGate?.(); return { name: 'Album', cover: '', artists: [], releaseYear: null } },
+        recordActivity: async entry => { activities.push(entry) },
         normalizeListName: value => String(value ?? '').trim(),
         getReleasePreviewMap: async () => new Map(),
         isMissingTableError: (error, table) => [error, error?.cause].some(e => e?.message?.includes('relation "' + table + '" does not exist')),
@@ -267,9 +269,15 @@ test.skipIf(!process.env.TEST_DATABASE_URL)('media reservations, review saves, c
       assert.deepEqual((await listRows()).map(row => row.albumId), ['list-album'])
       assert.equal((await listCall('/' + listId + '/toggle', { id: 'list-album' })).body.data.added, false)
       assert.equal((await listRows()).length, 0)
+      // Hold both adds after their membership check so they always race to the insert.
+      let arrived = 0, releaseAdds
+      const bothArrived = new Promise(resolve => { releaseAdds = resolve })
+      metadataGate = () => { if (++arrived === 2) releaseAdds(); return bothArrived }
       const adds = await Promise.all([1, 2].map(() => listCall('/' + listId + '/toggle', { id: 'second' })))
-      assert.deepEqual(adds.map(add => add.status), [200, 200])
+      metadataGate = null
+      assert.deepEqual(adds.map(add => [add.status, add.body.data.added]), [[200, true], [200, true]])
       assert.deepEqual((await listRows()).map(row => row.albumId), ['second'])
+      assert.equal(activities.filter(entry => entry.albumId === 'second').length, 1)
 
       await pool.unsafe('drop table review_media')
       assert.equal((await save('text', [])).status, 200)

@@ -39,13 +39,26 @@ test('edge-cacheable responses are marked no-transform, others keep their Cache-
 
 test('unexpected errors return a generic body instead of the thrown message', async () => {
   const { result } = await runScript(`
+    const { t } = await import('elysia')
     const { createApp } = await import('./src/index.ts')
-    const app = createApp().get('/boom', () => { throw new Error('relation "secret_table" does not exist') })
-    const response = await app.handle(new Request('http://localhost/boom'))
-    console.log(JSON.stringify({ status: response.status, requestId: response.headers.get('x-request-id'), body: await response.text() }))
+    const app = createApp()
+      .get('/plain', () => { throw new Error('relation "secret_table" does not exist') })
+      // Postgres and network errors carry their own code, which Elysia adopts as the error code.
+      .get('/coded', () => { throw Object.assign(new Error('violates "secret_index"'), { code: '23505' }) })
+      .get('/status', ({ set }) => { set.status = 503; throw new Error('secret upstream') })
+      .get('/validated', ({ query }) => query, { query: t.Object({ n: t.Numeric() }) })
+    const read = async (path) => {
+      const response = await app.handle(new Request('http://localhost' + path))
+      return { status: response.status, requestId: response.headers.get('x-request-id'), body: await response.text() }
+    }
+    console.log(JSON.stringify(await Promise.all(['/plain', '/coded', '/status', '/validated?n=x'].map(read))))
   `)
 
-  expect(result.status).toBe(500)
-  expect(result.body).not.toContain('secret_table')
-  expect(JSON.parse(result.body)).toEqual({ error: 'Something went wrong. Please try again.', requestId: result.requestId })
+  const [plain, coded, status, validated] = result
+  expect([plain.status, coded.status, status.status, validated.status]).toEqual([500, 500, 503, 422])
+  for (const response of [plain, coded, status]) {
+    expect(response.body).not.toContain('secret')
+    expect(JSON.parse(response.body)).toEqual({ error: 'Something went wrong. Please try again.', requestId: response.requestId })
+  }
+  expect(JSON.parse(validated.body).type).toBe('validation')
 })

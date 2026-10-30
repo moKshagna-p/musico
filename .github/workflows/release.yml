@@ -25,21 +25,25 @@ permissions:
 
 # Cancel older release runs for the same ref
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: ${{ github.workflow }}-${{ inputs.tag_name || github.ref }}
   cancel-in-progress: true
 
 jobs:
   # main only takes merges that passed CI, and CI runs again on the merged commit, so the release reuses that
-  # result instead of repeating the same lint, build and test run.
+  # result instead of repeating the same lint, build and test run. Later jobs deploy this exact commit, so a merge
+  # landing while the release waits can't ship untested.
   checks:
     name: Require Green CI
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     permissions:
       checks: read
       contents: read
+    outputs:
+      sha: ${{ steps.ci.outputs.sha }}
     steps:
       - name: Wait for CI on the release commit
+        id: ci
         env:
           GH_TOKEN: ${{ github.token }}
           TARGET_REF: ${{ inputs.target_ref || github.sha }}
@@ -47,15 +51,26 @@ jobs:
           set -euo pipefail
           sha=$(gh api "repos/$GITHUB_REPOSITORY/commits/$TARGET_REF" -q .sha)
           echo "Release commit: $sha"
+          on_main=$(gh api "repos/$GITHUB_REPOSITORY/compare/$sha...main" -q .status)
+          if [ "$on_main" != identical ] && [ "$on_main" != ahead ]; then
+            echo "$sha is not on main. Merge it first; only merged commits can be released." >&2
+            exit 1
+          fi
+          # A tag pushed right after a merge can arrive before main's CI run has been created.
+          deadline=$((SECONDS + 300))
           while :; do
             if ! run=$(gh api "repos/$GITHUB_REPOSITORY/commits/$sha/check-runs?check_name=Build%20%26%20Test" \
-              -q '.check_runs | sort_by(.started_at) | last // empty | "\(.status) \(.conclusion)"'); then
+              -q '.check_runs | sort_by(.id) | last // empty | "\(.status) \(.conclusion)"'); then
               echo 'Could not read CI status; retrying.' >&2; sleep 15; continue
             fi
             case "$run" in
-              "completed success") echo 'CI passed.'; exit 0 ;;
+              "completed success") echo 'CI passed.'; echo "sha=$sha" >> "$GITHUB_OUTPUT"; exit 0 ;;
               completed*) echo "CI finished as '${run#completed }' for $sha. Rerun CI on it, then rerun this release." >&2; exit 1 ;;
-              "") echo "No CI run found for $sha. Only commits on main that went through CI can be released." >&2; exit 1 ;;
+              "")
+                if [ "$SECONDS" -ge "$deadline" ]; then
+                  echo "No CI run appeared for $sha within 5 minutes. Run CI on main, then rerun this release." >&2; exit 1
+                fi
+                echo 'CI has not started yet; waiting.'; sleep 15 ;;
               *) echo "CI is $run; waiting."; sleep 15 ;;
             esac
           done
@@ -101,7 +116,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          ref: ${{ inputs.target_ref || github.sha }}
+          ref: ${{ needs.checks.outputs.sha }}
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
@@ -139,7 +154,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          ref: ${{ inputs.target_ref || github.sha }}
+          ref: ${{ needs.checks.outputs.sha }}
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -207,7 +222,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          ref: ${{ inputs.target_ref || github.sha }}
+          ref: ${{ needs.checks.outputs.sha }}
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -267,12 +282,13 @@ jobs:
     name: Create GitHub Release
     runs-on: ubuntu-latest
     needs:
+      - checks
       - deploy-api
       - deploy-web
     env:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
       RELEASE_TAG: ${{ inputs.tag_name || github.ref_name }}
-      TARGET_REF: ${{ inputs.target_ref || github.sha }}
+      TARGET_REF: ${{ needs.checks.outputs.sha }}
       BASE_REF: ${{ inputs.base_ref }}
       CUSTOM_RELEASE_BODY: ${{ inputs.release_body }}
     steps:

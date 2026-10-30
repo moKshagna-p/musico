@@ -242,8 +242,9 @@ export const listRoutes = new Elysia({ prefix: '/api' })
       releaseYear: album?.releaseYear,
     })
 
-    // A double-tapped add lands on the unique (listId, albumId) index; the second insert is a no-op, not a 500.
-    await db.batch([
+    // A double-tapped add lands on the unique (listId, albumId) index; the second insert is a no-op, not a 500,
+    // and only the request that inserted the row posts to the feed.
+    const [inserted] = await db.batch([
       db.insert(userListAlbum).values({
         id: crypto.randomUUID(),
         listId,
@@ -253,19 +254,20 @@ export const listRoutes = new Elysia({ prefix: '/api' })
         artists: albumMeta.artists,
         releaseYear: albumMeta.releaseYear,
         addedAt: now,
-      }).onConflictDoNothing(),
+      }).onConflictDoNothing().returning({ id: userListAlbum.id }),
       db.update(userList).set({ updatedAt: now }).where(eq(userList.id, listId)),
     ])
 
-    // Record activity for the feed
-    await recordActivity({
-      userId: authUser.id,
-      type: 'listed',
-      albumId,
-      albumName: albumMeta.name,
-      albumCover: albumMeta.cover,
-      metadata: { listName: targetList.name, listId },
-    })
+    if (inserted.length) {
+      await recordActivity({
+        userId: authUser.id,
+        type: 'listed',
+        albumId,
+        albumName: albumMeta.name,
+        albumCover: albumMeta.cover,
+        metadata: { listName: targetList.name, listId },
+      })
+    }
 
     set.headers ??= {}
     set.headers['Cache-Control'] = 'no-store'
