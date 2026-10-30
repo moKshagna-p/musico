@@ -39,14 +39,17 @@ test.skipIf(!process.env.TEST_DATABASE_URL)('media reservations, review saves, c
       mock.module('./src/core/db.ts', () => ({ db }))
       mock.module('./src/core/utils.ts', () => ({
         ensureAuthenticated: async () => ({ id: 'owner' }),
-        getCanonicalAlbumMetadata: async () => ({ name: 'Album', cover: '' }),
+        getCanonicalAlbumMetadata: async () => ({ name: 'Album', cover: '', artists: [], releaseYear: null }),
         recordActivity: async () => {},
+        normalizeListName: value => String(value ?? '').trim(),
+        getReleasePreviewMap: async () => new Map(),
         isMissingTableError: (error, table) => [error, error?.cause].some(e => e?.message?.includes('relation "' + table + '" does not exist')),
       }))
       const { mediaRoutes } = await import('./src/routes/media.ts')
       const { reviewRoutes } = await import('./src/routes/reviews.ts')
+      const { listRoutes } = await import('./src/routes/lists.ts')
       const { sweepDetachedMedia } = await import('./src/core/media.ts')
-      const app = new Elysia().onError(({ error }) => { console.error(error); return { error: String(error) } }).use(mediaRoutes).use(reviewRoutes)
+      const app = new Elysia().onError(({ error }) => { console.error(error); return { error: String(error) } }).use(mediaRoutes).use(reviewRoutes).use(listRoutes)
       const objects = new Set()
       let putHook = async () => {}
       let deleteHook = async () => {}
@@ -249,7 +252,25 @@ test.skipIf(!process.env.TEST_DATABASE_URL)('media reservations, review saves, c
       await assert.rejects(() => findStreamingLinks('Limited Artist', 'Limited Album', async () => new Response('', { status: 429 })), /429/)
       assert.equal(await isServicePaused('musicbrainz'), true)
 
-      // Text-only saves still work before the original media migration is installed.
+      // List writes go through Neon batches, and a double-tapped add stays one row instead of a 500.
+      const listCall = async (path, body) => {
+        const response = await app.handle(new Request('http://localhost/api/me/lists' + path, {
+          method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body),
+        }))
+        return { status: response.status, body: await response.json() }
+      }
+      const createdList = await listCall('', { name: 'Batch', album: { id: 'list-album' } })
+      assert.equal(createdList.status, 200, JSON.stringify(createdList.body))
+      assert.equal(createdList.body.data.added, true)
+      const listId = createdList.body.data.id
+      const listRows = () => pool.unsafe('select "albumId" from user_list_album where "listId" = $1 order by "albumId"', [listId])
+      assert.deepEqual((await listRows()).map(row => row.albumId), ['list-album'])
+      assert.equal((await listCall('/' + listId + '/toggle', { id: 'list-album' })).body.data.added, false)
+      assert.equal((await listRows()).length, 0)
+      const adds = await Promise.all([1, 2].map(() => listCall('/' + listId + '/toggle', { id: 'second' })))
+      assert.deepEqual(adds.map(add => add.status), [200, 200])
+      assert.deepEqual((await listRows()).map(row => row.albumId), ['second'])
+
       await pool.unsafe('drop table review_media')
       assert.equal((await save('text', [])).status, 200)
       console.log('media concurrency checks passed')
