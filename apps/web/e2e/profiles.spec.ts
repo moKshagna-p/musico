@@ -75,3 +75,50 @@ test('your recent top artist shows as their logo when there is one', async ({ pa
   const topArtist = page.locator('div').filter({ has: page.getByText('Recent top artist', { exact: true }) }).last()
   await expect(topArtist.getByRole('img', { name: 'Daft Punk' })).toBeVisible()
 })
+
+test('a profile cached before sign-in uses the signed-in follow state', async ({ page }) => {
+  await installApiMocks(page)
+  let signedIn = false
+  let profileRequests = 0
+  page.on('request', (request) => {
+    if (request.url().includes('/api/auth/sign-in')) signedIn = true
+  })
+  await page.route('**/api/users/ava', (route) => {
+    profileRequests += 1
+    return route.fulfill({ json: { data: {
+      userId: 'ava', username: 'ava', name: 'Ava', followerCount: 3, followingCount: 2,
+      isFollowing: signedIn, isOwnProfile: false, recentRatings: [], lists: [],
+    } } })
+  })
+  await page.goto('/profile/ava')
+  await expect(page.getByRole('heading', { name: 'Ava', exact: true })).toBeVisible()
+  await page.getByRole('banner').getByRole('link', { name: 'Sign In' }).click()
+  // Sign in without reloading the app, so the anonymous profile remains cached.
+  await page.getByLabel(/email/i).fill('e2e@musico.dev')
+  await page.getByLabel(/password/i).fill('password123')
+  await page.locator('form').getByRole('button', { name: /^sign in$/i }).click()
+  await expect(page).toHaveURL('/')
+  await page.goBack()
+  await expect(page.getByRole('heading', { name: 'Ava', exact: true })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Unfollow ava', exact: true })).toBeVisible()
+  expect(profileRequests).toBe(2)
+})
+
+test('following from a mixed-case profile URL refreshes the follower count', async ({ page }) => {
+  await installApiMocks(page)
+  let following = false
+  await page.route('**/api/users/AVA', (route) => route.fulfill({ json: { data: {
+    userId: 'ava', username: 'ava', name: 'Ava', followerCount: following ? 4 : 3, followingCount: 2,
+    isFollowing: following, isOwnProfile: false, recentRatings: [], lists: [],
+  } } }))
+  await page.route('**/api/users/ava/follow', (route) => {
+    following = !following
+    return route.fulfill({ json: { data: { following } } })
+  })
+  await signIn(page)
+  await page.goto('/profile/AVA')
+  await expect(page.getByText('3 followers', { exact: true })).toBeVisible()
+  await page.getByRole('button', { name: 'Follow ava', exact: true }).click()
+  await expect(page.getByRole('button', { name: 'Unfollow ava', exact: true })).toBeVisible()
+  await expect(page.getByText('4 followers', { exact: true })).toBeVisible()
+})

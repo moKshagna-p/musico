@@ -15,12 +15,12 @@ import { fetchUserProfile } from '../services/socialService.js'
 const UserProfile = () => {
   const { username } = useParams()
   const navigate = useNavigate()
-  const { user } = useAuth()
+  const { user, isPending } = useAuth()
   // Cached, so coming back from an album or list shows the profile at once instead of its skeleton.
   const profileQuery = useQuery({
-    queryKey: ['user-profile', username],
+    queryKey: ['user-profile', username?.toLowerCase(), user?.id ?? null],
     queryFn: () => fetchUserProfile(username),
-    enabled: Boolean(username),
+    enabled: !isPending && Boolean(username),
     staleTime: 1000 * 60 * 5,
     retry: false,
   })
@@ -34,7 +34,7 @@ const UserProfile = () => {
     artists: Array.isArray(item?.albumArtists) ? item.albumArtists : [],
   })) ?? []
   
-  if (profileQuery.isLoading) {
+  if (isPending || profileQuery.isLoading) {
     return (
       <PageTransition>
         <ProfilePageSkeleton />

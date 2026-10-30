@@ -28,7 +28,7 @@ const FollowButton = ({ username, initialFollowing = false, onToggle }) => {
       setFollowing(result.following)
       onToggle?.(result.following)
       // Profiles are cached (UserProfile); refresh this one so its follow state and follower count are current.
-      void queryClient.invalidateQueries({ queryKey: ['user-profile', username] })
+      void queryClient.invalidateQueries({ queryKey: ['user-profile', username.toLowerCase()] })
     } catch {
       setFollowing(prev)
     } finally {

@@ -38,7 +38,7 @@ test('admins open the dashboard by URL and moderate flagged reviews, on phones t
   await flagged.getByRole('button', { name: 'Remove', exact: true }).click()
   await flagged.getByRole('button', { name: 'Remove review' }).click()
   await expect(page.getByText('Removed review on Homework.')).toBeVisible()
-  await expect(page.getByText('Nothing flagged. The queue is clear.')).toBeVisible()
+  await expect(page.getByText('Nothing flagged among the 50 most recently updated reviews.')).toBeVisible()
 
   // Admins cannot remove their own access.
   await expect(page.locator('article').filter({ hasText: 'e2e@musico.dev' }).getByRole('button', { name: 'Remove admin' })).toBeDisabled()
@@ -49,4 +49,21 @@ test('admins open the dashboard by URL and moderate flagged reviews, on phones t
   await page.getByRole('button', { name: 'See all reviews' }).click()
   await expect(page.getByText('Still the best Daft Punk record.')).toBeVisible()
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
+})
+
+test('long flagged review text stays readable beside phone confirmation buttons', async ({ page }) => {
+  await installApiMocks(page, { admin: true })
+  await page.setViewportSize({ width: 390, height: 844 })
+  const content = `spam https://example.com/${'a'.repeat(300)}`
+  await page.route('**/api/admin/reviews?*', (route) => route.fulfill({ json: { data: [{
+    id: 'long-review', albumId: 'm:1003', albumName: 'Homework', userName: 'Promo Bot',
+    content, updatedAt: Date.now(), isFlagged: true,
+  }] } }))
+  await signIn(page)
+  await page.goto('/admin')
+  const review = page.locator('article').filter({ hasText: content })
+  await review.getByRole('button', { name: 'Remove', exact: true }).click()
+  const paragraph = review.getByText(content, { exact: true })
+  await expect(paragraph).toBeVisible()
+  expect(await paragraph.evaluate((node) => node.scrollWidth <= node.clientWidth + 1)).toBe(true)
 })

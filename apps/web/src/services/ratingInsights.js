@@ -54,8 +54,11 @@ export const pickTopArtist = (ratings) => {
   for (const { rating, timestamp, artists = [] } of ratings) {
     const stars = Number(rating)
     if (!(stars >= TOP_ARTIST_MIN_RATING)) continue
-    for (const name of new Set(artists.map(cleanArtistName).filter(Boolean))) {
+    const credited = new Set()
+    for (const name of artists.map(cleanArtistName).filter(Boolean)) {
       const key = name.toLowerCase()
+      if (credited.has(key)) continue
+      credited.add(key)
       const entry = scores.get(key) ?? { name, score: 0, lastRatedAt: 0 }
       entry.score += stars
       entry.lastRatedAt = Math.max(entry.lastRatedAt, Number(timestamp) || 0)

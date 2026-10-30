@@ -17,7 +17,7 @@ const REVIEW_FILTERS = [
   ['clean', 'Clean'],
 ]
 const EMPTY_REVIEWS = {
-  flagged: 'Nothing flagged. The queue is clear.',
+  flagged: 'Nothing flagged among the 50 most recently updated reviews.',
   all: 'No reviews yet.',
   clean: 'No clean reviews yet.',
 }
@@ -298,7 +298,7 @@ const AdminDashboard = () => {
                           <p className="mt-1 text-xs text-muted">
                             {review.userName}, {formatRelative(review.updatedAt)}
                           </p>
-                          <p className="mt-3 max-w-prose whitespace-pre-line text-[15px] leading-relaxed text-paper/85">{review.content}</p>
+                          <p className="mt-3 max-w-prose whitespace-pre-line [overflow-wrap:anywhere] text-[15px] leading-relaxed text-paper/85">{review.content}</p>
                         </div>
                         <ConfirmButton
                           label="Remove"

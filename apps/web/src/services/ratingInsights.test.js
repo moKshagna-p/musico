@@ -39,6 +39,8 @@ test('the top artist is weighted by stars, skips misses, merges Discogs variants
   assert.equal(pickTopArtist([rated(4, 200, 'Newer'), rated(4, 100, 'Older')]), 'Newer')
   // Every credited artist on a collaboration gets the stars.
   assert.equal(pickTopArtist([rated(5, 2, 'Solo'), rated(4, 3, 'Duo A', 'Feature'), rated(4, 1, 'Feature')]), 'Feature')
+  // The same artist credited twice, with different casing or a Discogs suffix, only gets the album's stars once.
+  assert.equal(pickTopArtist([rated(5, 1, 'Solo'), rated(3, 2, 'Feature', 'feature (2)')]), 'Solo')
   assert.equal(pickTopArtist([rated(2, 1, 'Meh')]), null)
   assert.equal(pickTopArtist([]), null)
 })
