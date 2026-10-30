@@ -1,10 +1,10 @@
-import { expect, test, type Page } from '@playwright/test'
+import { expect, test } from '@playwright/test'
 
 import { albumCatalog, installApiMocks } from './support/mockApi'
 
 const PIXEL_PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64')
 
-const signIn = async (page: Page) => {
+const signIn = async (page) => {
   await page.goto('/auth')
   await page.getByLabel(/email/i).fill('e2e@musico.dev')
   await page.getByLabel(/password/i).fill('password123')
@@ -13,14 +13,14 @@ const signIn = async (page: Page) => {
 }
 
 // Records whether any page skeleton shows from now on, even for a single frame.
-const watchForSkeletons = (page: Page) => page.evaluate(() => {
-  const seen: string[] = []
-  ;(window as unknown as { skeletonsSeen: string[] }).skeletonsSeen = seen
+const watchForSkeletons = (page) => page.evaluate(() => {
+  const seen = []
+  window.skeletonsSeen = seen
   new MutationObserver(() => {
     document.querySelectorAll('[aria-busy="true"][aria-label^="Loading"]').forEach((node) => seen.push(node.getAttribute('aria-label') ?? ''))
   }).observe(document.body, { childList: true, subtree: true })
 })
-const skeletonsSeen = (page: Page) => page.evaluate(() => (window as unknown as { skeletonsSeen: string[] }).skeletonsSeen)
+const skeletonsSeen = (page) => page.evaluate(() => window.skeletonsSeen)
 
 test('moving between someone else\'s profile, their albums and lists never flashes a skeleton', async ({ page }) => {
   await installApiMocks(page)
