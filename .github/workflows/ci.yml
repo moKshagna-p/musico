@@ -10,10 +10,10 @@ on:
 permissions:
   contents: read
 
-# Ensure only one CI run happens per branch at a time
+# Superseded PR runs are cancelled, but every commit on main finishes, since releases require its green CI run
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   check:

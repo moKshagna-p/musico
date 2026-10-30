@@ -11,7 +11,7 @@ export default defineConfig({
   fullyParallel: true,
   forbidOnly: isCi,
   retries: isCi ? 1 : 0,
-  workers: isCi ? 2 : undefined,
+  workers: isCi ? 4 : undefined,
   reporter: [['list'], ['html', { open: 'never' }]],
   outputDir: './test-results',
   use: {
@@ -27,7 +27,8 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: 'bun run --cwd apps/web dev --host 127.0.0.1 --port 4173',
+    // CI builds dist before E2E, and serving it skips the dev server's per-page compiles.
+    command: `bun run --cwd apps/web ${isCi ? 'preview' : 'dev'} --host 127.0.0.1 --port 4173 --strictPort`,
     url: 'http://127.0.0.1:4173',
     timeout: 120_000,
     reuseExistingServer: !isCi,

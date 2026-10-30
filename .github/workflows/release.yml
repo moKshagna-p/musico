@@ -29,62 +29,36 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # main only takes merges that passed CI, and CI runs again on the merged commit, so the release reuses that
+  # result instead of repeating the same lint, build and test run.
   checks:
-    name: Release Checks
+    name: Require Green CI
     runs-on: ubuntu-latest
-    timeout-minutes: 15
-    env:
-      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+    timeout-minutes: 20
+    permissions:
+      checks: read
+      contents: read
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          ref: ${{ inputs.target_ref || github.sha }}
-          fetch-depth: 0
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22
-
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: 1.3.10
-
-      - name: Install dependencies
-        run: bun install --frozen-lockfile
-
-      - name: Verify workspace integrity
-        run: bun run check:bun
-
-      - name: Lint
-        run: bun run lint
-
-      - name: Build project
-        run: bun run build
-
-      - name: Run unit tests
-        run: bun run test
-
-      - name: Test release notes
-        run: bun run test:release-notes
-
-      - name: Install Playwright browsers
-        run: bunx playwright install --with-deps chromium
-
-      - name: Run E2E smoke tests
-        run: bun run test:e2e
-
-      - name: Upload Playwright artifacts
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: release-playwright-artifacts
-          path: |
-            playwright-report
-            test-results
-          if-no-files-found: ignore
+      - name: Wait for CI on the release commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TARGET_REF: ${{ inputs.target_ref || github.sha }}
+        run: |
+          set -euo pipefail
+          sha=$(gh api "repos/$GITHUB_REPOSITORY/commits/$TARGET_REF" -q .sha)
+          echo "Release commit: $sha"
+          while :; do
+            if ! run=$(gh api "repos/$GITHUB_REPOSITORY/commits/$sha/check-runs?check_name=Build%20%26%20Test" \
+              -q '.check_runs | sort_by(.started_at) | last // empty | "\(.status) \(.conclusion)"'); then
+              echo 'Could not read CI status; retrying.' >&2; sleep 15; continue
+            fi
+            case "$run" in
+              "completed success") echo 'CI passed.'; exit 0 ;;
+              completed*) echo "CI finished as '${run#completed }' for $sha. Rerun CI on it, then rerun this release." >&2; exit 1 ;;
+              "") echo "No CI run found for $sha. Only commits on main that went through CI can be released." >&2; exit 1 ;;
+              *) echo "CI is $run; waiting."; sleep 15 ;;
+            esac
+          done
 
   # Releases are grouped per tag above, so two tags can run at once. A concurrency group would cancel all but one
   # waiting run, so instead each release waits here for every older one to finish, and they migrate and deploy in
