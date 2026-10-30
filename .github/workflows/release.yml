@@ -56,13 +56,6 @@ jobs:
             echo "$sha is not on main. Merge it first; only merged commits can be released." >&2
             exit 1
           fi
-          # A rerun of a release that failed here keeps its old run id, so the queue job wouldn't hold it behind
-          # newer releases and it could deploy older code over them. Roll back by reverting on main instead.
-          latest=$(gh api "repos/$GITHUB_REPOSITORY/releases/latest" -q .tag_name 2>/dev/null || true)
-          if [ -n "$latest" ] && [ "$(gh api "repos/$GITHUB_REPOSITORY/compare/$sha...$latest" -q .status)" = ahead ]; then
-            echo "$sha is older than the latest release $latest. Revert on main and release that instead." >&2
-            exit 1
-          fi
           # Only push runs on main count: a PR run tested the merge ref, and docs-only PRs skip every step.
           # A tag pushed right after a merge can arrive before that run has been created.
           deadline=$((SECONDS + 300))
@@ -93,6 +86,7 @@ jobs:
     timeout-minutes: 360
     permissions:
       actions: read
+      contents: read
     steps:
       - name: Wait for older release runs to finish
         env:
@@ -110,6 +104,21 @@ jobs:
             fi
             sleep 20
           done
+
+      # Checked only once earlier releases have finished, so one that published while this run waited counts. This
+      # also stops a rerun of an old release, which keeps its old run id and so never waits behind newer ones.
+      - name: Refuse commits older than the latest release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SHA: ${{ needs.checks.outputs.sha }}
+        run: |
+          set -euo pipefail
+          latest=$(gh api "repos/$GITHUB_REPOSITORY/releases/latest" -q .tag_name 2>/dev/null || true)
+          if [ -n "$latest" ] && [ "$(gh api "repos/$GITHUB_REPOSITORY/compare/$SHA...$latest" -q .status)" = ahead ]; then
+            echo "$SHA is older than the latest release $latest. Roll back by reverting on main and releasing that." >&2
+            exit 1
+          fi
+          echo "$SHA is not older than ${latest:-any release}."
 
   # Migrations are additive, so the schema lands before either deploy and the running code never meets a missing column.
   migrate:
