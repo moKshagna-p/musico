@@ -95,7 +95,7 @@ const Footer = () => (
           whileInView={{ y: 0, x: 0, rotate: 0, opacity: 1 }}
           viewport={{ once: true }}
           transition={{ duration: 1.4, ease: [0.16, 1, 0.3, 1] }}
-          className="vinyl pointer-events-none absolute -bottom-[1.39em] left-[calc(100%+0.05em)] h-[2.25em] w-[2.25em] tablet:-bottom-[1.14em] tablet:h-[1.75em] tablet:w-[1.75em]"
+          className="vinyl pointer-events-none absolute -bottom-[0.87em] left-[calc(100%+0.05em)] h-[2.25em] w-[2.25em] sm:-bottom-[0.65em] sm:h-[1.75em] sm:w-[1.75em]"
         >
           <span className="absolute inset-[38%] rounded-full bg-paper/90" />
           <span className="absolute inset-[48.5%] rounded-full bg-canvas" />
