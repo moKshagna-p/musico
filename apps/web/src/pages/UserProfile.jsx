@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { useQuery } from '@tanstack/react-query'
+import { useNavigate, useParams } from 'react-router-dom'
 
 import FollowButton from '../components/user/FollowButton.jsx'
 import ProfileCover from '../components/user/ProfileCover.jsx'
@@ -16,31 +16,16 @@ const UserProfile = () => {
   const { username } = useParams()
   const navigate = useNavigate()
   const { user } = useAuth()
-  const [profile, setProfile] = useState(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState(null)
-
-  useEffect(() => {
-    let cancelled = false
-
-    const load = async () => {
-      setLoading(true)
-      setError(null)
-      try {
-        const data = await fetchUserProfile(username)
-        if (!cancelled) setProfile(data)
-      } catch (err) {
-        if (!cancelled) setError(err?.message ?? 'User not found.')
-      } finally {
-        if (!cancelled) setLoading(false)
-      }
-    }
-
-    void load()
-    return () => {
-      cancelled = true
-    }
-  }, [username])
+  // Cached, so coming back from an album or list shows the profile at once instead of its skeleton.
+  const profileQuery = useQuery({
+    queryKey: ['user-profile', username],
+    queryFn: () => fetchUserProfile(username),
+    enabled: Boolean(username),
+    staleTime: 1000 * 60 * 5,
+    retry: false,
+  })
+  const profile = profileQuery.data
+  const error = profileQuery.error ? (profileQuery.error.message ?? 'User not found.') : null
 
   const ratedAlbumDetails = profile?.recentRatings?.map((item) => ({
     ...item,
@@ -49,11 +34,7 @@ const UserProfile = () => {
     artists: Array.isArray(item?.albumArtists) ? item.albumArtists : [],
   })) ?? []
   
-  // Limit display to 12 items for better performance
-  const displayedRatings = ratedAlbumDetails.slice(0, 12)
-  const hasMoreRatings = ratedAlbumDetails.length > 12
-
-  if (loading) {
+  if (profileQuery.isLoading) {
     return (
       <PageTransition>
         <ProfilePageSkeleton />
@@ -127,7 +108,7 @@ const UserProfile = () => {
               <div>
                 <div className="mb-10"><SectionHeading title="Recently Rated" /></div>
                 <div className="grid grid-cols-2 gap-x-5 gap-y-10 md:grid-cols-3 lg:grid-cols-4 tablet:gap-x-8 tablet:gap-y-14">
-                  {displayedRatings.map((album) => (
+                  {ratedAlbumDetails.map((album) => (
                     <AlbumTile
                       key={album.albumId}
                       to={`/album/${album.albumId}`}
@@ -138,16 +119,6 @@ const UserProfile = () => {
                     />
                   ))}
                 </div>
-                {hasMoreRatings && (
-                  <div className="mt-10 text-center">
-                    <Link
-                      to={`/${profile.username}/history`}
-                      className="inline-block rounded-full border border-white/15 px-6 py-3 text-sm text-paper transition hover:border-white/35 hover:bg-white/[0.06]"
-                    >
-                      View All {ratedAlbumDetails.length} Ratings
-                    </Link>
-                  </div>
-                )}
               </div>
             )}
 

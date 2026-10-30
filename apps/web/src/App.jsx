@@ -24,28 +24,37 @@ import { useAuth } from './hooks/useAuth.js'
 // network round trip for its chunk before the first render.
 import Home from './pages/Home.jsx'
 
-const Discover = lazy(() => import('./pages/Discover.jsx'))
-const SearchResults = lazy(() => import('./pages/SearchResults.jsx'))
-const Profile = lazy(() => import('./pages/Profile.jsx'))
-const ProfileHistory = lazy(() => import('./pages/ProfileHistory.jsx'))
-const UserProfile = lazy(() => import('./pages/UserProfile.jsx'))
-const Feed = lazy(() => import('./pages/Feed.jsx'))
-const PublicList = lazy(() => import('./pages/PublicList.jsx'))
-const Auth = lazy(() => import('./pages/Auth.jsx'))
-// Album cards morph into the album page (utils/morph.js), which needs the page mounted right away rather than behind
-// a Suspense fallback. So App preloads it at idle, and once loaded it renders directly. Each mount picks once.
-let LoadedAlbumDetails = null
-const loadAlbumDetails = () => import('./pages/AlbumDetails.jsx').then((module) => {
-  LoadedAlbumDetails = module.default
-  return module
-})
-const LazyAlbumDetails = lazy(loadAlbumDetails)
-const AlbumDetails = () => {
-  const [Page] = useState(() => LoadedAlbumDetails ?? LazyAlbumDetails)
-  return <Page />
+// React.lazy suspends on every first mount, even when the chunk is already downloaded, so a page that has its data
+// (seeded from the card that linked to it) would still flash its skeleton. Once a page's chunk is in, it renders
+// directly instead; album cards also need that to morph into the album page (utils/morph.js). Each mount picks once.
+const lazyPage = (load) => {
+  let Loaded = null
+  const preload = () => load().then((module) => {
+    Loaded = module.default
+    return module
+  })
+  const Lazy = lazy(preload)
+  const Page = () => {
+    const [Component] = useState(() => Loaded ?? Lazy)
+    return <Component />
+  }
+  Page.preload = preload
+  return Page
 }
-const NotFound = lazy(() => import('./pages/NotFound.jsx'))
-const AdminDashboard = lazy(() => import('./pages/AdminDashboard.jsx'))
+
+const Discover = lazyPage(() => import('./pages/Discover.jsx'))
+const SearchResults = lazyPage(() => import('./pages/SearchResults.jsx'))
+const Profile = lazyPage(() => import('./pages/Profile.jsx'))
+const ProfileHistory = lazyPage(() => import('./pages/ProfileHistory.jsx'))
+const UserProfile = lazyPage(() => import('./pages/UserProfile.jsx'))
+const Feed = lazyPage(() => import('./pages/Feed.jsx'))
+const PublicList = lazyPage(() => import('./pages/PublicList.jsx'))
+const Auth = lazyPage(() => import('./pages/Auth.jsx'))
+const AlbumDetails = lazyPage(() => import('./pages/AlbumDetails.jsx'))
+const NotFound = lazyPage(() => import('./pages/NotFound.jsx'))
+const AdminDashboard = lazyPage(() => import('./pages/AdminDashboard.jsx'))
+// Pages a visitor moves between, fetched once the first page has settled. Auth, admin and 404 load on demand.
+const IDLE_PRELOADS = [AlbumDetails, PublicList, UserProfile, Profile, Feed, Discover, SearchResults, ProfileHistory]
 
 const INACTIVITY_TIMEOUT_MS = 20 * 60 * 1000
 const LAST_ACTIVITY_KEY = 'musico:last-activity-at'
@@ -140,7 +149,7 @@ const App = () => {
   }, [isPending, user])
 
   useEffect(() => {
-    const timer = setTimeout(loadAlbumDetails, 2000)
+    const timer = setTimeout(() => IDLE_PRELOADS.forEach((page) => page.preload().catch(() => {})), 2000)
     return () => clearTimeout(timer)
   }, [])
 
