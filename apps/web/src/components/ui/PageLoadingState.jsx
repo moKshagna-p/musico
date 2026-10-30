@@ -395,30 +395,28 @@ export const AdminRowsSkeleton = () =>
   ))
 
 export const AdminDashboardPageSkeleton = () => (
-  <section aria-busy="true" aria-label="Loading admin dashboard" className="space-y-8">
-    <header className="flex flex-col gap-6 border-b border-white/[0.07] pb-8 tablet:flex-row tablet:items-end tablet:justify-between">
-      <div>
-        <div className="skeleton h-12 w-64 rounded-xl tablet:h-[4.5rem] tablet:w-96" />
-        <div className="skeleton mt-4 h-3.5 w-56 max-w-full rounded-full" />
+  <section aria-busy="true" aria-label="Loading admin dashboard" className="space-y-14 tablet:space-y-20">
+    <header className="space-y-8 pt-4 tablet:pt-10">
+      <div className="skeleton h-12 w-64 rounded-xl tablet:h-[4.5rem] tablet:w-96" />
+      <div className="space-y-3">
+        <div className="skeleton h-8 w-full max-w-4xl rounded-lg tablet:h-11" />
+        <div className="skeleton h-8 w-2/3 rounded-lg tablet:h-11" />
       </div>
-      <div className="grid grid-cols-2 gap-2 tablet:flex">
-        {createSkeletonArray(4).map((_, index) => (
-          <div key={index} className="rounded-2xl border border-outline/60 bg-panel/30 px-4 py-3 tablet:w-28">
-            <div className="skeleton my-0.5 h-3 w-14 rounded-full" />
-            <div className="skeleton mt-1.5 h-[30px] w-12 rounded-lg" />
-          </div>
+      <div className="flex flex-wrap gap-x-8 gap-y-3">
+        {createSkeletonArray(6).map((_, index) => (
+          <div key={index} className="skeleton h-4 w-20 rounded-full" />
         ))}
       </div>
     </header>
 
-    <div className="grid gap-4 laptop:grid-cols-2">
-      {['tablet:w-72', 'tablet:w-44'].map((controlWidth) => (
-        <div key={controlWidth} className="rounded-2xl border border-outline/70 bg-panel/35 p-4 tablet:p-5">
-          <div className="flex flex-col gap-3 tablet:flex-row tablet:items-center tablet:justify-between">
-            <div className="skeleton h-8 w-28 rounded-lg" />
-            <div className={`skeleton h-9 w-full rounded-full ${controlWidth}`} />
+    <div className="grid gap-14 tablet:grid-cols-12 tablet:gap-12">
+      {['tablet:col-span-7', 'tablet:col-span-5'].map((span) => (
+        <div key={span} className={`min-w-0 ${span}`}>
+          <div className="flex items-center justify-between gap-3 border-b border-white/[0.07] pb-4">
+            <div className="skeleton h-8 w-32 rounded-lg" />
+            <div className="skeleton h-8 w-40 rounded-full" />
           </div>
-          <div className="mt-4 divide-y divide-outline/55">
+          <div className="divide-y divide-white/[0.07]">
             <AdminRowsSkeleton />
           </div>
         </div>

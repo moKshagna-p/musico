@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { AnimatePresence, motion as Motion } from 'framer-motion'
 import { FiCheck } from 'react-icons/fi'
 
@@ -7,6 +8,7 @@ import { toggleFollow } from '../../services/socialService.js'
 const FollowButton = ({ username, initialFollowing = false, onToggle }) => {
   const [following, setFollowing] = useState(initialFollowing)
   const [loading, setLoading] = useState(false)
+  const queryClient = useQueryClient()
 
   // Sync with parent prop when it changes (e.g. after search re-fetch)
   useEffect(() => {
@@ -25,6 +27,8 @@ const FollowButton = ({ username, initialFollowing = false, onToggle }) => {
       const result = await toggleFollow(username)
       setFollowing(result.following)
       onToggle?.(result.following)
+      // Profiles are cached (UserProfile); refresh this one so its follow state and follower count are current.
+      void queryClient.invalidateQueries({ queryKey: ['user-profile', username.toLowerCase()] })
     } catch {
       setFollowing(prev)
     } finally {

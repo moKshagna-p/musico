@@ -2,7 +2,6 @@ import { motion } from 'framer-motion'
 import { Link, NavLink } from 'react-router-dom'
 
 import { useAuth } from '../../hooks/useAuth.js'
-import { useAdminAccess } from '../../hooks/useAdminAccess.js'
 
 const MotionSpan = motion.span
 
@@ -42,7 +41,6 @@ const DockLink = ({ to, end, children }) => (
 
 const Navigation = () => {
   const { user } = useAuth()
-  const { isAdmin } = useAdminAccess()
 
   return (
     <header className="fixed inset-x-0 top-0 z-40 px-3 pt-3 tablet:pt-4">
@@ -62,7 +60,6 @@ const Navigation = () => {
           <DockLink to="/" end>Home</DockLink>
           <DockLink to="/discover">Discover</DockLink>
           {user && <DockLink to="/feed">Feed</DockLink>}
-          {isAdmin && <DockLink to="/admin">Admin</DockLink>}
           {user ? (
             <DockLink to="/profile">Profile</DockLink>
           ) : (
