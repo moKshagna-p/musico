@@ -25,7 +25,7 @@ permissions:
 
 # Cancel older release runs for the same ref
 concurrency:
-  group: ${{ github.workflow }}-${{ inputs.tag_name || github.ref }}
+  group: ${{ github.workflow }}-${{ inputs.tag_name || github.ref_name }}
   cancel-in-progress: true
 
 jobs:
@@ -37,7 +37,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
-      checks: read
+      actions: read
       contents: read
     outputs:
       sha: ${{ steps.ci.outputs.sha }}
@@ -56,16 +56,24 @@ jobs:
             echo "$sha is not on main. Merge it first; only merged commits can be released." >&2
             exit 1
           fi
-          # A tag pushed right after a merge can arrive before main's CI run has been created.
+          # A rerun of a release that failed here keeps its old run id, so the queue job wouldn't hold it behind
+          # newer releases and it could deploy older code over them. Roll back by reverting on main instead.
+          latest=$(gh api "repos/$GITHUB_REPOSITORY/releases/latest" -q .tag_name 2>/dev/null || true)
+          if [ -n "$latest" ] && [ "$(gh api "repos/$GITHUB_REPOSITORY/compare/$sha...$latest" -q .status)" = ahead ]; then
+            echo "$sha is older than the latest release $latest. Revert on main and release that instead." >&2
+            exit 1
+          fi
+          # Only push runs on main count: a PR run tested the merge ref, and docs-only PRs skip every step.
+          # A tag pushed right after a merge can arrive before that run has been created.
           deadline=$((SECONDS + 300))
           while :; do
-            if ! run=$(gh api "repos/$GITHUB_REPOSITORY/commits/$sha/check-runs?check_name=Build%20%26%20Test" \
-              -q '.check_runs | sort_by(.id) | last // empty | "\(.status) \(.conclusion)"'); then
+            if ! run=$(gh run list -R "$GITHUB_REPOSITORY" --workflow ci.yml --commit "$sha" --event push --branch main \
+              --json databaseId,status,conclusion -q 'sort_by(.databaseId) | last // empty | "\(.status) \(.conclusion)"'); then
               echo 'Could not read CI status; retrying.' >&2; sleep 15; continue
             fi
             case "$run" in
               "completed success") echo 'CI passed.'; echo "sha=$sha" >> "$GITHUB_OUTPUT"; exit 0 ;;
-              completed*) echo "CI finished as '${run#completed }' for $sha. Rerun CI on it, then rerun this release." >&2; exit 1 ;;
+              completed*) echo "CI finished as '${run#completed }' for $sha. Rerun that CI run, then rerun this release." >&2; exit 1 ;;
               "")
                 if [ "$SECONDS" -ge "$deadline" ]; then
                   echo "No CI run appeared for $sha within 5 minutes. Run CI on main, then rerun this release." >&2; exit 1

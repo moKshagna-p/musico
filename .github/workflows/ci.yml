@@ -13,7 +13,7 @@ permissions:
 # Superseded PR runs are cancelled. Pushes get a group per commit, because GitHub also cancels a group's pending run
 # when a newer one queues, and releases need a finished CI run on the exact commit they ship.
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.ref || github.sha }}
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event_name == 'pull_request' && github.ref || github.sha }}
   cancel-in-progress: true
 
 jobs:
