@@ -4,6 +4,7 @@ import * as SecureStore from 'expo-secure-store'
 
 // Shared with the web (no imports there, so it bundles here too).
 import { cleanArtistName } from '../../../web/src/utils/artistName.js'
+import type { Gif } from './reviewDraft'
 
 // The web app's origin proxies /api/* to the API (Vercel rewrite), so the app talks to the same place the site does.
 // Local API: EXPO_PUBLIC_API_URL=http://10.0.2.2:4000 (Android emulator) or http://<your LAN IP>:4000 (a phone).
@@ -157,9 +158,9 @@ export const uploadReviewImage = async ({ uri, width, height, mimeType }: { uri:
   return data.data as { id: string }
 }
 
-export type Gif = { id: string; url: string; preview: string; width: number; height: number; title?: string }
 export const searchGifs = async (q: string) => ((await api('/api/gifs', { params: { q, page: 1 } }))?.data ?? []) as Gif[]
 
+export const fetchMyReviews = async () => ((await api('/api/me/reviews'))?.data ?? []) as { id: string; albumId: string; content: string; updatedAt: number }[]
 export const fetchFeed = (cursor?: string) => api('/api/me/feed', { params: { cursor, limit: 20 } })
 export const fetchDashboard = () => api('/api/me/dashboard')
 export const fetchUserProfile = async (username: string) => (await api(`/api/users/${encodeURIComponent(username)}`))?.data ?? null
