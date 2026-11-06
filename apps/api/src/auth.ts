@@ -1,3 +1,4 @@
+import { expo } from '@better-auth/expo'
 import { betterAuth } from 'better-auth'
 import { drizzleAdapter } from 'better-auth/adapters/drizzle'
 
@@ -23,10 +24,12 @@ const initAuth = () => {
     }),
     baseURL: env.BETTER_AUTH_URL,
     secret: env.BETTER_AUTH_SECRET,
-    trustedOrigins: env.ALLOWED_ORIGINS,
+    // musico:// is the mobile app (apps/mobile); expo() maps its expo-origin header to Origin.
+    trustedOrigins: [...env.ALLOWED_ORIGINS, 'musico://'],
     // ponytail: no session cookieCache: it copies the user row into cookies, and user.image holds
     // data-URL avatars (up to ~2.8MB), so Vercel 502s the sign-in response. Re-enable once avatars move out of the user row.
     plugins: [
+      expo(),
       multiSession({
         maximumSessions: 1,
       }),
