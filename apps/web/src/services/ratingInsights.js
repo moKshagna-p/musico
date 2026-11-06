@@ -1,4 +1,4 @@
-import { cleanArtistName } from './artistService.js'
+import { cleanArtistName } from '../utils/artistName.js'
 
 // Ratings are half-star steps from 0.5 to 5, so bucket i holds ratings of (i + 1) / 2.
 export const ratingSpread = (ratings) => {
