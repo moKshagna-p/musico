@@ -101,6 +101,8 @@ export const FollowButton = ({ username, initialFollowing = false }: { username:
     try {
       setFollowing((await toggleFollow(username)).following)
       void queryClient.invalidateQueries({ queryKey: ['user-profile', username.toLowerCase()] })
+      void queryClient.invalidateQueries({ queryKey: ['my-following'] })
+      void queryClient.invalidateQueries({ queryKey: ['dashboard'] })
     } catch {
       setFollowing(previous)
     } finally {

@@ -8,7 +8,7 @@ import { useEffect, useState } from 'react'
 import { ActivityIndicator, Modal, Pressable, StyleSheet, TextInput, View } from 'react-native'
 import Animated, { FadeIn, FadeInDown, FadeOut, LinearTransition, ZoomIn, ZoomOut } from 'react-native-reanimated'
 
-import { fetchAlbumReviews, fetchMyReviews, saveReview, searchGifs, uploadReviewImage, type Album } from '@/lib/api'
+import { fetchAlbumReviews, fetchMyReview, saveReview, searchGifs, uploadReviewImage, type Album } from '@/lib/api'
 import { toDraft, type Gif, type Picked, type SavedMedia } from '@/lib/reviewDraft'
 import { Avatar, Display, EmptyNote, formatTimeAgo, Muted, Pill, Press, RatingStars, Skeleton, T, scalesUp } from './kit'
 import { colors, easeOut, fonts } from './theme'
@@ -206,8 +206,10 @@ export const ReviewComposer = ({ album, saved }: { album: Album; saved?: { conte
       })
       setPickingGif(false)
       setStatus(saved ? 'Review updated.' : 'Review posted.')
-      await queryClient.invalidateQueries({ queryKey: ['album-reviews', album.id] })
-      await queryClient.invalidateQueries({ queryKey: ['my-reviews'] })
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['album-reviews', album.id] }),
+        queryClient.invalidateQueries({ queryKey: ['my-review', album.id] }),
+      ])
     } catch (error) {
       setStatus((error as Error).message ?? 'Failed to save review.')
     } finally {
@@ -309,13 +311,9 @@ export const Reviews = ({ album, signedIn }: { album: Album; signedIn: boolean }
     enabled: signedIn,
   })
   const items = reviews.data?.pages.flatMap((page) => page.reviews) ?? []
-  // Your saved review for this album (text from /me/reviews; its attachments come with it in the album's list).
-  const mine = useQuery({ queryKey: ['my-reviews'], queryFn: fetchMyReviews, enabled: signedIn })
-  const own = mine.data?.find((review) => String(review.albumId) === String(album.id))
-  const saved = own ? (items.find((review) => review.id === own.id) ?? null) : null
-  // The composer opens once we know whether there's a review to edit. After a save it keeps what was saved,
-  // so it's already the edit view of the new review.
-  const composerReady = mine.isFetched && !reviews.isLoading
+  // Your saved review for this album, attachments included. The composer only opens once it's known, so a save can
+  // never replace a review it didn't load. After a save it keeps what was saved, so it's the edit view of it.
+  const mine = useQuery({ queryKey: ['my-review', album.id], queryFn: () => fetchMyReview(album.id), enabled: signedIn, staleTime: 0 })
   return (
     <View>
       <Display size={30}>Reviews</Display>
@@ -327,12 +325,16 @@ export const Reviews = ({ album, signedIn }: { album: Album; signedIn: boolean }
         </View>
       ) : (
         <View style={{ marginTop: 24 }}>
-          {composerReady ? (
-            <ReviewComposer album={album} saved={saved ?? (own ? { content: own.content, media: [] } : null)} />
+          {mine.isSuccess ? (
+            <ReviewComposer album={album} saved={mine.data} />
+          ) : mine.isError ? (
+            <View style={{ gap: 16, alignItems: 'flex-start' }}>
+              <Muted>Your review couldn’t be loaded, so it can’t be edited right now.</Muted>
+              <Pill label="Retry" icon="refresh-cw" onPress={() => mine.refetch()} />
+            </View>
           ) : (
             <Skeleton style={{ height: 150, borderRadius: 16 }} />
           )}
-          {own && !saved ? <Muted style={{ marginTop: 10, fontSize: 12 }}>Saving replaces your earlier review for this album.</Muted> : null}
           {reviews.isLoading ? <ActivityIndicator color={colors.paper} style={{ marginTop: 24 }} /> : null}
           {reviews.isError && !items.length ? (
             <View style={{ marginTop: 24, gap: 16, alignItems: 'flex-start' }}>

@@ -202,6 +202,47 @@ export const reviewRoutes = new Elysia()
       })),
     }
   })
+  // Your own review of one album with its attachments, so an app can edit it in place: a save replaces the whole
+  // review, and the album's list only carries the newest few, so it can't be relied on to include yours.
+  .get('/api/me/reviews/:albumId', async ({ request, params, set }) => {
+    set.headers ??= {}
+    set.headers['Cache-Control'] = 'private, no-store'
+    const authUser = await ensureAuthenticated(request, set)
+    if (!authUser) return { error: 'Unauthorized.' }
+
+    const albumId = readIdentifier(params?.albumId)
+    if (!albumId) {
+      set.status = 400
+      return { error: 'Missing album id.' }
+    }
+
+    const [review] = await db
+      .select({ id: userReview.id, content: userReview.content, updatedAt: userReview.updatedAt })
+      .from(userReview)
+      .where(and(eq(userReview.userId, authUser.id), eq(userReview.albumId, albumId)))
+      .limit(1)
+    if (!review) return { data: null }
+
+    const mediaRows = await db
+      .select({
+        id: reviewMedia.id,
+        kind: reviewMedia.kind,
+        key: reviewMedia.key,
+        url: reviewMedia.url,
+        width: reviewMedia.width,
+        height: reviewMedia.height,
+        alt: reviewMedia.alt,
+      })
+      .from(reviewMedia)
+      .where(eq(reviewMedia.reviewId, review.id))
+      .orderBy(asc(reviewMedia.position))
+      .catch((error) => {
+        if (isMissingTableError(error, 'review_media')) return []
+        throw error
+      })
+
+    return { data: { id: review.id, content: review.content, updatedAt: review.updatedAt.getTime(), media: mediaRows.map(toMedia) } }
+  })
   .get('/api/albums/:albumId/reviews', async ({ request, params, query, set }) => {
     set.headers ??= {}
     set.headers['Cache-Control'] = 'private, no-store'

@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test'
 
 import { EMPTY_DRAFT, toDraft } from './reviewDraft'
-import { createWriteQueue } from './writes'
+import { CancelledWrite, createWriteQueue } from './writes'
 
 const deferred = <T>() => {
   let resolve!: (value: T) => void
@@ -52,6 +52,28 @@ describe('createWriteQueue', () => {
     expect(b.current).toBe(true)
     slow.resolve('done')
     expect((await a).current).toBe(true)
+  })
+})
+
+describe('account changes', () => {
+  test('a write queued by one account never runs once another account is signed in, and nothing is applied', async () => {
+    const queue = createWriteQueue()
+    let account = 'a'
+    const slow = deferred<string>()
+    const sent: string[] = []
+    const first = queue('album', () => slow.promise, () => account === 'a')
+    const second = queue('album', async () => {
+      sent.push('second')
+      return 'saved'
+    }, () => account === 'a')
+    account = 'b'
+    slow.resolve('done')
+    const [one, two] = await Promise.all([first, second])
+    expect(sent).toEqual([])
+    expect(one.current).toBe(false)
+    expect(two.ok).toBe(false)
+    expect(two.ok ? null : two.error).toBeInstanceOf(CancelledWrite)
+    expect(two.current).toBe(false)
   })
 })
 

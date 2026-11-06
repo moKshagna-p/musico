@@ -7,7 +7,7 @@ import Animated, { Easing, FadeInDown, FadeInLeft, FadeOut, useAnimatedStyle, us
 
 // Same grouping as the web feed, so a sitting reads identically on both.
 import { feedDays, groupFeed } from '../../../web/src/services/feedGroups.js'
-import { fetchFeed, searchUsers } from '@/lib/api'
+import { fetchFeed, fetchFollowing, searchUsers } from '@/lib/api'
 import { useAuth } from '@/lib/state'
 import { Avatar, Display, Muted, PrimaryButton, Skeleton, T, scalesUp } from '@/ui/kit'
 import { ActivityCard, FollowButton } from '@/ui/people'
@@ -22,7 +22,12 @@ const PeopleSearch = () => {
     const timer = setTimeout(() => setDebounced(query.trim()), 350)
     return () => clearTimeout(timer)
   }, [query])
+  const { user } = useAuth()
   const results = useQuery({ queryKey: ['user-search', debounced], queryFn: () => searchUsers(debounced), enabled: debounced.length >= 2 })
+  // Search results don't say whether you follow someone, and following is a toggle, so the button waits for your
+  // real follow list instead of guessing "not following" (which would unfollow on tap).
+  const following = useQuery({ queryKey: ['my-following'], queryFn: fetchFollowing, enabled: debounced.length >= 2 })
+  const followed = useMemo(() => new Set((following.data ?? []).map((person) => person.id)), [following.data])
   const searching = debounced.length >= 2
   return (
     <View>
@@ -65,7 +70,7 @@ const PeopleSearch = () => {
                     <Muted numberOfLines={1} style={{ fontSize: 12, color: 'rgba(142,139,133,0.6)' }}>@{person.username}</Muted>
                   </View>
                 </Pressable>
-                {!person.isMe && person.username ? <FollowButton username={person.username} initialFollowing={person.isFollowing} /> : null}
+                {person.id !== user?.id && person.username && following.isSuccess ? <FollowButton username={person.username} initialFollowing={followed.has(person.id)} /> : null}
               </Animated.View>
             ))
           ) : (

@@ -61,9 +61,12 @@ export const MeProvider = ({ children }: { children: ReactNode }) => {
   const [ratings, setRatings] = useState<Ratings>({})
   const [lists, setLists] = useState<MusicList[]>([])
 
-  // Ratings the server has confirmed: where a failed newest write snaps back to. One write queue per album.
+  // Ratings the server has confirmed: where a failed newest write snaps back to. One write queue per album, and
+  // each write is tied to the account that made it (signedInAs is read when a queued write starts).
   const confirmed = useRef<Ratings>({})
   const [queueWrite] = useState(createWriteQueue)
+  const signedInAs = useRef(user?.id ?? null)
+  signedInAs.current = user?.id ?? null
 
   // Pages built from these (profile totals, history, lists, profiles) refetch the next time they're shown.
   const refreshSavedViews = useCallback((listId?: string) => {
@@ -94,7 +97,14 @@ export const MeProvider = ({ children }: { children: ReactNode }) => {
       })
     setOne(clearing ? undefined : { rating, timestamp: Date.now() })
 
-    void queueWrite(id, () => (clearing ? deleteRating(id) : saveRating(id, rating, { albumName: album.name, albumCover: album.cover }))).then((result) => {
+    const author = user.id
+    void queueWrite(
+      `${author}:${id}`,
+      () => (clearing ? deleteRating(id) : saveRating(id, rating, { albumName: album.name, albumCover: album.cover })),
+      () => signedInAs.current === author,
+    ).then((result) => {
+      // Signed out or switched accounts since: this account's state is gone, so there's nothing to apply.
+      if (signedInAs.current !== author) return
       if (!result.ok) {
         if (result.current) setOne(confirmed.current[id])
         return
