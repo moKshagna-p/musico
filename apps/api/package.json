@@ -20,6 +20,7 @@
   "dependencies": {
     "@elysiajs/cors": "^1.4.1",
     "@neondatabase/serverless": "^0.10.4",
+    "@better-auth/expo": "1.6.23",
     "better-auth": "^1.6.23",
     "drizzle-kit": "^0.31.6",
     "drizzle-orm": "^0.45.2",
