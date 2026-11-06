@@ -13,8 +13,9 @@ const ArtistImageSchema = z.object({
   square: HeroArtSchema.nullable().optional(),
 })
 
-// Discogs disambiguates duplicate names as "Artist (2)" and marks name variations with "*".
-export const cleanArtistName = (name = '') => String(name).replace(/\s*\(\d+\)$/, '').replace(/\*$/, '').trim()
+import { cleanArtistName } from '../utils/artistName.js'
+
+export { cleanArtistName }
 
 export const getArtistLogo = async (name) => {
   const data = await validatedRequest({ url: '/api/artist-logo', params: { name: cleanArtistName(name) } }, z.object({ logo: z.string().url().nullable() }))
