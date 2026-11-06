@@ -3,6 +3,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 
 // Shared with the web app so list rules (name length, caps) never drift between the two.
 import { listStorageConfig, normalizeListName, toListAlbumSummary } from '../../../web/src/services/listsService.js'
+import { createWriteQueue } from './writes'
 import { authClient, createList as createRemoteList, deleteRating, fetchBootstrap, saveRating, toggleListAlbum, type Album } from './api'
 
 export type ListAlbum = { id: string; name: string; cover: string; artists: string[]; releaseYear: number | null; addedAt: number }
@@ -60,44 +61,63 @@ export const MeProvider = ({ children }: { children: ReactNode }) => {
   const [ratings, setRatings] = useState<Ratings>({})
   const [lists, setLists] = useState<MusicList[]>([])
 
+  // Ratings the server has confirmed: where a failed newest write snaps back to. One write queue per album.
+  const confirmed = useRef<Ratings>({})
+  const [queueWrite] = useState(createWriteQueue)
+
+  // Pages built from these (profile totals, history, lists, profiles) refetch the next time they're shown.
+  const refreshSavedViews = useCallback((listId?: string) => {
+    for (const queryKey of [['dashboard'], ['profile-history'], ['user-profile'], ...(listId ? [['public-list', listId]] : [])]) {
+      void queryClient.invalidateQueries({ queryKey })
+    }
+  }, [queryClient])
+
   useEffect(() => {
+    confirmed.current = bootstrap.data?.ratings ?? {}
     setRatings(bootstrap.data?.ratings ?? {})
     setLists(byUpdated((bootstrap.data?.lists ?? []).map(normalizeList).filter(Boolean)))
   }, [bootstrap.data])
 
-  // Optimistic, like the web: the stars move at once and snap back if the save fails.
+  // Optimistic, like the web: the stars move at once. Writes for an album go out in tap order, and only the newest
+  // one's outcome counts, so quick taps can't end on an older rating and a late failure can't undo a newer choice.
   const rateAlbum = useCallback((album: Album, value: number) => {
     if (!user?.id) return
     const id = String(album.id)
     const rating = Math.min(5, Math.max(0.5, Math.round(value * 2) / 2))
-    const before = ratings[id]
-    const clearing = Math.abs((before?.rating ?? 0) - rating) < 0.001
-    setRatings((prev) => {
-      const next = { ...prev }
-      if (clearing) delete next[id]
-      else next[id] = { rating, timestamp: Date.now() }
-      return next
-    })
-    const request = clearing ? deleteRating(id) : saveRating(id, rating, { albumName: album.name, albumCover: album.cover })
-    request
-      .then((saved) => {
-        const community = Number(saved?.communityRating)
-        const count = Number(saved?.reviewCount)
-        if (Number.isFinite(community) && Number.isFinite(count)) {
-          queryClient.setQueryData(['release', id], (current: Album | undefined) =>
-            current ? { ...current, communityRating: community, reviewCount: count } : current,
-          )
-        }
+    const clearing = Math.abs((ratings[id]?.rating ?? 0) - rating) < 0.001
+    const setOne = (entry: { rating: number; timestamp: number } | undefined) =>
+      setRatings((prev) => {
+        const next = { ...prev }
+        if (entry) next[id] = entry
+        else delete next[id]
+        return next
       })
-      .catch(() =>
-        setRatings((prev) => {
-          const next = { ...prev }
-          if (before) next[id] = before
-          else delete next[id]
-          return next
-        }),
-      )
-  }, [user?.id, ratings, queryClient])
+    setOne(clearing ? undefined : { rating, timestamp: Date.now() })
+
+    void queueWrite(id, () => (clearing ? deleteRating(id) : saveRating(id, rating, { albumName: album.name, albumCover: album.cover }))).then((result) => {
+      if (!result.ok) {
+        if (result.current) setOne(confirmed.current[id])
+        return
+      }
+      const saved = result.value
+      const savedRating = Number(saved?.rating)
+      const entry = Number.isFinite(savedRating) && savedRating > 0 ? { rating: savedRating, timestamp: Number(saved?.timestamp ?? Date.now()) } : undefined
+      if (entry) confirmed.current = { ...confirmed.current, [id]: entry }
+      else {
+        const { [id]: _removed, ...rest } = confirmed.current
+        confirmed.current = rest
+      }
+      if (!result.current) return
+      const community = Number(saved?.communityRating)
+      const count = Number(saved?.reviewCount)
+      if (Number.isFinite(community) && Number.isFinite(count)) {
+        queryClient.setQueryData(['release', id], (current: Album | undefined) =>
+          current ? { ...current, communityRating: community, reviewCount: count } : current,
+        )
+      }
+      refreshSavedViews()
+    })
+  }, [user?.id, ratings, queryClient, queueWrite, refreshSavedViews])
 
   const applyToggle = (listId: string, summary: ListAlbum, added: boolean) =>
     setLists((prev) =>
@@ -119,11 +139,12 @@ export const MeProvider = ({ children }: { children: ReactNode }) => {
     try {
       const result = await toggleListAlbum(listId, summary)
       applyToggle(listId, summary, Boolean(result.added))
+      refreshSavedViews(listId)
       return { ok: true, added: Boolean(result.added), listName: list.name }
     } catch {
       return { ok: false }
     }
-  }, [lists, user?.id])
+  }, [lists, user?.id, refreshSavedViews])
 
   const createList = useCallback(async (name: string, album?: Album) => {
     if (!user?.id) return { ok: false, reason: 'auth' }
@@ -135,11 +156,12 @@ export const MeProvider = ({ children }: { children: ReactNode }) => {
       const created = normalizeList(await createRemoteList(normalized, (album && toListAlbumSummary(album)) || undefined))
       if (!created) return { ok: false, reason: 'error' }
       setLists((prev) => byUpdated([created, ...prev]))
+      refreshSavedViews()
       return { ok: true, list: created }
     } catch {
       return { ok: false, reason: 'error' }
     }
-  }, [lists, user?.id])
+  }, [lists, user?.id, refreshSavedViews])
 
   const listenLater = lists.find((list) => list.name.toLowerCase() === LISTEN_LATER.toLowerCase()) ?? null
 

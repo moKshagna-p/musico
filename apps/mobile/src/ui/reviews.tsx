@@ -5,10 +5,11 @@ import { ImageManipulator, SaveFormat } from 'expo-image-manipulator'
 import * as ImagePicker from 'expo-image-picker'
 import { router } from 'expo-router'
 import { useEffect, useState } from 'react'
-import { ActivityIndicator, Modal, Pressable, StyleSheet, TextInput, useWindowDimensions, View } from 'react-native'
+import { ActivityIndicator, Modal, Pressable, StyleSheet, TextInput, View } from 'react-native'
 import Animated, { FadeIn, FadeInDown, FadeOut, LinearTransition, ZoomIn, ZoomOut } from 'react-native-reanimated'
 
-import { fetchAlbumReviews, saveReview, searchGifs, uploadReviewImage, type Album, type Gif } from '@/lib/api'
+import { fetchAlbumReviews, fetchMyReviews, saveReview, searchGifs, uploadReviewImage, type Album } from '@/lib/api'
+import { toDraft, type Gif, type Picked, type SavedMedia } from '@/lib/reviewDraft'
 import { Avatar, Display, EmptyNote, formatTimeAgo, Muted, Pill, Press, RatingStars, Skeleton, T, scalesUp } from './kit'
 import { colors, easeOut, fonts } from './theme'
 
@@ -18,25 +19,25 @@ const MAX_LENGTH = 280
 const MAX_EDGE = 2048
 const unfold = FadeInDown.duration(300).easing(easeOut)
 
-type Picked = { localId: string; uri: string; width: number; height: number; id?: string; status: 'uploading' | 'done' | 'error'; error?: string }
-type MediaItem = { id?: string; kind?: string; url: string; width?: number; height?: number; alt?: string }
+type MediaItem = SavedMedia
 
 // Tweet-style layouts, as on the web: one item keeps its shape, 2-4 share a 16:9 frame (the first of three runs tall).
+// Tiles are sized from the frame's own measured width, since the composer's padding makes it narrower than the page.
 export const MediaGrid = <T extends { width?: number; height?: number }>({ items, renderTile }: { items: T[]; renderTile: (item: T, index: number) => React.ReactNode }) => {
-  const { width: screen } = useWindowDimensions()
+  const [frameWidth, setFrameWidth] = useState(0)
   if (!items.length) return null
   if (items.length === 1) {
     const [item] = items
     const ratio = item.width && item.height ? Math.min(Math.max(item.width / item.height, 0.75), 2.5) : 16 / 9
     return <View style={[styles.frame, { aspectRatio: ratio, maxHeight: 512 }]}>{renderTile(item, 0)}</View>
   }
-  const frameWidth = Math.min(screen - 32, 544)
-  const half = (frameWidth - 2) / 2
-  const rows = items.length > 2 ? 2 : 1
-  const cell = rows === 2 ? (frameWidth * 9) / 16 / 2 - 1 : (frameWidth * 9) / 16
+  const inner = frameWidth - 2 // inside the 1pt border
+  const half = (inner - 2) / 2
+  const height = (inner * 9) / 16
+  const cell = items.length > 2 ? (height - 2) / 2 : height
   return (
-    <View style={[styles.frame, { aspectRatio: 16 / 9, flexDirection: 'column', flexWrap: 'wrap', gap: 2 }]}>
-      {items.map((item, index) => (
+    <View onLayout={(event) => setFrameWidth(event.nativeEvent.layout.width)} style={[styles.frame, { aspectRatio: 16 / 9, flexDirection: 'column', flexWrap: 'wrap', gap: 2 }]}>
+      {frameWidth > 0 && items.map((item, index) => (
         <View key={index} style={{ width: half, height: items.length === 3 && index === 0 ? cell * 2 + 2 : cell }}>
           {renderTile(item, index)}
         </View>
@@ -143,12 +144,14 @@ const GifPicker = ({ onPick, onClose }: { onPick: (gif: Gif) => void; onClose: (
 }
 
 // Composer with tweet-style media: up to 4 images or one GIF. Images upload as soon as they're picked,
-// so Post only has to attach them (the web's ReviewInput).
-export const ReviewComposer = ({ album }: { album: Album }) => {
+// so Post only has to attach them (the web's ReviewInput). Each person has one review per album and saving replaces
+// it, so a saved review opens here for editing, attachments included, rather than being silently overwritten.
+export const ReviewComposer = ({ album, saved }: { album: Album; saved?: { content?: string | null; media?: SavedMedia[] } | null }) => {
   const queryClient = useQueryClient()
-  const [content, setContent] = useState('')
-  const [images, setImages] = useState<Picked[]>([])
-  const [gif, setGif] = useState<Gif | null>(null)
+  const [draft] = useState(() => toDraft(saved))
+  const [content, setContent] = useState(draft.content)
+  const [images, setImages] = useState<Picked[]>(draft.images)
+  const [gif, setGif] = useState<Gif | null>(draft.gif)
   const [pickingGif, setPickingGif] = useState(false)
   const [saving, setSaving] = useState(false)
   const [status, setStatus] = useState('')
@@ -201,12 +204,10 @@ export const ReviewComposer = ({ album }: { album: Album }) => {
         media: images.map((image) => ({ id: image.id!, alt: '' })),
         gif: gif && { url: gif.url, width: gif.width, height: gif.height, alt: gif.title?.slice(0, 1000) ?? '' },
       })
-      setContent('')
-      setImages([])
-      setGif(null)
       setPickingGif(false)
-      setStatus('Review posted.')
+      setStatus(saved ? 'Review updated.' : 'Review posted.')
       await queryClient.invalidateQueries({ queryKey: ['album-reviews', album.id] })
+      await queryClient.invalidateQueries({ queryKey: ['my-reviews'] })
     } catch (error) {
       setStatus((error as Error).message ?? 'Failed to save review.')
     } finally {
@@ -268,11 +269,11 @@ export const ReviewComposer = ({ album }: { album: Album }) => {
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
           <Muted style={{ fontSize: 12, color: content.length > MAX_LENGTH - 20 ? '#fbbf24' : colors.muted }}>{MAX_LENGTH - content.length}</Muted>
           <Press onPress={post} disabled={!canPost} style={[styles.post, !canPost && { opacity: 0.4 }]}>
-            {saving ? <ActivityIndicator color="#000" size="small" /> : <T style={{ color: '#000', fontFamily: fonts.medium, fontSize: 13 }}>Post review</T>}
+            {saving ? <ActivityIndicator color="#000" size="small" /> : <T style={{ color: '#000', fontFamily: fonts.medium, fontSize: 13 }}>{saved ? 'Update review' : 'Post review'}</T>}
           </Press>
         </View>
       </View>
-      {status ? <Animated.View entering={FadeIn}><Muted style={{ marginTop: 10, fontSize: 12, color: status === 'Review posted.' ? '#4ade80' : colors.muted }}>{status}</Muted></Animated.View> : null}
+      {status ? <Animated.View entering={FadeIn}><Muted style={{ marginTop: 10, fontSize: 12, color: status === 'Review posted.' || status === 'Review updated.' ? '#4ade80' : colors.muted }}>{status}</Muted></Animated.View> : null}
     </Animated.View>
   )
 }
@@ -308,6 +309,13 @@ export const Reviews = ({ album, signedIn }: { album: Album; signedIn: boolean }
     enabled: signedIn,
   })
   const items = reviews.data?.pages.flatMap((page) => page.reviews) ?? []
+  // Your saved review for this album (text from /me/reviews; its attachments come with it in the album's list).
+  const mine = useQuery({ queryKey: ['my-reviews'], queryFn: fetchMyReviews, enabled: signedIn })
+  const own = mine.data?.find((review) => String(review.albumId) === String(album.id))
+  const saved = own ? (items.find((review) => review.id === own.id) ?? null) : null
+  // The composer opens once we know whether there's a review to edit. After a save it keeps what was saved,
+  // so it's already the edit view of the new review.
+  const composerReady = mine.isFetched && !reviews.isLoading
   return (
     <View>
       <Display size={30}>Reviews</Display>
@@ -319,15 +327,26 @@ export const Reviews = ({ album, signedIn }: { album: Album; signedIn: boolean }
         </View>
       ) : (
         <View style={{ marginTop: 24 }}>
-          <ReviewComposer album={album} />
+          {composerReady ? (
+            <ReviewComposer album={album} saved={saved ?? (own ? { content: own.content, media: [] } : null)} />
+          ) : (
+            <Skeleton style={{ height: 150, borderRadius: 16 }} />
+          )}
+          {own && !saved ? <Muted style={{ marginTop: 10, fontSize: 12 }}>Saving replaces your earlier review for this album.</Muted> : null}
           {reviews.isLoading ? <ActivityIndicator color={colors.paper} style={{ marginTop: 24 }} /> : null}
+          {reviews.isError && !items.length ? (
+            <View style={{ marginTop: 24, gap: 16, alignItems: 'flex-start' }}>
+              <Muted>{reviews.error?.message ?? 'Reviews could not be loaded.'}</Muted>
+              <Pill label="Retry" icon="refresh-cw" onPress={() => reviews.refetch()} />
+            </View>
+          ) : null}
           {items.map((review, index) => <ReviewCard key={review.id ?? index} review={review} index={index} />)}
           {reviews.hasNextPage ? (
             <View style={{ alignItems: 'center', marginTop: 24 }}>
               <Pill label={reviews.isFetchingNextPage ? 'Loading' : 'Load more reviews'} onPress={() => reviews.fetchNextPage()} />
             </View>
           ) : null}
-          {!reviews.isLoading && !items.length ? <Muted style={{ marginTop: 24 }}>No reviews yet. Be the first to write one.</Muted> : null}
+          {!reviews.isLoading && !reviews.isError && !items.length ? <Muted style={{ marginTop: 24 }}>No reviews yet. Be the first to write one.</Muted> : null}
         </View>
       )}
     </View>
