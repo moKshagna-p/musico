@@ -50,6 +50,14 @@ const PeopleSearch = () => {
       </View>
       {searching ? (
         <Animated.View entering={FadeInDown.duration(200).easing(easeOut)} exiting={FadeOut.duration(150)} style={styles.results}>
+          {following.isError ? (
+            <View style={styles.followError}>
+              <Muted style={{ flex: 1, fontSize: 12 }}>Couldn’t load who you follow, so follow buttons are hidden.</Muted>
+              <Pressable onPress={() => void following.refetch()} hitSlop={8} accessibilityLabel="Retry loading who you follow">
+                <T style={{ fontSize: 12, textDecorationLine: 'underline' }}>Retry</T>
+              </Pressable>
+            </View>
+          ) : null}
           {results.isLoading || debounced !== query.trim() ? (
             [1, 2, 3].map((key) => (
               <View key={key} style={styles.person}>
@@ -191,6 +199,7 @@ const styles = StyleSheet.create({
   searchFocused: { borderColor: 'rgba(255,255,255,0.3)', backgroundColor: 'rgba(255,255,255,0.06)' },
   input: { flex: 1, color: '#fff', fontFamily: fonts.regular, fontSize: 14, paddingVertical: 13 },
   results: { marginTop: 12, borderRadius: 24, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)', backgroundColor: 'rgba(255,255,255,0.02)', padding: 8, overflow: 'hidden' },
+  followError: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 12, paddingVertical: 8 },
   person: { flexDirection: 'row', alignItems: 'center', gap: 12, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 10 },
   day: { marginTop: 24, marginBottom: 4, fontSize: 12, letterSpacing: 2.4, textTransform: 'uppercase', color: 'rgba(142,139,133,0.8)' },
   empty: { marginTop: 16, borderRadius: 24, borderWidth: 1, borderColor: colors.line, overflow: 'hidden' },
