@@ -1,0 +1,32 @@
+name: PR Style
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, edited, reopened, synchronize, ready_for_review]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  style:
+    name: PR Style
+    # Bot PRs (Dependabot) write their own descriptions. A skipped job still satisfies a required check.
+    if: github.event.pull_request.user.type != 'Bot'
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: scripts
+
+      # Title and body go through env, never into the shell script, so PR text can't inject commands.
+      - name: Check title and description
+        run: node scripts/check-pr.mjs
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_BODY: ${{ github.event.pull_request.body }}

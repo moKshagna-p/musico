@@ -1,0 +1,12 @@
+version: 2
+updates:
+  # Workflow actions only; app dependencies are bumped by hand with the bun lockfile.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    groups:
+      actions:
+        patterns: ['*']
+    commit-message:
+      prefix: ci

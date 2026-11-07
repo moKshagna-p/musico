@@ -10,7 +10,7 @@ This project is a **TypeScript monorepo** managed by **Turbo**, utilizing **Bun*
 
 ## Monorepo Structure
 
-The workspace is defined for `apps/*` and `packages/*`. The primary code resides in the `apps/` directory.
+The workspace is defined for `apps/*`: `api`, `web` and `mobile`.
 
 ### 1. `apps/api` (Backend)
 - **Framework**: ElysiaJS running on Bun.
@@ -21,11 +21,16 @@ The workspace is defined for `apps/*` and `packages/*`. The primary code resides
 - **Key Concepts**: It uses a multi-layered caching strategy (PostgreSQL + in-memory TTLs) to minimize Discogs API calls and reduce latency.
 
 ### 2. `apps/web` (Frontend)
-- **Framework**: React 18+ bundled with Vite.
+- **Framework**: React 19 bundled with Vite.
 - **Styling**: TailwindCSS.
 - **State Management & Data Fetching**: TanStack Query (React Query) for managing server state and caching.
 - **Testing**: Playwright for E2E testing (`playwright-report`, `test-results` in root).
 - **Key Features**: Infinite scroll, blur-up image loading, and responsive user interfaces.
+
+### 3. `apps/mobile` (Android and iOS)
+- **Framework**: Expo (React Native) with Expo Router, written in TypeScript (`.tsx`).
+- **Data**: TanStack Query against the same API; sign-in via Better Auth's Expo plugin.
+- **Testing**: `bun test src`.
 
 ## Technology Stack Summary
 
@@ -34,7 +39,7 @@ The workspace is defined for `apps/*` and `packages/*`. The primary code resides
 - **Frontend**: React, Vite, TailwindCSS, TanStack Query
 - **Backend**: Bun, Elysia
 - **Database / ORM**: PostgreSQL, Drizzle ORM
-- **Testing**: Vitest (Unit), Playwright (E2E)
+- **Testing**: `bun test` (API, mobile), `node --test` (web, scripts), Playwright (E2E)
 - **Process Manager**: `mprocs` (used in dev mode to run web and API together)
 
 ## Development Workflow
@@ -47,10 +52,16 @@ The workspace is defined for `apps/*` and `packages/*`. The primary code resides
 - Environment variables are managed via `.env` (derived from `.env.example`).
   - Important variables: `DATABASE_URL`, `DISCOGS_TOKEN`, `BETTER_AUTH_SECRET`.
 
+### Pull Requests
+
+- Title: `type(scope): subject`, lowercase subject, no trailing period, at most 72 characters. Types: `feat`, `fix`, `perf`, `refactor`, `docs`, `test`, `ci`, `build`, `chore`, `revert`. The title becomes the commit subject on `main`, and release notes group commits by type.
+- Description: follow `.github/pull_request_template.md`: `## Summary` (1-5 one-line bullets on what changed and why) and `## Testing` (what was run, with results, and what was not tested). At most 1500 characters. No file inventories, review logs, or AI attribution.
+- The `PR Style` check (`scripts/check-pr.mjs`) enforces both and reruns when the PR is edited.
+
 ### Landing Changes and Releasing
 
 - A user request to land changes on `main` authorizes the normal protected-branch workflow: push a branch, open or update a pull request, wait for required checks, fix failures, and merge when GitHub permits it. Do not ask for separate permission for each step. Never bypass branch protection, required reviews, or failing checks.
-- A user request to release a new version authorizes tagging the verified commit on `main`, pushing the tag, running the existing release workflow, and checking the deployment and GitHub Release results. If the user does not specify a version, use the next unused patch version. Do not reuse an existing tag or release unmerged changes.
+- A user request to release a new version authorizes tagging the verified commit on `main`, pushing the tag, running the existing release workflow, and checking the deployment and GitHub Release results. If the user does not specify a version, use the next unused patch version, or the next minor version when the release adds a user-facing feature. Do not reuse an existing tag or release unmerged changes.
 - Ordinary code changes do not authorize a release. Ask only when a material version or deployment choice is unresolved, or when GitHub requires a human production approval. Report a failed check or deployment instead of claiming the release succeeded.
 
 ## Architectural Rules & Guidelines for LLMs
@@ -70,6 +81,6 @@ The workspace is defined for `apps/*` and `packages/*`. The primary code resides
 
 1. **Package Manager**: **Always use `bun`** for installing packages, running scripts, and managing dependencies. Avoid `npm` or `yarn` (unless running specific npm script aliases defined in `package.json` like `npm run check:bun`).
 2. **Component Structure**: Keep React components modular. Place reusable components in `apps/web/src/components` and page-level views in `apps/web/src/pages`.
-3. **Testing**: Add or update tests when modifying logic. Use Vitest/Node for unit tests and Playwright for E2E tests.
+3. **Testing**: Add or update tests when modifying logic. Use the package's existing runner (`bun test` or `node --test`) for unit tests and Playwright for E2E tests.
 
 When making modifications or adding features, ensure you check the relevant configuration files (`turbo.json`, `package.json`) to understand the linking between workspaces.
