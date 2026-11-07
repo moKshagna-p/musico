@@ -1159,7 +1159,7 @@ export const userRoutes = new Elysia({ prefix: '/api' })
         })
 
        // Process lists
-       let lists = []
+       let lists: unknown[] = []
        if (listsRows.length) {
          const listIds = listsRows.map((entry) => entry.id)
          const listAlbums = await db
@@ -1197,7 +1197,6 @@ export const userRoutes = new Elysia({ prefix: '/api' })
              return {
                id: list.id,
                name: list.name,
-               description: list.description,
                albumCount: albumsByList.get(list.id)?.length ?? 0,
                albums,
              }
@@ -1214,7 +1213,6 @@ export const userRoutes = new Elysia({ prefix: '/api' })
           },
           recentRatings,
           profile: {
-            id: profile.id,
             userId: profile.userId,
             username: profile.username,
             bio: profile.bio,

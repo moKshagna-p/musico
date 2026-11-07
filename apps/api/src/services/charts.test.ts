@@ -55,3 +55,9 @@ test('an incomplete chart response fails instead of producing unrelated page tex
   expect(() => parseBillboard200Albums('<div>1</div><h2>News</h2><h3>Author</h3>')).toThrow()
   expect(() => parseBillboard200Albums('<div class="chart-item"><div class="chart-item-position">1</div></div>')).toThrow()
 })
+
+test('entities decode once, so an escaped entity stays as text', () => {
+  expect(parseBillboard200Albums(row(1, 'Love &amp;lt;3', 'Simon &amp; Garfunkel', 1))).toEqual([
+    { rank: 1, name: 'Love &lt;3', artist: 'Simon & Garfunkel' },
+  ])
+})

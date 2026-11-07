@@ -274,7 +274,7 @@ const upsertReleaseDetailsCache = async (release: ReleaseDetails) => {
     .insert(releaseCacheTable)
     .values({
       releaseId: release.id,
-      payload: release,
+      payload: { ...release },
       expiresAt,
       refreshedAt: now,
       createdAt: now,
@@ -283,7 +283,7 @@ const upsertReleaseDetailsCache = async (release: ReleaseDetails) => {
     .onConflictDoUpdate({
       target: releaseCacheTable.releaseId,
       set: {
-        payload: release,
+        payload: { ...release },
         expiresAt,
         refreshedAt: now,
         updatedAt: now,
