@@ -35,5 +35,8 @@
     "husky": "^9.1.7",
     "mprocs": "0.7.3",
     "turbo": "^2.10.4"
+  },
+  "dependencies": {
+    "geist": "^1.9.2"
   }
 }

@@ -22,3 +22,8 @@ test('rejects missing, empty, or oversized sections', () => {
   assert.ok(checkPr({ title, body: '## Summary\n<!-- hint -->\n-\n\n## Testing\n- ok' }).some((e) => e.includes('Fill in the "## Summary"')))
   assert.ok(checkPr({ title, body: `${body}${'x'.repeat(1500)}` }).some((e) => e.includes('keep it to 1500')))
 })
+
+test('a comment that only remains after stripping another is still removed', () => {
+  const nested = '## Summary\n<!<!---->-- hint -->\n\n## Testing\n- ok'
+  assert.ok(checkPr({ title: 'docs: tidy readme', body: nested }).some((e) => e.includes('Fill in the "## Summary"')))
+})
