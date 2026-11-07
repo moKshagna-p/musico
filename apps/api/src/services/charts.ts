@@ -6,9 +6,9 @@ export interface ChartAlbum {
   artist: string
 }
 
+// &amp; goes last, so "&amp;lt;" becomes the text "&lt;" instead of decoding twice to "<".
 const decodeHtmlEntities = (value: string) =>
   value
-    .replace(/&amp;/g, '&')
     .replace(/&apos;/g, "'")
     .replace(/&#39;/g, "'")
     .replace(/&quot;/g, '"')
@@ -19,6 +19,7 @@ const decodeHtmlEntities = (value: string) =>
     .replace(/&mdash;/g, '-')
     .replace(/&lt;/g, '<')
     .replace(/&gt;/g, '>')
+    .replace(/&amp;/g, '&')
 
 const normalizeWhitespace = (value = '') => value.replace(/\s+/g, ' ').trim()
 
