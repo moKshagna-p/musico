@@ -11,7 +11,7 @@ import Animated, {
   withTiming,
   type SharedValue,
 } from 'react-native-reanimated'
-import Svg, { Circle, Path } from 'react-native-svg'
+import Svg, { Circle, Defs, LinearGradient, Path, RadialGradient, Stop } from 'react-native-svg'
 
 import { hidden, registerSource } from './morph'
 import { colors, easeOut } from './theme'
@@ -132,14 +132,35 @@ export const VinylSleeve = ({ size, cover, label, out = false, spin = false, pul
 }
 
 // The brand mark from the web nav: a tiny record.
+// Same drawing as the web's MusicoMark (apps/web/src/components/ui/Navigation.jsx).
+const MARK_GROOVES = [8.6, 9.15, 9.7, 10.25, 10.8, 11.35, 11.9, 12.45, 13, 13.55, 14.1, 14.65]
+
 export const MusicoMark = ({ size = 28 }: { size?: number }) => (
   <Svg width={size} height={size} viewBox="0 0 32 32">
-    <Circle cx={16} cy={16} r={15.5} fill={colors.vinyl} stroke="rgba(255,255,255,0.16)" />
-    <Circle cx={16} cy={16} r={12} fill="none" stroke="rgba(255,255,255,0.09)" />
-    <Circle cx={16} cy={16} r={9} fill="none" stroke="rgba(255,255,255,0.09)" />
-    <Path d="M5.5 11 A11.5 11.5 0 0 1 11 5.5" fill="none" stroke="rgba(255,255,255,0.4)" strokeWidth={1.4} strokeLinecap="round" />
-    <Circle cx={16} cy={16} r={5.6} fill={colors.paper} />
-    <Circle cx={16} cy={16} r={1.2} fill={colors.vinyl} />
+    <Defs>
+      <RadialGradient id="d" cx={16} cy={16} r={15.5} gradientUnits="userSpaceOnUse">
+        <Stop offset={0.45} stopColor="#1a1a19" />
+        <Stop offset={1} stopColor="#070707" />
+      </RadialGradient>
+      <LinearGradient id="a" x1={6.47} y1={10.5} x2={16.96} y2={5.04} gradientUnits="userSpaceOnUse">
+        <Stop offset={0} stopColor="#fff" stopOpacity={0} />
+        <Stop offset={0.5} stopColor="#fff" stopOpacity={0.34} />
+        <Stop offset={1} stopColor="#fff" stopOpacity={0} />
+      </LinearGradient>
+      <LinearGradient id="b" x1={25.53} y1={21.5} x2={15.04} y2={26.96} gradientUnits="userSpaceOnUse">
+        <Stop offset={0} stopColor="#fff" stopOpacity={0} />
+        <Stop offset={0.5} stopColor="#fff" stopOpacity={0.18} />
+        <Stop offset={1} stopColor="#fff" stopOpacity={0} />
+      </LinearGradient>
+    </Defs>
+    <Circle cx={16} cy={16} r={15.5} fill="url(#d)" />
+    {MARK_GROOVES.map((r, i) => <Circle key={r} cx={16} cy={16} r={r} fill="none" strokeWidth={0.25} stroke={i % 3 ? '#222221' : '#2e2e2d'} />)}
+    <Path d="M16 16 2.58 8.25A15.5 15.5 0 0 1 17.35 .56Z" fill="url(#a)" />
+    <Path d="M16 16 29.42 23.75A15.5 15.5 0 0 1 14.65 31.44Z" fill="url(#b)" />
+    <Circle cx={16} cy={16} r={15.25} fill="none" stroke="#3a3a38" strokeWidth={0.5} />
+    <Circle cx={16} cy={16} r={6.3} fill={colors.paper} />
+    <Circle cx={16} cy={16} r={4.6} fill="none" stroke="#d6d2cb" strokeWidth={0.35} />
+    <Circle cx={16} cy={16} r={1} fill="#070707" />
   </Svg>
 )
 

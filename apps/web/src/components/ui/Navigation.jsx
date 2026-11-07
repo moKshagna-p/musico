@@ -1,20 +1,47 @@
 import { motion } from 'framer-motion'
+import { useId } from 'react'
 import { Link, NavLink } from 'react-router-dom'
 
 import { useAuth } from '../../hooks/useAuth.js'
 
 const MotionSpan = motion.span
 
-export const MusicoMark = ({ className = '' }) => (
-  <svg viewBox="0 0 32 32" aria-hidden="true" className={className}>
-    <circle cx="16" cy="16" r="15.5" fill="#0b0b0b" stroke="rgba(255,255,255,0.16)" />
-    <circle cx="16" cy="16" r="12" fill="none" stroke="rgba(255,255,255,0.09)" />
-    <circle cx="16" cy="16" r="9" fill="none" stroke="rgba(255,255,255,0.09)" />
-    <path d="M5.5 11 A11.5 11.5 0 0 1 11 5.5" fill="none" stroke="rgba(255,255,255,0.4)" strokeWidth="1.4" strokeLinecap="round" />
-    <circle cx="16" cy="16" r="5.6" fill="#eeeae3" />
-    <circle cx="16" cy="16" r="1.2" fill="#0b0b0b" />
-  </svg>
-)
+// Grooves alternate two tones so the disc keeps its texture at favicon size; solid colours render the same everywhere.
+const GROOVES = [8.6, 9.15, 9.7, 10.25, 10.8, 11.35, 11.9, 12.45, 13, 13.55, 14.1, 14.65]
+
+export const MusicoMark = ({ className = '' }) => {
+  const id = useId()
+  return (
+    <svg viewBox="0 0 32 32" aria-hidden="true" className={className}>
+      <defs>
+        <radialGradient id={`${id}d`} cx="16" cy="16" r="15.5" gradientUnits="userSpaceOnUse">
+          <stop offset="0.45" stopColor="#1a1a19" />
+          <stop offset="1" stopColor="#070707" />
+        </radialGradient>
+        <linearGradient id={`${id}a`} x1="6.47" y1="10.5" x2="16.96" y2="5.04" gradientUnits="userSpaceOnUse">
+          <stop stopColor="#fff" stopOpacity="0" />
+          <stop offset="0.5" stopColor="#fff" stopOpacity="0.34" />
+          <stop offset="1" stopColor="#fff" stopOpacity="0" />
+        </linearGradient>
+        <linearGradient id={`${id}b`} x1="25.53" y1="21.5" x2="15.04" y2="26.96" gradientUnits="userSpaceOnUse">
+          <stop stopColor="#fff" stopOpacity="0" />
+          <stop offset="0.5" stopColor="#fff" stopOpacity="0.18" />
+          <stop offset="1" stopColor="#fff" stopOpacity="0" />
+        </linearGradient>
+      </defs>
+      <circle cx="16" cy="16" r="15.5" fill={`url(#${id}d)`} />
+      <g fill="none" strokeWidth="0.25">
+        {GROOVES.map((r, i) => <circle key={r} cx="16" cy="16" r={r} stroke={i % 3 ? '#222221' : '#2e2e2d'} />)}
+      </g>
+      <path d="M16 16 2.58 8.25A15.5 15.5 0 0 1 17.35 .56Z" fill={`url(#${id}a)`} />
+      <path d="M16 16 29.42 23.75A15.5 15.5 0 0 1 14.65 31.44Z" fill={`url(#${id}b)`} />
+      <circle cx="16" cy="16" r="15.25" fill="none" stroke="#3a3a38" strokeWidth="0.5" />
+      <circle cx="16" cy="16" r="6.3" fill="#eeeae3" />
+      <circle cx="16" cy="16" r="4.6" fill="none" stroke="#d6d2cb" strokeWidth="0.35" />
+      <circle cx="16" cy="16" r="1" fill="#070707" />
+    </svg>
+  )
+}
 
 const DockLink = ({ to, end, children }) => (
   <NavLink
