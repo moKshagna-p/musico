@@ -18,7 +18,13 @@ export const checkPr = ({ title = '', body = '' }) => {
   if (/\.$/.test(title)) errors.push('Title must not end with a period.')
   if (/^[^:]+: [A-Z][a-z]/.test(title)) errors.push('Start the subject in lowercase.')
 
-  const text = body.replace(/<!--[\s\S]*?-->/g, '').replace(/\r\n/g, '\n').trim()
+  // Repeat until nothing changes: stripping one comment can join the pieces of another.
+  let text = body.replace(/\r\n/g, '\n')
+  for (let previous; previous !== text; ) {
+    previous = text
+    text = text.replace(/<!--[\s\S]*?-->/g, '')
+  }
+  text = text.trim()
   if (text.length > MAX_BODY) errors.push(`Description is ${text.length} characters; keep it to ${MAX_BODY}.`)
 
   for (const name of SECTIONS) {
