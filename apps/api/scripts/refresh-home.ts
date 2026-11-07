@@ -1,3 +1,5 @@
+export {}
+
 process.env.HOMEPAGE_REFRESH_MINIMAL ??= 'false'
 
 const { refreshStoredHomeAlbums, refreshStoredTrendingAlbums } = await import('../src/services/trending')

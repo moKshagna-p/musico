@@ -78,6 +78,20 @@ jobs:
         if: steps.filter.outputs.code != 'false'
         run: bun run lint
 
+      # The release workflow runs these migrations against production, so a schema change without one ships broken.
+      - name: Check migrations match the schema
+        if: steps.filter.outputs.code != 'false'
+        working-directory: apps/api
+        env:
+          DATABASE_URL: postgres://unused@localhost/unused
+        run: |
+          bunx drizzle-kit generate --config=drizzle.config.ts
+          if [ -n "$(git status --porcelain drizzle)" ]; then
+            git status --porcelain drizzle
+            echo '::error::src/core/schema.ts changed without a migration. Run `bun run --cwd apps/api db:generate` and commit the result.'
+            exit 1
+          fi
+
       - name: Build
         if: steps.filter.outputs.code != 'false'
         run: bun run build

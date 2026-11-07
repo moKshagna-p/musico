@@ -12,12 +12,9 @@ import { authSchema } from './core/schema'
 // serve health routes even if Better Auth secrets are missing.
 // Move to eager init when startup profiling shows a bottleneck.
 
-let _auth: ReturnType<typeof betterAuth> | null = null
-
-const initAuth = () => {
-  if (_auth) return _auth
+const createAuth = () => {
   const isHttpsAuthUrl = env.BETTER_AUTH_URL.startsWith('https://')
-  _auth = betterAuth({
+  return betterAuth({
     database: drizzleAdapter(db, {
       provider: 'pg',
       schema: authSchema,
@@ -53,10 +50,12 @@ const initAuth = () => {
       joins: true,
     },
   })
-  return _auth
 }
 
-export const auth = new Proxy({} as ReturnType<typeof betterAuth>, {
+let _auth: ReturnType<typeof createAuth> | null = null
+const initAuth = () => (_auth ??= createAuth())
+
+export const auth = new Proxy({} as ReturnType<typeof createAuth>, {
   get(_, key: string | symbol) {
     return Reflect.get(initAuth(), key)
   },

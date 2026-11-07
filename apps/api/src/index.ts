@@ -75,7 +75,7 @@ export const createApp = (options?: ConstructorParameters<typeof Elysia>[0]) => 
     log('error', 'request.failed', {
       requestId,
       code,
-      message: String(error?.message ?? 'Unknown error'),
+      message: error instanceof Error ? error.message : 'Unknown error',
       method: request.method,
       path: requestPath,
       status: Number(set.status ?? 500),

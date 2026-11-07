@@ -73,8 +73,8 @@ The workspace is defined for `apps/*`: `api`, `web` and `mobile`.
 4. **State Management**: Use React Context for global state (refer to existing files in `apps/web/src/context`).
 
 ### Backend Conventions (`apps/api`)
-1. **Strict TypeScript**: Enforce type safety in the backend. Use Drizzle's generated types or Elysia's schema validation (`t` from `elysia`) where applicable.
-2. **Database Changes**: When updating database models in `apps/api/drizzle/schema.ts`, ensure Drizzle migrations are correctly planned and generated. Do not manually edit migration SQL files.
+1. **Strict TypeScript**: Enforce type safety in the backend. `bun run lint` type-checks it in CI (test files excluded). Use Drizzle's generated types or Elysia's schema validation (`t` from `elysia`) where applicable.
+2. **Database Changes**: When updating database models in `apps/api/src/core/schema.ts`, generate the migration with `bun run --cwd apps/api db:generate` and commit it. CI fails a schema change that has no migration. Do not manually edit migration SQL files.
 3. **Error Handling**: Use consistent error handling and standard HTTP status codes. Avoid swallowing errors; ensure they are logged and appropriately returned to the frontend.
 
 ## General Guidelines

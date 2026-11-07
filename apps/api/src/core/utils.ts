@@ -259,7 +259,7 @@ export const getAuthUser = async (request: Request) => {
   return session?.user ?? null
 }
 
-export const ensureAuthenticated = async (request: Request, set: { status?: number }) => {
+export const ensureAuthenticated = async (request: Request, set: { status?: number | string }) => {
   const user = await getAuthUser(request)
   if (!user?.id) {
     set.status = 401
@@ -284,7 +284,7 @@ export const isAdminIdentity = async (identity: { id?: string | null }) => {
   }
 }
 
-export const ensureAdmin = async (request: Request, set: { status?: number }) => {
+export const ensureAdmin = async (request: Request, set: { status?: number | string }) => {
   const authUser = await ensureAuthenticated(request, set)
   if (!authUser) return null
 
@@ -312,7 +312,7 @@ const secureSecretEquals = async (provided: string, expected: string) => {
   return difference === 0
 }
 
-export const authorizeCron = async (request: Request, set: { status?: number }) => {
+export const authorizeCron = async (request: Request, set: { status?: number | string }) => {
   if (request.method !== 'POST') {
     set.status = 405
     return { error: 'Method not allowed.' }
