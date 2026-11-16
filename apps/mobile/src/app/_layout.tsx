@@ -51,7 +51,7 @@ export default function RootLayout() {
               <StatusBar style="light" />
               <View style={{ flex: 1 }}>
                 {/* Pages fade through like the web's, so the flying cover is the only thing that moves across them. */}
-                <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.canvas }, animation: 'fade', animationDuration: 350 }} />
+                <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.canvas }, animation: 'fade', animationDuration: 250 }} />
                 <Dock />
                 <MorphLayer />
               </View>

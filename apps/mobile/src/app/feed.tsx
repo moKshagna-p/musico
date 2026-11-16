@@ -124,7 +124,13 @@ const EmptyFeed = () => (
 const RefreshButton = ({ loading, onPress }: { loading: boolean; onPress: () => void }) => {
   const turn = useSharedValue(0)
   useEffect(() => {
-    turn.value = loading ? withRepeat(withTiming(360, { duration: 900, easing: Easing.linear }), -1, false) : withTiming(0)
+    // Stopping finishes the turn forward; easing back to 0 would spin the icon backwards.
+    if (!loading) {
+      if (turn.value % 360) turn.value = withTiming(360)
+      return
+    }
+    turn.value = 0
+    turn.value = withRepeat(withTiming(360, { duration: 900, easing: Easing.linear }), -1, false)
   }, [loading, turn])
   const spin = useAnimatedStyle(() => ({ transform: [{ rotate: `${turn.value}deg` }] }))
   return (
