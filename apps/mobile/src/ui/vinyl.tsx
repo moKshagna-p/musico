@@ -20,7 +20,7 @@ import { colors, easeOut } from './theme'
 
 const isCdArt = (url?: string | null) => /\/cdart\//.test(url ?? '')
 
-// Grooves + sheen, drawn once in a 100x100 box. The sheen is the web's conic highlight, as two still wedges:
+// Grooves + sheen, drawn once in a 100x100 box. The sheen is the web's conic highlight, as two still soft beams:
 // only the label turns, so the light stays put like a real record under a lamp.
 const GROOVES = Array.from({ length: 22 }, (_, index) => 18 + index * 1.45)
 const wedge = (from: number, to: number) => {
@@ -30,6 +30,16 @@ const wedge = (from: number, to: number) => {
   }
   return `M50 50 L${point(from)} A50 50 0 0 1 ${point(to)} Z`
 }
+// SVG has no conic gradient, so each highlight is thin overlapping slices whose opacity eases off from its centre
+// (cos²), blending into the grooves instead of ending in the hard edges of one flat wedge.
+const STEP = 1
+const sheen = (center: number, spread: number, peak: number) =>
+  Array.from({ length: Math.round((spread * 2) / STEP) + 1 }, (_, index) => {
+    const offset = -spread + index * STEP
+    const falloff = Math.cos((offset / spread) * (Math.PI / 2)) ** 2
+    return { d: wedge(center + offset - STEP * 0.52, center + offset + STEP * 0.52), opacity: peak * falloff }
+  })
+const SHEEN = [...sheen(73, 22, 0.07), ...sheen(254, 24, 0.05)]
 
 // `color` presses the record in another vinyl (the footer's oxblood); grooves are drawn lighter over it either way.
 export const VinylDisc = ({ size, color = colors.vinyl }: { size: number; color?: string }) => (
@@ -38,8 +48,7 @@ export const VinylDisc = ({ size, color = colors.vinyl }: { size: number; color?
     {GROOVES.map((r) => (
       <Circle key={r} cx={50} cy={50} r={r} fill="none" stroke="rgba(255,255,255,0.045)" strokeWidth={0.55} />
     ))}
-    <Path d={wedge(66, 80)} fill="rgba(255,255,255,0.07)" />
-    <Path d={wedge(246, 262)} fill="rgba(255,255,255,0.05)" />
+    {SHEEN.map(({ d, opacity }) => <Path key={d} d={d} fill="#fff" fillOpacity={opacity} />)}
     <Circle cx={50} cy={50} r={49.6} fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth={0.6} />
   </Svg>
 )

@@ -125,8 +125,10 @@ export const ListCard = ({ list, index = 0 }: { list: { id: string; name: string
   const spread = useSharedValue(0)
   const client = useQueryClient()
   // Hand the list page what the card already has (name, count, first covers) so it opens filled while the rest loads.
+  // Stamped as updated at time 0 so it is already stale: with the app's 5-minute staleTime, a fresh stamp kept the page
+  // from fetching the rest of the list at all.
   const open = () => {
-    if (!client.getQueryData(['public-list', list.id])) client.setQueryData(['public-list', list.id], { id: list.id, name: list.name, albumCount: count, albums })
+    if (!client.getQueryData(['public-list', list.id])) client.setQueryData(['public-list', list.id], { id: list.id, name: list.name, albumCount: count, albums }, { updatedAt: 0 })
     router.push({ pathname: '/list/[id]', params: { id: list.id } })
   }
   return (
