@@ -11,7 +11,9 @@ export const WIDE_GUTTER = 'w-full px-[max(1rem,4vw)]'
 const prefersStill = () =>
   window.matchMedia('(prefers-reduced-motion: reduce)').matches || navigator.connection?.saveData === true
 
-// Apple's motion heroes are HLS: Safari plays them natively, other browsers through hls.js (light build: no audio, captions or DRM needed), loaded only when needed.
+// Apple's motion heroes are HLS, played through hls.js (light build: no audio, captions or DRM needed), loaded only when needed.
+// Only browsers without MediaSource (iPhone Safari) use their native HLS player. Chrome now answers canPlayType for HLS
+// too, but its native player rejects these streams (MEDIA_ERR_SRC_NOT_SUPPORTED), so that answer can't pick the path.
 const HeroVideo = ({ src, className }) => {
   const videoRef = useRef(null)
   const [playingSrc, setPlayingSrc] = useState(null)
@@ -20,7 +22,7 @@ const HeroVideo = ({ src, className }) => {
     const video = videoRef.current
     // React doesn't reflect `muted` to the DOM, and browsers only autoplay muted video.
     video.muted = true
-    if (video.canPlayType('application/vnd.apple.mpegurl')) {
+    if (!window.MediaSource && video.canPlayType('application/vnd.apple.mpegurl')) {
       video.src = src
       return () => video.removeAttribute('src')
     }

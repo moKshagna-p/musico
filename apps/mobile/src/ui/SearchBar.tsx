@@ -116,9 +116,9 @@ export const SearchBar = ({ value, onChangeText, onSubmit, scope, placeholder = 
           onFocus={() => {
             setFocused(true)
             glow.value = 1
-            // Lift the bar up under the nav so its suggestions have the room above the keyboard.
+            // Lift the bar to the top so its suggestions have the room above the keyboard.
             input.current?.measureInWindow((_x, y) => {
-              const target = insets.top + 76
+              const target = insets.top + 16
               if (y > target + 8) scrollTo(scrollY.value + y - target)
             })
           }}

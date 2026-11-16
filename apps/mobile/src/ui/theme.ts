@@ -36,6 +36,6 @@ export const spring = { damping: 18, stiffness: 220, mass: 0.7 }
 
 export const GUTTER = 16
 // Screens pad their bottom by this so the last row clears the floating dock.
-export const DOCK_SPACE = 110
-// Non-bleed pages start below the floating nav (the web's pt-28).
-export const NAV_SPACE = 96
+export const DOCK_SPACE = 96
+// Non-bleed pages start this far below the status bar.
+export const NAV_SPACE = 24

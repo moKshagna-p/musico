@@ -6,7 +6,7 @@ import Animated, { runOnJS, useAnimatedScrollHandler, useSharedValue } from 'rea
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import { dockHidden, ScrollContext, showDock } from './scroll'
-import { colors, GUTTER, NAV_SPACE } from './theme'
+import { colors, DOCK_SPACE, GUTTER, NAV_SPACE } from './theme'
 
 type ScreenProps = {
   children: ReactNode
@@ -61,13 +61,13 @@ export const Screen = ({ children, bleed = false, refreshing, onRefresh, onEndRe
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="interactive"
         style={{ flex: 1, backgroundColor: colors.canvas }}
-        contentContainerStyle={{ paddingBottom: insets.bottom + 48 }}
-        refreshControl={onRefresh ? <RefreshControl tintColor={colors.paper} progressViewOffset={insets.top + 60} refreshing={Boolean(refreshing)} onRefresh={onRefresh} /> : undefined}
+        contentContainerStyle={{ paddingBottom: insets.bottom + DOCK_SPACE }}
+        refreshControl={onRefresh ? <RefreshControl tintColor={colors.paper} progressViewOffset={insets.top + 8} refreshing={Boolean(refreshing)} onRefresh={onRefresh} /> : undefined}
       >
         <Animated.View style={bleed ? undefined : { paddingTop: insets.top + NAV_SPACE, paddingHorizontal: GUTTER, paddingBottom: 32 }}>{children}</Animated.View>
       </KeyboardAwareScrollView>
-      {/* Content scrolls under the clock and the floating dock; this keeps both readable over it. */}
-      <LinearGradient pointerEvents="none" colors={['rgba(0,0,0,0.85)', 'transparent']} style={{ position: 'absolute', top: 0, left: 0, right: 0, height: insets.top + 56 }} />
+      {/* Content scrolls under the clock; this keeps it readable over the page. */}
+      <LinearGradient pointerEvents="none" colors={['rgba(0,0,0,0.85)', 'transparent']} style={{ position: 'absolute', top: 0, left: 0, right: 0, height: insets.top + 24 }} />
       </View>
     </ScrollContext.Provider>
   )

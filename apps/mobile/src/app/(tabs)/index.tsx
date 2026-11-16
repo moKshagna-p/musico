@@ -85,11 +85,7 @@ const HeroDeck = ({ albums, loading }: { albums: Album[]; loading: boolean }) =>
       >
         {albums.map((album, index) => <HeroPage key={album.id} album={album} rank={index + 1} width={width} height={tall} active={index === page} />)}
       </ScrollView>
-      <View pointerEvents="none" style={{ position: 'absolute', bottom: 18, left: 0, right: 0, flexDirection: 'row', justifyContent: 'center', gap: 6 }}>
-        {albums.map((album, index) => (
-          <View key={album.id} style={{ height: 6, width: index === page ? 18 : 6, borderRadius: 3, backgroundColor: index === page ? colors.paper : 'rgba(238,234,227,0.3)' }} />
-        ))}
-      </View>
+      <Dots count={albums.length} current={page} style={{ position: 'absolute', bottom: 18, left: 0, right: 0 }} />
     </View>
   )
 }
@@ -124,20 +120,27 @@ const HeroPage = ({ album, rank, width, height, active }: { album: Album; rank: 
   )
 }
 
-// The rest of the top 20 as tappable rows, four to a column, paged sideways so the list never runs down the page.
+// The rest of the top 20 as tappable rows, four to a page, paged sideways a full screen at a time with dots, so the
+// list never runs down the page and no page is left half empty or showing a sliver of the next.
 const ChartPages = ({ albums, loading }: { albums: Album[]; loading: boolean }) => {
   const { width } = useWindowDimensions()
   const { ratings } = useMe()
-  const column = width - GUTTER * 2 - 28
-  const items = loading ? (Array.from({ length: ROWS_PER_PAGE * 2 }) as Album[]) : albums
+  const [current, setCurrent] = useState(0)
+  const items = loading ? (Array.from({ length: ROWS_PER_PAGE }) as Album[]) : albums
   if (!items.length) return null
   const pages = Array.from({ length: Math.ceil(items.length / ROWS_PER_PAGE) }, (_, page) => items.slice(page * ROWS_PER_PAGE, (page + 1) * ROWS_PER_PAGE))
   return (
     <View style={{ marginTop: 28 }}>
       <SectionTitle title={`Rounding out the top ${CHART_END}`} />
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} snapToInterval={column + 12} decelerationRate="fast" contentContainerStyle={{ paddingHorizontal: GUTTER, gap: 12, paddingTop: 8 }}>
+      <ScrollView
+        horizontal
+        pagingEnabled
+        showsHorizontalScrollIndicator={false}
+        onMomentumScrollEnd={(event) => setCurrent(Math.round(event.nativeEvent.contentOffset.x / width))}
+        contentContainerStyle={{ paddingTop: 8, alignItems: 'flex-start' }}
+      >
         {pages.map((rows, page) => (
-          <View key={page} style={{ width: column }}>
+          <View key={page} style={{ width, paddingHorizontal: GUTTER }}>
             {rows.map((album, row) => {
               const rank = FEATURED + page * ROWS_PER_PAGE + row + 1
               const line = row < rows.length - 1 && styles.rowLine
@@ -158,9 +161,18 @@ const ChartPages = ({ albums, loading }: { albums: Album[]; loading: boolean }) 
           </View>
         ))}
       </ScrollView>
+      {pages.length > 1 ? <Dots count={pages.length} current={current} style={{ marginTop: 10 }} /> : null}
     </View>
   )
 }
+
+const Dots = ({ count, current, style }: { count: number; current: number; style?: object }) => (
+  <View pointerEvents="none" style={[{ flexDirection: 'row', justifyContent: 'center', gap: 6 }, style]}>
+    {Array.from({ length: count }, (_, index) => (
+      <View key={index} style={{ height: 6, width: index === current ? 18 : 6, borderRadius: 3, backgroundColor: index === current ? colors.paper : 'rgba(238,234,227,0.3)' }} />
+    ))}
+  </View>
+)
 
 const ChartRowSkeleton = () => (
   <View style={styles.row}>
