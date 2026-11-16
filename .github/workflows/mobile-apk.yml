@@ -7,7 +7,9 @@ on:
     branches: [main]
     paths:
       - 'apps/mobile/**'
-      - 'apps/web/src/**'
+      # The web files the app imports (grep "web/src/" apps/mobile/src).
+      - 'apps/web/src/services/**'
+      - 'apps/web/src/utils/**'
       - 'bun.lock'
   workflow_dispatch:
 
@@ -35,10 +37,24 @@ jobs:
           distribution: temurin
           java-version: 17
 
+      # Caches the Gradle distribution, dependencies and build cache. PR runs write too, so a PR's later pushes reuse
+      # its first build (the default only writes from main, which never runs this workflow).
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v6
+        with:
+          cache-read-only: false
+
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
         with:
           bun-version: 1.3.10
+
+      - name: Cache Bun packages
+        uses: actions/cache@v6
+        with:
+          path: ~/.bun/install/cache
+          key: bun-${{ runner.os }}-${{ hashFiles('bun.lock') }}
+          restore-keys: bun-${{ runner.os }}-
 
       - name: Install dependencies
         run: bun install --frozen-lockfile
@@ -47,7 +63,7 @@ jobs:
         working-directory: apps/mobile
         run: |
           bunx expo prebuild --platform android --no-install
-          cd android && ./gradlew assembleRelease -PreactNativeArchitectures=arm64-v8a --no-daemon
+          cd android && ./gradlew assembleRelease -PreactNativeArchitectures=arm64-v8a --build-cache
 
       - name: Upload APK
         uses: actions/upload-artifact@v7
