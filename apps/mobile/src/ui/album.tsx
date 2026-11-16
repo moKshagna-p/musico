@@ -231,13 +231,19 @@ export const Billboard = ({ artist, cover, children }: { artist?: string; cover?
     <View>
       <View style={[StyleSheet.absoluteFill, { overflow: 'hidden' }]} pointerEvents="none">
         <Animated.View style={[StyleSheet.absoluteFill, parallax]}>
-          {/* RN can't mask the photo to transparent like the web, so the blur steps back once the photo is in. */}
-          {cover ? <Image source={cover} blurRadius={40} style={[StyleSheet.absoluteFill, { opacity: loaded ? 0 : 0.5, transform: [{ scale: 1.25 }] }]} transition={700} /> : null}
+          {/* RN can't mask the photo to transparent like the web, so the blur steps back once the photo is in.
+              The photo and its fade to black come in together: shown before the photo loads (or when it never does),
+              the fade ends in a hard black edge at `art` with the blur still showing below it. */}
+          {cover ? (
+            <Animated.View style={[StyleSheet.absoluteFill, { opacity: loaded === photo && photo ? 0 : 0.5 }, FADE]}>
+              <Image source={cover} blurRadius={40} style={[StyleSheet.absoluteFill, { transform: [{ scale: 1.25 }] }]} transition={700} />
+            </Animated.View>
+          ) : null}
           {photo ? (
-            <View style={{ position: 'absolute', top: 0, left: 0, right: 0, height: art }}>
-              <Image source={photo} style={{ width: '100%', height: '100%' }} contentPosition={{ top: '25%' }} contentFit="cover" transition={700} onLoad={() => setLoaded(photo)} />
+            <Animated.View style={[{ position: 'absolute', top: 0, left: 0, right: 0, height: art, opacity: loaded === photo ? 1 : 0 }, FADE]}>
+              <Image source={photo} style={{ width: '100%', height: '100%' }} contentPosition={{ top: '25%' }} contentFit="cover" onLoad={() => setLoaded(photo)} />
               <LinearGradient colors={['transparent', 'rgba(0,0,0,0.6)', '#000']} locations={[0.55, 0.8, 1]} style={StyleSheet.absoluteFill} />
-            </View>
+            </Animated.View>
           ) : null}
         </Animated.View>
         <LinearGradient colors={['rgba(0,0,0,0.7)', 'transparent']} style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 160 }} />
@@ -247,6 +253,9 @@ export const Billboard = ({ artist, cover, children }: { artist?: string; cover?
     </View>
   )
 }
+
+// Reanimated CSS transition: the hero's layers cross-fade whenever their opacity changes.
+const FADE = { transitionProperty: 'opacity', transitionDuration: 700 } as const
 
 const styles = StyleSheet.create({
   listCard: { borderRadius: 24, borderWidth: 1, borderColor: colors.line, backgroundColor: 'rgba(255,255,255,0.02)', padding: 20, overflow: 'hidden' },

@@ -44,9 +44,13 @@ export const Dock = () => {
   const spin = useSharedValue(0)
   const markStyle = useAnimatedStyle(() => ({ transform: [{ rotate: `${spin.value}deg` }] }))
 
+  // In a stack, navigate() always pushes a fresh copy of the page: it remounts, replays its entrance and the
+  // history grows with every tap. Home stays at the root, so from Home push; from anywhere else go back to the
+  // page if it's already open (still mounted, as you left it), or swap it in for the current one.
   const go = (href: Href) => {
     void Haptics.selectionAsync()
-    router.navigate(href)
+    if (pathname === '/') router.navigate(href)
+    else router.dismissTo(href)
   }
 
   return (
