@@ -15,7 +15,7 @@ export default function PublicList() {
   const tile = (width - GUTTER * 2 - 20) / 2
   const list = useQuery({ queryKey: ['public-list', id], queryFn: () => fetchPublicList(id), enabled: Boolean(id), retry: false })
 
-  if (list.error || (!list.isLoading && !list.data)) {
+  if (!list.data && (list.error || !list.isLoading)) {
     return (
       <Screen>
         <View style={{ alignItems: 'center', paddingVertical: 64 }}>
@@ -26,13 +26,16 @@ export default function PublicList() {
       </Screen>
     )
   }
-  const { name = '', owner, albums = [] } = list.data ?? {}
+  const { name = '', owner, albums = [], albumCount } = list.data ?? {}
+  // A seeded card shows its first covers at once; the rest of the albums arrive with the fetch.
+  const pending = list.isFetching ? Math.max(0, (albumCount ?? 0) - albums.length) : 0
+  const total = pending ? albumCount : albums.length
 
   return (
     <Screen>
       <Animated.View entering={FadeInDown.duration(500).easing(easeOut)} style={{ paddingTop: 16 }}>
         <Muted>
-          {list.isLoading ? 'Loading list' : `${albums.length} ${albums.length === 1 ? 'album' : 'albums'}`}
+          {!list.data ? 'Loading list' : `${total} ${total === 1 ? 'album' : 'albums'}`}
           {owner?.username ? ' · by ' : ''}
           {owner?.username ? <Muted style={{ color: colors.paper }} onPress={() => router.push({ pathname: '/user/[username]', params: { username: owner.username } })}>@{owner.username}</Muted> : null}
         </Muted>
@@ -40,13 +43,14 @@ export default function PublicList() {
         {/* The web's public link, so a list can be sent to someone without the app. */}
         {name ? <Pill label="Share list" icon="share" onPress={() => Share.share({ message: `${name} on Musico: https://musico-web.vercel.app/lists/${id}` })} style={{ marginTop: 24, alignSelf: 'flex-start' }} /> : null}
       </Animated.View>
-      {list.isLoading ? (
+      {!list.data ? (
         <View style={{ marginTop: 40, flexDirection: 'row', flexWrap: 'wrap', columnGap: 20, rowGap: 40 }}>
           {Array.from({ length: 4 }, (_, index) => <AlbumCardSkeleton key={index} width={tile} />)}
         </View>
       ) : albums.length ? (
         <View style={{ marginTop: 40, flexDirection: 'row', flexWrap: 'wrap', columnGap: 20, rowGap: 40 }}>
           {albums.map((album: any, index: number) => <AlbumTile key={album.id} album={album} width={tile} index={index} />)}
+          {Array.from({ length: pending }, (_, index) => <AlbumCardSkeleton key={`pending-${index}`} width={tile} />)}
         </View>
       ) : (
         <View style={{ marginTop: 40 }}><EmptyNote>This list is empty for now.</EmptyNote></View>

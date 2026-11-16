@@ -1,18 +1,18 @@
 import { Feather } from '@expo/vector-icons'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Image } from 'expo-image'
 import { LinearGradient } from 'expo-linear-gradient'
 import { router } from 'expo-router'
 import { memo, useId, useState, type ReactNode } from 'react'
-import { Dimensions, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native'
+import { Dimensions, StyleSheet, useWindowDimensions, View } from 'react-native'
 import Animated, { Extrapolation, FadeInDown, interpolate, useAnimatedStyle, useSharedValue, type SharedValue } from 'react-native-reanimated'
-import Svg, { Text as SvgText } from 'react-native-svg'
 
 import { getArtistImage, type Album } from '@/lib/api'
-import { Display, EmptyNote, Muted, Press, Skeleton, StarValue, T } from './kit'
+import { Display, Muted, Press, Skeleton, StarValue, T } from './kit'
 import { takeOff } from './morph'
 import { usePageScroll } from './scroll'
 import { colors, display, easeOut, fonts, GUTTER } from './theme'
+import { HeroVideo } from './HeroVideo'
 import { VinylSleeve } from './vinyl'
 
 // Opening an album hands the card's data along, so the page shows name and cover at once while the rest loads,
@@ -71,64 +71,6 @@ export const AlbumCardSkeleton = ({ width }: { width: number }) => (
   </View>
 )
 
-// The web's hollow chart numeral (-webkit-text-stroke). RN text can't stroke, so it's drawn as SVG text.
-const RankNumeral = ({ value, width }: { value: number; width: number }) => {
-  // text-[60cqw] (40cqw past 9) of the item, with leading-[0.8] and tracking-[-0.09em].
-  const item = width / 0.3
-  const size = item * (value < 10 ? 0.6 : 0.4)
-  return (
-    <Svg width={width} height={size * 0.8} pointerEvents="none">
-      <SvgText x={width} y={size * 0.74} textAnchor="end" fontFamily={fonts.black} fontSize={size} letterSpacing={-size * 0.09} fill="#000" stroke="rgba(238,234,227,0.4)" strokeWidth={2}>
-        {value}
-      </SvgText>
-    </Svg>
-  )
-}
-
-// A horizontal shelf, exactly two items across on phones like the web (--n:2): equal gutters, snapping by item.
-// Ranked rows set the numeral in the first 30% of each item and the card from -3%.
-export const AlbumRow = ({ title, note, albums, loading, error, ranked = false }: { title: string; note?: string; albums: Album[]; loading?: boolean; error?: string | null; ranked?: boolean }) => {
-  const { width: screen } = useWindowDimensions()
-  const gap = 16
-  const item = (screen - GUTTER * 2 - gap) / 2
-  const card = ranked ? item * 0.73 : item
-  const data = loading ? (Array.from({ length: 4 }) as Album[]) : albums
-  return (
-    <View>
-      <View style={{ paddingHorizontal: GUTTER, marginBottom: 8 }}>
-        <Display size={24}>{title}</Display>
-        {note ? <Muted style={{ marginTop: 8 }}>{note}</Muted> : null}
-      </View>
-      {error ? (
-        <View style={{ paddingHorizontal: GUTTER, paddingTop: 24 }}><EmptyNote dashed={false}>{error}</EmptyNote></View>
-      ) : !loading && !albums.length ? (
-        <View style={{ paddingHorizontal: GUTTER, paddingTop: 24 }}><EmptyNote>Nothing here yet. Check back after the next chart update.</EmptyNote></View>
-      ) : (
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          snapToInterval={item + gap}
-          decelerationRate="fast"
-          // Top padding leaves room for the record that rises out of each sleeve on press.
-          contentContainerStyle={{ paddingHorizontal: GUTTER, paddingTop: 48, paddingBottom: 16, gap }}
-        >
-          {data.map((album, index) => (
-            <View key={`${album?.id ?? 'skeleton'}-${index}`} style={{ width: item, flexDirection: 'row', alignItems: 'flex-start' }}>
-              {ranked ? (
-                // Skeletons leave the numeral's column empty so the cards land where they will sit.
-                <View style={{ width: item * 0.3 }}>{loading ? null : <RankNumeral value={index + 1} width={item * 0.3} />}</View>
-              ) : null}
-              <View style={ranked ? { marginLeft: -item * 0.03 } : undefined}>
-                {loading ? <AlbumCardSkeleton width={card} /> : <AlbumCard album={album} width={card} index={index} />}
-              </View>
-            </View>
-          ))}
-        </ScrollView>
-      )}
-    </View>
-  )
-}
-
 // Two-up grid for search results and Discover (gap-x-5 gap-y-10 on the web).
 export const AlbumGrid = ({ albums, loading, inset = true }: { albums: Album[]; loading?: boolean; inset?: boolean }) => {
   const { width: screen } = useWindowDimensions()
@@ -181,9 +123,17 @@ export const ListCard = ({ list, index = 0 }: { list: { id: string; name: string
   const shown = albums.slice(0, 4)
   const count = list.albumCount ?? albums.length
   const spread = useSharedValue(0)
+  const client = useQueryClient()
+  // Hand the list page what the card already has (name, count, first covers) so it opens filled while the rest loads.
+  // Stamped as updated at time 0 so it is already stale: with the app's 5-minute staleTime, a fresh stamp kept the page
+  // from fetching the rest of the list at all.
+  const open = () => {
+    if (!client.getQueryData(['public-list', list.id])) client.setQueryData(['public-list', list.id], { id: list.id, name: list.name, albumCount: count, albums }, { updatedAt: 0 })
+    router.push({ pathname: '/list/[id]', params: { id: list.id } })
+  }
   return (
     <Animated.View entering={enter(index)}>
-      <Press onPress={() => router.push({ pathname: '/list/[id]', params: { id: list.id } })} pressed={spread} style={styles.listCard} scaleTo={0.98}>
+      <Press onPress={open} pressed={spread} style={styles.listCard} scaleTo={0.98}>
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: 16 }}>
           <View style={{ flex: 1 }}>
             <Display size={24} numberOfLines={1}>{list.name}</Display>
@@ -220,6 +170,8 @@ export const Billboard = ({ artist, cover, children }: { artist?: string; cover?
     retry: false,
   })
   const photo = artistArt?.square?.image ?? artistArt?.image
+  // The motion hero for the same cut as the photo: the square one on phones, like the web.
+  const video = artistArt?.square ? artistArt.square.video : artistArt?.video
   const parallax = useAnimatedStyle(() => ({
     transform: [
       { translateY: scrollY.value < 0 ? scrollY.value : scrollY.value * 0.5 },
@@ -242,6 +194,7 @@ export const Billboard = ({ artist, cover, children }: { artist?: string; cover?
           {photo ? (
             <Animated.View style={[{ position: 'absolute', top: 0, left: 0, right: 0, height: art, opacity: loaded === photo ? 1 : 0 }, FADE]}>
               <Image source={photo} style={{ width: '100%', height: '100%' }} contentPosition={{ top: '25%' }} contentFit="cover" onLoad={() => setLoaded(photo)} />
+              <HeroVideo key={video} src={video} />
               <LinearGradient colors={['transparent', 'rgba(0,0,0,0.6)', '#000']} locations={[0.55, 0.8, 1]} style={StyleSheet.absoluteFill} />
             </Animated.View>
           ) : null}

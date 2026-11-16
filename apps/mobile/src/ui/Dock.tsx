@@ -2,14 +2,15 @@ import { Feather } from '@expo/vector-icons'
 import { BlurView } from 'expo-blur'
 import * as Haptics from 'expo-haptics'
 import { router, usePathname, type Href } from 'expo-router'
-import { useState } from 'react'
-import { Platform, Pressable, StyleSheet, View, type LayoutRectangle } from 'react-native'
+import { useEffect, useState } from 'react'
+import { Keyboard, Platform, Pressable, StyleSheet, View, type LayoutRectangle } from 'react-native'
 import Animated, { FadeIn, FadeOut, LinearTransition, useAnimatedStyle, useSharedValue, withSequence, withSpring, withTiming } from 'react-native-reanimated'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import { useAuth } from '@/lib/state'
 import { T } from './kit'
-import { colors, fonts } from './theme'
+import { dockHidden, showDock } from './scroll'
+import { colors, easeOut, fonts } from './theme'
 import { MusicoMark } from './vinyl'
 
 type Item = { label: string; href: Href; match: (path: string) => boolean }
@@ -27,7 +28,7 @@ const SPRING = { stiffness: 420, damping: 34 }
 // pushed above them it would push another copy of the tabs, so it pops back down to them instead.
 export const navigateTo = (href: Href, fromTab: boolean) => (fromTab || !TABS.includes(String(href)) ? router.navigate(href) : router.dismissTo(href))
 
-// The web's floating nav: a blurred pill pinned to the top with the brand record and a highlight that springs
+// The web's floating nav, moved to the bottom for thumbs: a blurred pill with the brand record and a highlight that springs
 // between links (layoutId="dock-active" there). Rendered once above every screen, like the site's header.
 export const Dock = () => {
   const insets = useSafeAreaInsets()
@@ -45,6 +46,26 @@ export const Dock = () => {
       : { opacity: withTiming(0, { duration: 150 }) },
   )
 
+  // Slides down off the bottom edge when the page asks it to (scroll.ts) and while the keyboard is up, so it never
+  // covers a field; every new page brings it back.
+  useEffect(showDock, [pathname])
+  const typing = useSharedValue(0)
+  useEffect(() => {
+    const shown = Keyboard.addListener('keyboardDidShow', () => (typing.value = 1))
+    const hidden = Keyboard.addListener('keyboardDidHide', () => (typing.value = 0))
+    return () => {
+      shown.remove()
+      hidden.remove()
+    }
+  }, [typing])
+  const slide = useAnimatedStyle(() => {
+    const away = dockHidden.value || typing.value
+    return {
+      opacity: withTiming(away ? 0 : 1, { duration: 300 }),
+      transform: [{ translateY: withTiming(away ? insets.bottom + 90 : 0, { duration: 350, easing: easeOut }) }],
+    }
+  })
+
   // The mark turns 200° on press, as it does on hover on the web.
   const spin = useSharedValue(0)
   const markStyle = useAnimatedStyle(() => ({ transform: [{ rotate: `${spin.value}deg` }] }))
@@ -55,7 +76,7 @@ export const Dock = () => {
   }
 
   return (
-    <View pointerEvents="box-none" style={[styles.wrap, { top: insets.top + 10 }]}>
+    <Animated.View pointerEvents="box-none" style={[styles.wrap, { bottom: insets.bottom + 10 }, slide]}>
       <Animated.View layout={LinearTransition.springify().damping(22)} style={styles.shadow}>
         {/* Real blur on iOS. Android blur needs a blurTarget per screen, so there the glass is a denser fill to stay legible. */}
         <BlurView intensity={40} tint="dark" style={styles.dock}>
@@ -103,13 +124,13 @@ export const Dock = () => {
           </View>
         </BlurView>
       </Animated.View>
-    </View>
+    </Animated.View>
   )
 }
 
 const styles = StyleSheet.create({
   wrap: { position: 'absolute', left: 12, right: 12, alignItems: 'center' },
-  shadow: { borderRadius: 999, shadowColor: '#000', shadowOpacity: 0.9, shadowRadius: 30, shadowOffset: { width: 0, height: 10 }, elevation: 16 },
+  shadow: { borderRadius: 999, shadowColor: '#000', shadowOpacity: 0.9, shadowRadius: 30, shadowOffset: { width: 0, height: -4 }, elevation: 16 },
   dock: { flexDirection: 'row', alignItems: 'center', gap: 4, padding: 6, borderRadius: 999, overflow: 'hidden', borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)', backgroundColor: Platform.OS === 'android' ? 'rgba(10,10,9,0.86)' : 'rgba(0,0,0,0.55)' },
   divider: { width: 1, height: 20, backgroundColor: 'rgba(255,255,255,0.1)', marginHorizontal: 4 },
   highlight: { position: 'absolute', top: 0, bottom: 0, borderRadius: 999, backgroundColor: 'rgba(255,255,255,0.09)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)' },

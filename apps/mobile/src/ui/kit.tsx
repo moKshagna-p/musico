@@ -9,7 +9,7 @@ import { PixelRatio, Pressable, StyleSheet, Text, TextInput, View, type TextInpu
 import { GestureDetector, useCompetingGestures, usePanGesture, useTapGesture } from 'react-native-gesture-handler'
 import Animated, {
   FadeIn,
-  FadeOutUp,
+  FadeOut,
   interpolate,
   useAnimatedStyle,
   useSharedValue,
@@ -110,8 +110,7 @@ export const Avatar = ({ person, size = 40 }: { person?: { image?: string | null
     </View>
   )
 
-// The artist's wordmark in place of their name, for a single artist. The web repaints logos for dark heroes;
-// tinting to paper does the same job here. The name shows until the logo loads, and stays if there is none.
+// The artist's wordmark in place of their name, for a single artist, repainted for dark heroes like the web's. The name shows until the logo loads, and stays if there is none.
 export const ArtistName = ({ artists = [], style, logoHeight = 40 }: { artists?: string[]; style?: StyleProp<TextStyle>; logoHeight?: number }) => {
   const solo = artists.length === 1 ? artists[0] : null
   const { data: logo } = useQuery({
@@ -125,7 +124,7 @@ export const ArtistName = ({ artists = [], style, logoHeight = 40 }: { artists?:
   if (logo && ratio) {
     return (
       <Animated.View entering={FadeIn.duration(500)}>
-        <Image source={logo} tintColor={colors.paper} contentFit="contain" contentPosition="left" style={{ height: logoHeight, width: Math.min(logoHeight * ratio, 280) }} />
+        <Image source={logo} contentFit="contain" contentPosition="left" style={{ height: logoHeight, width: Math.min(logoHeight * ratio, 280) }} />
       </Animated.View>
     )
   }
@@ -138,9 +137,10 @@ export const ArtistName = ({ artists = [], style, logoHeight = 40 }: { artists?:
 }
 
 // Half-star rating. Tap a star's left or right half, or drag across the row like a slider; each half-step ticks
-// a haptic. Like the web, the filled star springs, a ring bursts from it, and "Recorded" floats up.
+// a haptic. Like the web, the filled star springs and a ring bursts from it; "Recorded" or "Cleared" appears beside
+// the heading (`label`), so it never sits on top of it.
 const STAR = 34
-export const RatingStars = ({ value = 0, onRate, readOnly = false, size = STAR }: { value?: number; onRate?: (value: number) => void; readOnly?: boolean; size?: number }) => {
+export const RatingStars = ({ value = 0, onRate, readOnly = false, size = STAR, label }: { value?: number; onRate?: (value: number) => void; readOnly?: boolean; size?: number; label?: string }) => {
   const [preview, setPreview] = useState<number | null>(null)
   const [toast, setToast] = useState<{ key: number; label: string } | null>(null)
   const shown = preview ?? value
@@ -183,18 +183,23 @@ export const RatingStars = ({ value = 0, onRate, readOnly = false, size = STAR }
 
   return (
     <View>
+      {label ? (
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 4, minHeight: 20 }}>
+          <Muted style={{ color: 'rgba(238,234,227,0.6)' }}>{label}</Muted>
+          {toast ? (
+            <Animated.View key={toast.key} entering={FadeIn.duration(200)} exiting={FadeOut.duration(300)} style={styles.toast} pointerEvents="none">
+              <T style={{ fontFamily: fonts.semibold, fontSize: 12 }}>{toast.label}</T>
+            </Animated.View>
+          ) : null}
+        </View>
+      ) : null}
       <GestureDetector gesture={gesture}>
         <View style={{ flexDirection: 'row', width }} hitSlop={8} accessibilityRole="adjustable" accessibilityLabel={`Rating ${value} of 5`}>
           {[1, 2, 3, 4, 5].map((star) => (
-            <Star key={star} size={size} fill={Math.min(Math.max(shown - (star - 1), 0), 1)} burst={toast && Math.ceil(value) === star ? toast.key : 0} />
+            <Star key={star} size={size} fill={Math.min(Math.max(shown - (star - 1), 0), 1)} burst={toast?.label === 'Recorded' && Math.ceil(value) === star ? toast.key : 0} />
           ))}
         </View>
       </GestureDetector>
-      {toast ? (
-        <Animated.View key={toast.key} entering={FadeIn.duration(200)} exiting={FadeOutUp.duration(400)} style={styles.toast} pointerEvents="none">
-          <T style={{ fontFamily: fonts.bold, fontSize: 12 }}>{toast.label}</T>
-        </Animated.View>
-      ) : null}
     </View>
   )
 }
@@ -204,7 +209,8 @@ const Star = ({ size, fill, burst }: { size: number; fill: number; burst: number
   const pop = useSharedValue(1)
   const ring = useSharedValue(0)
   useEffect(() => {
-    fillWidth.value = withSpring(fill, { damping: 20, stiffness: 320 })
+    // Clamped: a spring overshooting past empty made cleared stars flash full for a frame.
+    fillWidth.value = withSpring(fill, { damping: 20, stiffness: 320, overshootClamping: true })
   }, [fill, fillWidth])
   useEffect(() => {
     if (!burst) return
@@ -214,7 +220,8 @@ const Star = ({ size, fill, burst }: { size: number; fill: number; burst: number
   }, [burst, pop, ring])
   const icon = size * 0.62
   const clip = useAnimatedStyle(() => ({ width: icon * fillWidth.value }))
-  const scale = useAnimatedStyle(() => ({ transform: [{ scale: pop.value * (fillWidth.value > 0 ? 1.04 : 1) }] }))
+  // Filled stars sit 4% larger, eased with the fill instead of snapping when it crosses zero.
+  const scale = useAnimatedStyle(() => ({ transform: [{ scale: pop.value * (1 + 0.04 * Math.min(1, Math.max(0, fillWidth.value))) }] }))
   const ringStyle = useAnimatedStyle(() => ({ opacity: burst ? 0.8 * (1 - ring.value) : 0, transform: [{ scale: 0.5 + ring.value * 2 }] }))
   return (
     <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
@@ -338,7 +345,7 @@ const styles = StyleSheet.create({
   },
   pillActive: { backgroundColor: colors.paper, borderColor: colors.paper, shadowColor: colors.paper, shadowOpacity: 0.18, shadowRadius: 12, shadowOffset: { width: 0, height: 8 } },
   primary: { flexDirection: 'row', alignItems: 'center', gap: 8, alignSelf: 'flex-start', backgroundColor: colors.paper, borderRadius: 999, paddingHorizontal: 24, paddingVertical: 13 },
-  toast: { position: 'absolute', top: -22, left: 0 },
+  toast: { borderRadius: 999, backgroundColor: 'rgba(255,255,255,0.1)', paddingHorizontal: 8, paddingVertical: 2 },
   platform: {
     flexDirection: 'row',
     alignItems: 'center',

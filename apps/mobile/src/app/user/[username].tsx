@@ -26,7 +26,7 @@ export default function UserProfile() {
 
   if (isPending || profile.isLoading) {
     return (
-      <Screen footer={false}>
+      <Screen>
         <View style={{ paddingTop: 16 }}>
           <Skeleton style={{ width: 96, height: 96 }} />
           <Skeleton style={{ marginTop: 24, height: 44, width: '70%', borderRadius: 12 }} />

@@ -5,6 +5,7 @@ import * as SecureStore from 'expo-secure-store'
 // Shared with the web (no imports there, so it bundles here too).
 import { cleanArtistName } from '../../../web/src/utils/artistName.js'
 import type { Gif, SavedMedia } from './reviewDraft'
+import { inkLogoPng } from './logo'
 
 // The web app's origin proxies /api/* to the API (Vercel rewrite), so the app talks to the same place the site does.
 // Local API: EXPO_PUBLIC_API_URL=http://10.0.2.2:4000 (Android emulator) or http://<your LAN IP>:4000 (a phone).
@@ -92,14 +93,20 @@ export const getRelease = (id: string) => api<Album>(`/api/releases/${encodeURIC
 export const getStreamingLinks = async (artist: string, album: string) =>
   ((await api('/api/streaming-links', { params: { artist, album } }))?.links ?? {}) as Record<string, string>
 
-export type ArtistArt = { image: string; kind: 'editorial' | 'portrait'; square?: { image: string } | null }
+// `video` is Apple's looping motion hero (HLS) when the artist has one; `square` is its phone cut.
+export type ArtistArt = { image: string; kind: 'editorial' | 'portrait'; video?: string | null; square?: { image: string; video?: string | null } | null }
 export const getArtistImage = async (name: string): Promise<ArtistArt | null> => {
   const data = await api('/api/artist-image', { params: { name: cleanArtistName(name) } })
-  return data?.image ? { image: data.image, kind: data.kind ?? 'portrait', square: data.square ?? null } : null
+  return data?.image ? { image: data.image, kind: data.kind ?? 'portrait', video: data.video ?? null, square: data.square ?? null } : null
 }
 
-export const getArtistLogo = async (name: string): Promise<string | null> =>
-  (await api('/api/artist-logo', { params: { name: cleanArtistName(name) } }))?.logo ? `${API_BASE_URL}/api/artist-logo/image?name=${encodeURIComponent(cleanArtistName(name))}` : null
+// The logo repainted for dark heroes, as a data URL (lib/logo.ts).
+export const getArtistLogo = async (name: string): Promise<string | null> => {
+  const clean = cleanArtistName(name)
+  if (!(await api('/api/artist-logo', { params: { name: clean } }))?.logo) return null
+  const response = await fetch(`${API_BASE_URL}/api/artist-logo/image?name=${encodeURIComponent(clean)}`)
+  return response.ok ? inkLogoPng(new Uint8Array(await response.arrayBuffer())) : null
+}
 
 // Search links hold each button until the album's own page is known, and stay for platforms without one.
 export const searchStreamingLinks = (album?: Album | null): Record<string, string> => {
