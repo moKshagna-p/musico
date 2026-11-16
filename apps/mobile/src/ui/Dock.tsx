@@ -2,14 +2,15 @@ import { Feather } from '@expo/vector-icons'
 import { BlurView } from 'expo-blur'
 import * as Haptics from 'expo-haptics'
 import { router, usePathname, type Href } from 'expo-router'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Platform, Pressable, StyleSheet, View, type LayoutRectangle } from 'react-native'
 import Animated, { FadeIn, FadeOut, LinearTransition, useAnimatedStyle, useSharedValue, withSequence, withSpring, withTiming } from 'react-native-reanimated'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import { useAuth } from '@/lib/state'
 import { T } from './kit'
-import { colors, fonts } from './theme'
+import { dockHidden, showDock } from './scroll'
+import { colors, easeOut, fonts } from './theme'
 import { MusicoMark } from './vinyl'
 
 type Item = { label: string; href: Href; match: (path: string) => boolean }
@@ -45,6 +46,13 @@ export const Dock = () => {
       : { opacity: withTiming(0, { duration: 150 }) },
   )
 
+  // Slides up past the status bar when the page asks it to (scroll.ts); every new page brings it back.
+  useEffect(showDock, [pathname])
+  const slide = useAnimatedStyle(() => ({
+    opacity: withTiming(dockHidden.value ? 0 : 1, { duration: 300 }),
+    transform: [{ translateY: withTiming(dockHidden.value ? -(insets.top + 90) : 0, { duration: 350, easing: easeOut }) }],
+  }))
+
   // The mark turns 200° on press, as it does on hover on the web.
   const spin = useSharedValue(0)
   const markStyle = useAnimatedStyle(() => ({ transform: [{ rotate: `${spin.value}deg` }] }))
@@ -55,7 +63,7 @@ export const Dock = () => {
   }
 
   return (
-    <View pointerEvents="box-none" style={[styles.wrap, { top: insets.top + 10 }]}>
+    <Animated.View pointerEvents="box-none" style={[styles.wrap, { top: insets.top + 10 }, slide]}>
       <Animated.View layout={LinearTransition.springify().damping(22)} style={styles.shadow}>
         {/* Real blur on iOS. Android blur needs a blurTarget per screen, so there the glass is a denser fill to stay legible. */}
         <BlurView intensity={40} tint="dark" style={styles.dock}>
@@ -103,7 +111,7 @@ export const Dock = () => {
           </View>
         </BlurView>
       </Animated.View>
-    </View>
+    </Animated.View>
   )
 }
 

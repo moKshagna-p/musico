@@ -5,7 +5,7 @@ import { KeyboardAwareScrollView } from 'react-native-keyboard-controller'
 import Animated, { runOnJS, useAnimatedScrollHandler, useSharedValue } from 'react-native-reanimated'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
-import { ScrollContext } from './scroll'
+import { dockHidden, ScrollContext, showDock } from './scroll'
 import { colors, GUTTER, NAV_SPACE } from './theme'
 
 type ScreenProps = {
@@ -34,7 +34,10 @@ export const Screen = ({ children, bleed = false, refreshing, onRefresh, onEndRe
   const armed = useSharedValue(true)
   const contentHeight = useSharedValue(0)
   const onScroll = useAnimatedScrollHandler((event) => {
+    const delta = event.contentOffset.y - scrollY.value
     scrollY.value = event.contentOffset.y
+    if (delta > 4 && event.contentOffset.y > 80 && dockHidden.value === 0) dockHidden.value = 1
+    else if (delta < -4 && dockHidden.value === 1) runOnJS(showDock)()
     if (!onEndReached) return
     if (event.contentSize.height !== contentHeight.value) {
       contentHeight.value = event.contentSize.height
@@ -53,6 +56,7 @@ export const Screen = ({ children, bleed = false, refreshing, onRefresh, onEndRe
       <KeyboardAwareScrollView
         ref={scroller}
         onScroll={onScroll}
+        onTouchStart={showDock}
         bottomOffset={96}
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="interactive"
@@ -60,7 +64,7 @@ export const Screen = ({ children, bleed = false, refreshing, onRefresh, onEndRe
         contentContainerStyle={{ paddingBottom: insets.bottom + 48 }}
         refreshControl={onRefresh ? <RefreshControl tintColor={colors.paper} progressViewOffset={insets.top + 60} refreshing={Boolean(refreshing)} onRefresh={onRefresh} /> : undefined}
       >
-        <Animated.View style={bleed ? { paddingBottom: 48 } : { paddingTop: insets.top + NAV_SPACE, paddingHorizontal: GUTTER, paddingBottom: 32 }}>{children}</Animated.View>
+        <Animated.View style={bleed ? undefined : { paddingTop: insets.top + NAV_SPACE, paddingHorizontal: GUTTER, paddingBottom: 32 }}>{children}</Animated.View>
       </KeyboardAwareScrollView>
       {/* Content scrolls under the clock and the floating dock; this keeps both readable over it. */}
       <LinearGradient pointerEvents="none" colors={['rgba(0,0,0,0.85)', 'transparent']} style={{ position: 'absolute', top: 0, left: 0, right: 0, height: insets.top + 56 }} />

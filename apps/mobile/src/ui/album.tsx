@@ -12,6 +12,7 @@ import { Display, Muted, Press, Skeleton, StarValue, T } from './kit'
 import { takeOff } from './morph'
 import { usePageScroll } from './scroll'
 import { colors, display, easeOut, fonts, GUTTER } from './theme'
+import { HeroVideo } from './HeroVideo'
 import { VinylSleeve } from './vinyl'
 
 // Opening an album hands the card's data along, so the page shows name and cover at once while the rest loads,
@@ -167,6 +168,8 @@ export const Billboard = ({ artist, cover, children }: { artist?: string; cover?
     retry: false,
   })
   const photo = artistArt?.square?.image ?? artistArt?.image
+  // The motion hero for the same cut as the photo: the square one on phones, like the web.
+  const video = artistArt?.square ? artistArt.square.video : artistArt?.video
   const parallax = useAnimatedStyle(() => ({
     transform: [
       { translateY: scrollY.value < 0 ? scrollY.value : scrollY.value * 0.5 },
@@ -189,6 +192,7 @@ export const Billboard = ({ artist, cover, children }: { artist?: string; cover?
           {photo ? (
             <Animated.View style={[{ position: 'absolute', top: 0, left: 0, right: 0, height: art, opacity: loaded === photo ? 1 : 0 }, FADE]}>
               <Image source={photo} style={{ width: '100%', height: '100%' }} contentPosition={{ top: '25%' }} contentFit="cover" onLoad={() => setLoaded(photo)} />
+              <HeroVideo key={video} src={video} />
               <LinearGradient colors={['transparent', 'rgba(0,0,0,0.6)', '#000']} locations={[0.55, 0.8, 1]} style={StyleSheet.absoluteFill} />
             </Animated.View>
           ) : null}

@@ -110,8 +110,7 @@ export const Avatar = ({ person, size = 40 }: { person?: { image?: string | null
     </View>
   )
 
-// The artist's wordmark in place of their name, for a single artist. The web repaints logos for dark heroes;
-// tinting to paper does the same job here. The name shows until the logo loads, and stays if there is none.
+// The artist's wordmark in place of their name, for a single artist, repainted for dark heroes like the web's. The name shows until the logo loads, and stays if there is none.
 export const ArtistName = ({ artists = [], style, logoHeight = 40 }: { artists?: string[]; style?: StyleProp<TextStyle>; logoHeight?: number }) => {
   const solo = artists.length === 1 ? artists[0] : null
   const { data: logo } = useQuery({
@@ -125,7 +124,7 @@ export const ArtistName = ({ artists = [], style, logoHeight = 40 }: { artists?:
   if (logo && ratio) {
     return (
       <Animated.View entering={FadeIn.duration(500)}>
-        <Image source={logo} tintColor={colors.paper} contentFit="contain" contentPosition="left" style={{ height: logoHeight, width: Math.min(logoHeight * ratio, 280) }} />
+        <Image source={logo} contentFit="contain" contentPosition="left" style={{ height: logoHeight, width: Math.min(logoHeight * ratio, 280) }} />
       </Animated.View>
     )
   }
