@@ -1,11 +1,12 @@
 import { FontAwesome5 } from '@expo/vector-icons'
-import { router, type Href } from 'expo-router'
+import { useNavigation, type Href } from 'expo-router'
 import * as WebBrowser from 'expo-web-browser'
 import { useState } from 'react'
 import { StyleSheet, Text, useWindowDimensions, View } from 'react-native'
 import Animated, { useAnimatedStyle } from 'react-native-reanimated'
 import Svg, { Defs, LinearGradient, Stop, Text as SvgText } from 'react-native-svg'
 
+import { navigateTo } from './Dock'
 import { Muted, Press, T, scalesUp } from './kit'
 import { useReveal } from './scroll'
 import { colors, display, fonts, GUTTER } from './theme'
@@ -25,6 +26,9 @@ export const Footer = () => {
   const { width } = useWindowDimensions()
   const { shown: rise, ref, onLayout } = useReveal(1400, 120)
   const [wordWidth, setWordWidth] = useState(0)
+  // Read at tap time rather than subscribing to the route, so the footers in mounted tabs don't re-render on every switch.
+  const navigation = useNavigation()
+  const navigate = (href: Href) => navigateTo(href, navigation.getState()?.type === 'tab')
   const em = width * 0.2 // text-[20vw]
   const record = useAnimatedStyle(() => ({
     opacity: rise.value,
@@ -33,7 +37,7 @@ export const Footer = () => {
 
   return (
     <View ref={ref} onLayout={onLayout} style={styles.footer}>
-      <Press onPress={() => router.navigate('/')} style={{ flexDirection: 'row', alignItems: 'center', gap: 10, alignSelf: 'flex-start' }} accessibilityLabel="Musico home">
+      <Press onPress={() => navigate('/')} style={{ flexDirection: 'row', alignItems: 'center', gap: 10, alignSelf: 'flex-start' }} accessibilityLabel="Musico home">
         <MusicoMark size={24} />
         <T style={display(20)}>musico</T>
       </Press>
@@ -46,7 +50,7 @@ export const Footer = () => {
             <T style={styles.columnTitle}>{column.title}</T>
             <View style={{ marginTop: 16, gap: 10 }}>
               {column.links.map((link) => (
-                <T key={link.label} onPress={() => router.navigate(link.to)} style={{ fontSize: 14, color: 'rgba(238,234,227,0.7)' }}>{link.label}</T>
+                <T key={link.label} onPress={() => navigate(link.to)} style={{ fontSize: 14, color: 'rgba(238,234,227,0.7)' }}>{link.label}</T>
               ))}
             </View>
           </View>

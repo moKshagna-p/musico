@@ -41,7 +41,7 @@ export default function UserProfile() {
         <View style={{ alignItems: 'center', paddingVertical: 64 }}>
           <Display size={48} style={{ textAlign: 'center' }}>User not found</Display>
           <Muted style={{ marginTop: 12 }}>{profile.error?.message ?? "This user doesn't exist."}</Muted>
-          <Pill label="Back to Feed" onPress={() => router.navigate('/feed')} style={{ marginTop: 24 }} />
+          <Pill label="Back to Feed" onPress={() => router.dismissTo('/feed')} style={{ marginTop: 24 }} />
         </View>
       </Screen>
     )

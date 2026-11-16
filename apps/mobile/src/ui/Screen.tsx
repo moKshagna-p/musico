@@ -30,9 +30,22 @@ export const Screen = ({ children, bleed = false, footer = true, refreshing, onR
     'worklet'
     return event.contentOffset.y + event.layoutMeasurement.height > event.contentSize.height - 800
   }
+  // Fires once per approach to the end. Calling it on every frame near the bottom sent a burst of JS calls that
+  // could restart the next-page fetch before the first one landed. Content growing (a page landed) re-arms it.
+  const armed = useSharedValue(true)
+  const contentHeight = useSharedValue(0)
   const onScroll = useAnimatedScrollHandler((event) => {
     scrollY.value = event.contentOffset.y
-    if (onEndReached && nearEnd(event)) runOnJS(onEndReached)()
+    if (!onEndReached) return
+    if (event.contentSize.height !== contentHeight.value) {
+      contentHeight.value = event.contentSize.height
+      armed.value = true
+    }
+    if (!nearEnd(event)) armed.value = true
+    else if (armed.value) {
+      armed.value = false
+      runOnJS(onEndReached)()
+    }
   })
 
   return (

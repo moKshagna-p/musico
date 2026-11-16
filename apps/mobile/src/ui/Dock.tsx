@@ -18,9 +18,14 @@ const DISCOVER: Item = { label: 'Discover', href: '/discover', match: (path) => 
 const FEED: Item = { label: 'Feed', href: '/feed', match: (path) => path === '/feed' }
 const PROFILE: Item = { label: 'Profile', href: '/profile', match: (path) => path === '/profile' }
 // Pages you can only reach by drilling in get a back button inside the pill (the web's nav-row BackButton).
-const TOP_LEVEL = ['/', '/discover', '/feed', '/profile', '/auth']
+const TABS = ['/', '/discover', '/feed', '/profile']
+const TOP_LEVEL = [...TABS, '/auth']
 
 const SPRING = { stiffness: 420, damping: 34 }
+
+// The dock's pages are mounted tabs ((tabs)/_layout.tsx). From a tab, navigate() just switches tabs; from a page
+// pushed above them it would push another copy of the tabs, so it pops back down to them instead.
+export const navigateTo = (href: Href, fromTab: boolean) => (fromTab || !TABS.includes(String(href)) ? router.navigate(href) : router.dismissTo(href))
 
 // The web's floating nav: a blurred pill pinned to the top with the brand record and a highlight that springs
 // between links (layoutId="dock-active" there). Rendered once above every screen, like the site's header.
@@ -44,13 +49,9 @@ export const Dock = () => {
   const spin = useSharedValue(0)
   const markStyle = useAnimatedStyle(() => ({ transform: [{ rotate: `${spin.value}deg` }] }))
 
-  // In a stack, navigate() always pushes a fresh copy of the page: it remounts, replays its entrance and the
-  // history grows with every tap. Home stays at the root, so from Home push; from anywhere else go back to the
-  // page if it's already open (still mounted, as you left it), or swap it in for the current one.
   const go = (href: Href) => {
     void Haptics.selectionAsync()
-    if (pathname === '/') router.navigate(href)
-    else router.dismissTo(href)
+    navigateTo(href, TABS.includes(pathname))
   }
 
   return (
