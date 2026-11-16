@@ -1,9 +1,11 @@
 import { Image } from 'expo-image'
-import { useEffect, useRef, type ComponentRef, type RefObject } from 'react'
+import { useEffect, useRef, useState, type ComponentRef, type RefObject } from 'react'
 import { StyleSheet, View, type ViewStyle } from 'react-native'
 import Animated, {
   cancelAnimation,
   Easing,
+  runOnJS,
+  useAnimatedReaction,
   useAnimatedStyle,
   useSharedValue,
   withDelay,
@@ -112,14 +114,26 @@ export const VinylSleeve = ({ size, cover, label, out = false, spin = false, pul
   }))
   const sleeveStyle = useAnimatedStyle(() => ({ opacity: morphKey && hidden.value === morphKey ? 0 : 1 }))
 
+  // A tile's record stays hidden behind its sleeve until a press pulls it up, so it mounts on the first press: a page
+  // of hidden records (each an SVG of grooves plus a label image) was most of the cost of a grid's first render.
+  const [discOn, setDiscOn] = useState(out || !pull)
+  useAnimatedReaction(
+    () => (pull ? pull.value > 0 : false),
+    (pulling, was) => {
+      if (pulling && !was) runOnJS(setDiscOn)(true)
+    },
+  )
+
   return (
     <View style={[{ width: size, height: size }, style]}>
-      <Animated.View style={[styles.disc, { width: disc, height: disc, left: size * 0.04, top: size * 0.04 }, discStyle]}>
-        <VinylDisc size={disc} />
-        <View style={[StyleSheet.absoluteFill, styles.center]}>
-          <VinylLabel size={disc * 0.34} src={label || cover} spin={spin} />
-        </View>
-      </Animated.View>
+      {discOn ? (
+        <Animated.View style={[styles.disc, { width: disc, height: disc, left: size * 0.04, top: size * 0.04 }, discStyle]}>
+          <VinylDisc size={disc} />
+          <View style={[StyleSheet.absoluteFill, styles.center]}>
+            <VinylLabel size={disc * 0.34} src={label || cover} spin={spin} />
+          </View>
+        </Animated.View>
+      ) : null}
       {/* iOS drops shadows on views that clip, so the shadow and the clip live on separate views. */}
       <Animated.View ref={ref} collapsable={false} onLayout={cover ? undefined : onSleeveReady} style={[styles.sleeve, sleeveStyle]}>
         <View style={styles.sleeveClip}>

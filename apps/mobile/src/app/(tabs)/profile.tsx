@@ -3,7 +3,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Image } from 'expo-image'
 import { ImageManipulator, SaveFormat } from 'expo-image-manipulator'
 import * as ImagePicker from 'expo-image-picker'
-import { router } from 'expo-router'
+import { router, useIsFocused } from 'expo-router'
 import { useEffect, useMemo, useState } from 'react'
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native'
 import Animated, { FadeIn } from 'react-native-reanimated'
@@ -43,9 +43,11 @@ export default function MyProfile() {
   }, [isPending, user])
 
   const profile = dashboard.data?.profile
+  // The tab mounts in the background (see (tabs)/_layout.tsx), and this sheet is a modal, so wait until it's on screen.
+  const focused = useIsFocused()
   useEffect(() => {
-    if (dashboard.data && !profile?.username) setSheet('username')
-  }, [dashboard.data, profile?.username])
+    if (focused && dashboard.data && !profile?.username) setSheet('username')
+  }, [focused, dashboard.data, profile?.username])
 
   const ratedItems = useMemo(
     () =>
