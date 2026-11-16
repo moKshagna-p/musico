@@ -136,8 +136,7 @@ export default function AlbumScreen() {
             )}
           </View>
           <View>
-            <Muted style={{ color: 'rgba(238,234,227,0.6)', marginBottom: 4 }}>{signedIn ? 'Your rating' : 'Sign in required to rate'}</Muted>
-            <RatingStars value={me.ratings[String(album.id)]?.rating ?? 0} readOnly={!signedIn} onRate={(value) => me.rateAlbum(album, value)} />
+            <RatingStars label={signedIn ? 'Your rating' : 'Sign in required to rate'} value={me.ratings[String(album.id)]?.rating ?? 0} readOnly={!signedIn} onRate={(value) => me.rateAlbum(album, value)} />
           </View>
         </Animated.View>
 
