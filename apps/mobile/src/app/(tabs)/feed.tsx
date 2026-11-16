@@ -6,7 +6,7 @@ import { ActivityIndicator, Pressable, StyleSheet, TextInput, View } from 'react
 import Animated, { Easing, FadeInDown, FadeInLeft, FadeOut, useAnimatedStyle, useSharedValue, withRepeat, withTiming } from 'react-native-reanimated'
 
 // Same grouping as the web feed, so a sitting reads identically on both.
-import { feedDays, groupFeed } from '../../../web/src/services/feedGroups.js'
+import { feedDays, groupFeed } from '../../../../web/src/services/feedGroups.js'
 import { fetchFeed, fetchFollowing, searchUsers } from '@/lib/api'
 import { useAuth } from '@/lib/state'
 import { Avatar, Display, Muted, PrimaryButton, Skeleton, T, scalesUp } from '@/ui/kit'
