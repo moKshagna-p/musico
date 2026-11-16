@@ -32,7 +32,7 @@ export default function AlbumScreen() {
   const signedIn = Boolean(user?.id)
   const sleeve = useRef<ComponentRef<typeof View>>(null)
   // The hero renders first so the page is on screen while the cover is still in flight; everything below it
-  // (tracklist, lists, reviews, footer) follows a frame later.
+  // (tracklist, lists, reviews) follows a frame later.
   const [below, setBelow] = useState(false)
   useEffect(() => {
     const frame = requestAnimationFrame(() => setBelow(true))
@@ -72,7 +72,7 @@ export default function AlbumScreen() {
 
   if (release.isLoading) {
     return (
-      <Screen bleed footer={false}>
+      <Screen bleed>
         <View style={{ paddingTop: height * 0.5, paddingHorizontal: GUTTER }}>
           <Skeleton style={{ width: 120, height: 120, borderRadius: 4 }} />
           <Skeleton style={{ marginTop: 32, height: 14, width: 120 }} />
@@ -98,7 +98,7 @@ export default function AlbumScreen() {
   const genres = album.genres?.length ? album.genres.slice(0, 3).join(', ') : 'Unknown genre'
 
   return (
-    <Screen bleed footer={below}>
+    <Screen bleed>
       <Billboard artist={artist} cover={album.cover}>
         <View style={{ width: 176, paddingRight: 56, marginBottom: 32 }}>
           <VinylSleeve

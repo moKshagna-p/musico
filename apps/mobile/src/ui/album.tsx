@@ -1,5 +1,5 @@
 import { Feather } from '@expo/vector-icons'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Image } from 'expo-image'
 import { LinearGradient } from 'expo-linear-gradient'
 import { router } from 'expo-router'
@@ -181,9 +181,15 @@ export const ListCard = ({ list, index = 0 }: { list: { id: string; name: string
   const shown = albums.slice(0, 4)
   const count = list.albumCount ?? albums.length
   const spread = useSharedValue(0)
+  const client = useQueryClient()
+  // Hand the list page what the card already has (name, count, first covers) so it opens filled while the rest loads.
+  const open = () => {
+    if (!client.getQueryData(['public-list', list.id])) client.setQueryData(['public-list', list.id], { id: list.id, name: list.name, albumCount: count, albums })
+    router.push({ pathname: '/list/[id]', params: { id: list.id } })
+  }
   return (
     <Animated.View entering={enter(index)}>
-      <Press onPress={() => router.push({ pathname: '/list/[id]', params: { id: list.id } })} pressed={spread} style={styles.listCard} scaleTo={0.98}>
+      <Press onPress={open} pressed={spread} style={styles.listCard} scaleTo={0.98}>
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: 16 }}>
           <View style={{ flex: 1 }}>
             <Display size={24} numberOfLines={1}>{list.name}</Display>
