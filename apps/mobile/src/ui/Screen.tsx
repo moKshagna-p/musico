@@ -1,5 +1,6 @@
 import { useRef, type ComponentRef, type ReactNode } from 'react'
-import { RefreshControl, useWindowDimensions, type NativeScrollEvent } from 'react-native'
+import { LinearGradient } from 'expo-linear-gradient'
+import { RefreshControl, useWindowDimensions, View, type NativeScrollEvent } from 'react-native'
 import { KeyboardAwareScrollView } from 'react-native-keyboard-controller'
 import Animated, { runOnJS, useAnimatedScrollHandler, useSharedValue } from 'react-native-reanimated'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
@@ -48,6 +49,7 @@ export const Screen = ({ children, bleed = false, refreshing, onRefresh, onEndRe
 
   return (
     <ScrollContext.Provider value={{ scrollY, viewport: height, scrollTo }}>
+      <View style={{ flex: 1, backgroundColor: colors.canvas }}>
       <KeyboardAwareScrollView
         ref={scroller}
         onScroll={onScroll}
@@ -60,6 +62,9 @@ export const Screen = ({ children, bleed = false, refreshing, onRefresh, onEndRe
       >
         <Animated.View style={bleed ? { paddingBottom: 48 } : { paddingTop: insets.top + NAV_SPACE, paddingHorizontal: GUTTER, paddingBottom: 32 }}>{children}</Animated.View>
       </KeyboardAwareScrollView>
+      {/* Content scrolls under the clock and the floating dock; this keeps both readable over it. */}
+      <LinearGradient pointerEvents="none" colors={['rgba(0,0,0,0.85)', 'transparent']} style={{ position: 'absolute', top: 0, left: 0, right: 0, height: insets.top + 56 }} />
+      </View>
     </ScrollContext.Provider>
   )
 }

@@ -4,12 +4,11 @@ import { Image } from 'expo-image'
 import { LinearGradient } from 'expo-linear-gradient'
 import { router } from 'expo-router'
 import { memo, useId, useState, type ReactNode } from 'react'
-import { Dimensions, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native'
+import { Dimensions, StyleSheet, useWindowDimensions, View } from 'react-native'
 import Animated, { Extrapolation, FadeInDown, interpolate, useAnimatedStyle, useSharedValue, type SharedValue } from 'react-native-reanimated'
-import Svg, { Text as SvgText } from 'react-native-svg'
 
 import { getArtistImage, type Album } from '@/lib/api'
-import { Display, EmptyNote, Muted, Press, Skeleton, StarValue, T } from './kit'
+import { Display, Muted, Press, Skeleton, StarValue, T } from './kit'
 import { takeOff } from './morph'
 import { usePageScroll } from './scroll'
 import { colors, display, easeOut, fonts, GUTTER } from './theme'
@@ -70,64 +69,6 @@ export const AlbumCardSkeleton = ({ width }: { width: number }) => (
     <Skeleton style={{ marginTop: 8, height: 12, width: width * 0.55 }} />
   </View>
 )
-
-// The web's hollow chart numeral (-webkit-text-stroke). RN text can't stroke, so it's drawn as SVG text.
-const RankNumeral = ({ value, width }: { value: number; width: number }) => {
-  // text-[60cqw] (40cqw past 9) of the item, with leading-[0.8] and tracking-[-0.09em].
-  const item = width / 0.3
-  const size = item * (value < 10 ? 0.6 : 0.4)
-  return (
-    <Svg width={width} height={size * 0.8} pointerEvents="none">
-      <SvgText x={width} y={size * 0.74} textAnchor="end" fontFamily={fonts.black} fontSize={size} letterSpacing={-size * 0.09} fill="#000" stroke="rgba(238,234,227,0.4)" strokeWidth={2}>
-        {value}
-      </SvgText>
-    </Svg>
-  )
-}
-
-// A horizontal shelf, exactly two items across on phones like the web (--n:2): equal gutters, snapping by item.
-// Ranked rows set the numeral in the first 30% of each item and the card from -3%.
-export const AlbumRow = ({ title, note, albums, loading, error, ranked = false }: { title: string; note?: string; albums: Album[]; loading?: boolean; error?: string | null; ranked?: boolean }) => {
-  const { width: screen } = useWindowDimensions()
-  const gap = 16
-  const item = (screen - GUTTER * 2 - gap) / 2
-  const card = ranked ? item * 0.73 : item
-  const data = loading ? (Array.from({ length: 4 }) as Album[]) : albums
-  return (
-    <View>
-      <View style={{ paddingHorizontal: GUTTER, marginBottom: 8 }}>
-        <Display size={24}>{title}</Display>
-        {note ? <Muted style={{ marginTop: 8 }}>{note}</Muted> : null}
-      </View>
-      {error ? (
-        <View style={{ paddingHorizontal: GUTTER, paddingTop: 24 }}><EmptyNote dashed={false}>{error}</EmptyNote></View>
-      ) : !loading && !albums.length ? (
-        <View style={{ paddingHorizontal: GUTTER, paddingTop: 24 }}><EmptyNote>Nothing here yet. Check back after the next chart update.</EmptyNote></View>
-      ) : (
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          snapToInterval={item + gap}
-          decelerationRate="fast"
-          // Top padding leaves room for the record that rises out of each sleeve on press.
-          contentContainerStyle={{ paddingHorizontal: GUTTER, paddingTop: 48, paddingBottom: 16, gap }}
-        >
-          {data.map((album, index) => (
-            <View key={`${album?.id ?? 'skeleton'}-${index}`} style={{ width: item, flexDirection: 'row', alignItems: 'flex-start' }}>
-              {ranked ? (
-                // Skeletons leave the numeral's column empty so the cards land where they will sit.
-                <View style={{ width: item * 0.3 }}>{loading ? null : <RankNumeral value={index + 1} width={item * 0.3} />}</View>
-              ) : null}
-              <View style={ranked ? { marginLeft: -item * 0.03 } : undefined}>
-                {loading ? <AlbumCardSkeleton width={card} /> : <AlbumCard album={album} width={card} index={index} />}
-              </View>
-            </View>
-          ))}
-        </ScrollView>
-      )}
-    </View>
-  )
-}
 
 // Two-up grid for search results and Discover (gap-x-5 gap-y-10 on the web).
 export const AlbumGrid = ({ albums, loading, inset = true }: { albums: Album[]; loading?: boolean; inset?: boolean }) => {
